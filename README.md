@@ -30,6 +30,8 @@
    ...
    ```
 
+## Update the Action Code
+
 1. Create a new branch
 
    ```bash

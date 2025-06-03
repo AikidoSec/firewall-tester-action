@@ -1,5 +1,5 @@
 import require$$0$3 from 'os';
-import require$$0$4 from 'crypto';
+import require$$0$4, { timingSafeEqual, randomInt } from 'crypto';
 import require$$1$1 from 'fs';
 import require$$1$6 from 'path';
 import require$$2$1 from 'http';
@@ -68852,6 +68852,121 @@ function requireExpress () {
 var expressExports = requireExpress();
 var express = /*@__PURE__*/getDefaultExportFromCjs(expressExports);
 
+const apps = [];
+let id = 1;
+function createZenApp() {
+    const appId = id++;
+    const token = `AIK_RUNTIME_1_${appId}_${generateRandomString(48)}`;
+    const app = {
+        id: appId,
+        token: token,
+        configUpdatedAt: Date.now()
+    };
+    apps.push(app);
+    return token;
+}
+function getByToken(token) {
+    return apps.find((app) => {
+        if (app.token.length !== token.length) {
+            return false;
+        }
+        return timingSafeEqual(Buffer.from(app.token), Buffer.from(token));
+    });
+}
+function generateRandomString(length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const size = chars.length;
+    let str = '';
+    for (let i = 0; i < length; i++) {
+        const randomIndex = randomInt(0, size);
+        str += chars[randomIndex];
+    }
+    return str;
+}
+
+function createApp(req, res) {
+    const token = createZenApp();
+    coreExports.info(`Created app with token: ${token}`);
+    res.json({
+        token
+    });
+}
+
+function checkToken(req, res, next) {
+    const token = req.headers['authorization'];
+    if (!token) {
+        res.status(401).json({
+            message: 'Token is required'
+        });
+        return;
+    }
+    const app = getByToken(token);
+    if (!app) {
+        res.status(401).json({ message: 'Invalid token' });
+        return;
+    }
+    req.appData = app;
+    next();
+}
+
+const configs = [];
+function generateConfig(app) {
+    return {
+        success: true,
+        serviceId: app.id,
+        configUpdatedAt: app.configUpdatedAt,
+        heartbeatIntervalInMS: 10 * 60 * 1000,
+        endpoints: [],
+        blockedUserIds: [],
+        allowedIPAddresses: [],
+        receivedAnyStats: true,
+        block: false
+    };
+}
+function getAppConfig(app) {
+    const existingConf = configs.find((config) => config.serviceId === app.id);
+    if (existingConf) {
+        return existingConf;
+    }
+    const newConf = generateConfig(app);
+    configs.push(newConf);
+    return newConf;
+}
+function updateAppConfig(app, newConfig // eslint-disable-line @typescript-eslint/no-explicit-any
+) {
+    let index = configs.findIndex((config) => config.serviceId === app.id);
+    if (index === -1) {
+        getAppConfig(app);
+        index = configs.length - 1;
+    }
+    configs[index] = {
+        ...configs[index],
+        ...newConfig,
+        configUpdatedAt: Date.now()
+    };
+    return configs[index];
+}
+
+function getConfig(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    res.json(getAppConfig(appData));
+}
+
+function updateConfig(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    const newConfig = req.body;
+    const updatedConfig = updateAppConfig(appData, newConfig);
+    res.json(updatedConfig);
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 let server;
@@ -68859,13 +68974,11 @@ let server;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Routes
-app.get('/', (req, res) => {
-    res.json({ message: 'Welcome to the Express API' });
-});
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
-});
+app.get('/api/runtime/config', checkToken, getConfig);
+//app.post('/api/runtime/config', checkToken, bumpUpdatedAt)
+app.put('/api/runtime/config/update', checkToken, updateConfig);
+// app.get('/api/runtime/app/events', checkToken, getEvents)
+app.post('/api/runtime/apps', createApp);
 // Function to start the server
 const startServer = () => {
     server = app.listen(port, () => {

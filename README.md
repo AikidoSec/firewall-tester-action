@@ -1,9 +1,9 @@
 # Firewall Tester Action
 
-<!-- [![GitHub Super-Linter](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/linter.yml/badge.svg)](https://github.com/super-linter/super-linter)
+[![GitHub Super-Linter](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/linter.yml/badge.svg)](https://github.com/super-linter/super-linter)
 ![CI](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/ci.yml/badge.svg)
 [![Check dist/](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml)
-[![Coverage](./badges/coverage.svg)](./badges/coverage.svg) -->
+[![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
 1. :hammer_and_wrench: Install the dependencies
 

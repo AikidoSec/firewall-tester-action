@@ -32,6 +32,9 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
+      - name: Make release script executable
+        run: chmod +x script/release
+
       - name: Install Dependencies
         id: install
         run: npm ci

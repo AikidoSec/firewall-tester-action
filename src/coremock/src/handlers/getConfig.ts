@@ -1,9 +1,6 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import { getAppConfig } from '../zen/config.js'
-
-interface RequestWithAppData extends Request {
-  appData?: { id: number; token: string; configUpdatedAt: number }
-}
+import { RequestWithAppData } from '../types.js'
 
 export function getConfig(req: RequestWithAppData, res: Response): void {
   const appData = req.appData

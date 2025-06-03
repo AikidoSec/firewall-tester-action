@@ -1,3 +1,5 @@
+import { AppData } from '../types.js'
+
 const configs: {
   success: boolean
   serviceId: number
@@ -10,7 +12,7 @@ const configs: {
   block: boolean
 }[] = []
 
-function generateConfig(app: { id: number; configUpdatedAt: number }) {
+function generateConfig(app: AppData) {
   return {
     success: true,
     serviceId: app.id,
@@ -24,7 +26,7 @@ function generateConfig(app: { id: number; configUpdatedAt: number }) {
   }
 }
 
-export function getAppConfig(app: { id: number; configUpdatedAt: number }) {
+export function getAppConfig(app: AppData) {
   const existingConf = configs.find((config) => config.serviceId === app.id)
   if (existingConf) {
     return existingConf
@@ -35,7 +37,7 @@ export function getAppConfig(app: { id: number; configUpdatedAt: number }) {
 }
 
 export function updateAppConfig(
-  app: { id: number; configUpdatedAt: number },
+  app: AppData,
   newConfig: any // eslint-disable-line @typescript-eslint/no-explicit-any
 ) {
   let index = configs.findIndex((config) => config.serviceId === app.id)

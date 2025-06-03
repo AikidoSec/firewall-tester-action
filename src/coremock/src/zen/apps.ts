@@ -1,6 +1,7 @@
 import { randomInt, timingSafeEqual } from 'crypto'
+import { AppData } from '../types.js'
 
-const apps: { id: number; token: string; configUpdatedAt: number }[] = []
+const apps: AppData[] = []
 
 let id = 1
 export function createZenApp(): string {

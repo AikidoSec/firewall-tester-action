@@ -68854,6 +68854,7 @@ var express = /*@__PURE__*/getDefaultExportFromCjs(expressExports);
 
 const app = express();
 const port = process.env.PORT || 3000;
+let server;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -68867,9 +68868,13 @@ app.get('/health', (req, res) => {
 });
 // Function to start the server
 const startServer = () => {
-    app.listen(port, () => {
+    server = app.listen(port, () => {
         coreExports.info(`Server is running on port ${port}`);
     });
+};
+const stopServer = () => {
+    coreExports.info('Stopping server');
+    server?.close();
 };
 
 /**
@@ -68890,6 +68895,8 @@ async function run() {
         coreExports.debug(new Date().toTimeString());
         // Set outputs for other workflow steps to use
         coreExports.setOutput('time', new Date().toTimeString());
+        // stop the server
+        stopServer();
     }
     catch (error) {
         // Fail the workflow run if an error occurs

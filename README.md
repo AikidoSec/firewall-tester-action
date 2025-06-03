@@ -1,4 +1,4 @@
-# Create a GitHub Action Using TypeScript
+# Firewall Tester Action
 
 <!-- [![GitHub Super-Linter](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/linter.yml/badge.svg)](https://github.com/super-linter/super-linter)
 ![CI](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/ci.yml/badge.svg)
@@ -36,8 +36,6 @@
    git checkout -b releases/v1
    ```
 
-1. Replace the contents of `src/` with your action code
-1. Add tests to `__tests__/` for your source code
 1. Format, test, and build the action
 
    ```bash

@@ -8,6 +8,7 @@
 import { jest } from '@jest/globals'
 import * as core from '../__fixtures__/core.js'
 import { wait } from '../__fixtures__/wait.js'
+import { stopServer } from '../src/coremock/app.js'
 
 // Mocks should be declared before the module being tested is imported.
 jest.unstable_mockModule('@actions/core', () => core)
@@ -28,6 +29,7 @@ describe('main.ts', () => {
 
   afterEach(() => {
     jest.resetAllMocks()
+    stopServer()
   })
 
   it('Sets the time output', async () => {

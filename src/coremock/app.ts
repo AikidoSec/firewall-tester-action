@@ -3,8 +3,14 @@ import * as core from '@actions/core'
 import { Server } from 'http'
 import createApp from './src/handlers/createApp.js'
 import { checkToken } from './src/middleware/checkToken.js'
-import { getConfig } from './src/handlers/getConfig.js'
-import { updateConfig } from './src/handlers/updateConfig.js'
+import { getConfigHandler } from './src/handlers/getConfig.js'
+import { updateConfigHandler } from './src/handlers/updateConfig.js'
+import { realtimeConfigHandler } from './src/handlers/realtimeConfig.js'
+import { listEventsHandler } from './src/handlers/listEvents.js'
+import { captureEventHandler } from './src/handlers/captureEvent.js'
+import { listsHandler } from './src/handlers/listsHandler.js'
+import { updateListsHandler } from './src/handlers/updateListsHandler.js'
+
 const app: Express = express()
 const port = process.env.PORT || 3000
 let server: Server | undefined
@@ -14,13 +20,16 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
-app.get('/api/runtime/config', checkToken, getConfig)
+app.get('/api/runtime/config', checkToken, getConfigHandler)
+app.post('/api/runtime/config', checkToken, updateConfigHandler)
 
-//app.post('/api/runtime/config', checkToken, bumpUpdatedAt)
+app.get('/config', checkToken, realtimeConfigHandler)
 
-app.put('/api/runtime/config/update', checkToken, updateConfig)
+app.get('/api/runtime/events', checkToken, listEventsHandler)
+app.post('/api/runtime/events', checkToken, captureEventHandler)
 
-// app.get('/api/runtime/app/events', checkToken, getEvents)
+app.get('/api/runtime/firewall/lists', checkToken, listsHandler)
+app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler)
 
 app.post('/api/runtime/apps', createApp)
 

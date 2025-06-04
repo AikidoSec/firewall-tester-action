@@ -22286,11 +22286,11 @@ function requireSymbols () {
 	return symbols;
 }
 
-var events;
+var events$1;
 var hasRequiredEvents;
 
 function requireEvents () {
-	if (hasRequiredEvents) return events;
+	if (hasRequiredEvents) return events$1;
 	hasRequiredEvents = 1;
 
 	const { webidl } = requireWebidl();
@@ -22589,12 +22589,12 @@ function requireEvents () {
 	  }
 	]);
 
-	events = {
+	events$1 = {
 	  MessageEvent,
 	  CloseEvent,
 	  ErrorEvent
 	};
-	return events;
+	return events$1;
 }
 
 var util;
@@ -68944,10 +68944,130 @@ function updateAppConfig(app, newConfig // eslint-disable-line @typescript-eslin
         ...newConfig,
         configUpdatedAt: Date.now()
     };
-    return configs[index];
+    return true;
+}
+const blockedIPAddresses = [];
+const allowedIPAddresses = [];
+const blockedUserAgents = [];
+const monitoredUserAgents = [];
+const monitoredIPAddresses = [];
+const userAgentDetails = [];
+function updateBlockedIPAddresses(app, ips) {
+    let entry = blockedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        blockedIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getBlockedIPAddresses(app) {
+    const entry = blockedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateAllowedIPAddresses(app, ips) {
+    let entry = allowedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        allowedIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getAllowedIPAddresses(app) {
+    const entry = allowedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateBlockedUserAgents(app, uas) {
+    let entry = blockedUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        blockedUserAgents.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getBlockedUserAgents(app) {
+    const entry = blockedUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return '';
+}
+function updateMonitoredUserAgents(app, uas) {
+    let entry = monitoredUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        monitoredUserAgents.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getMonitoredUserAgents(app) {
+    const entry = monitoredUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return '';
+}
+function updateMonitoredIPAddresses(app, ips) {
+    let entry = monitoredIPAddresses.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        monitoredIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getMonitoredIPAddresses(app) {
+    const entry = monitoredIPAddresses.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateUserAgentDetails(app, uas) {
+    let entry = userAgentDetails.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        userAgentDetails.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getUserAgentDetails(app) {
+    const entry = userAgentDetails.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return [];
 }
 
-function getConfig(req, res) {
+function getConfigHandler(req, res) {
     const appData = req.appData;
     if (!appData) {
         res.status(401).json({ message: 'Unauthorized' });
@@ -68956,15 +69076,162 @@ function getConfig(req, res) {
     res.json(getAppConfig(appData));
 }
 
-function updateConfig(req, res) {
+function updateConfigHandler(req, res) {
     const appData = req.appData;
     if (!appData) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
     }
     const newConfig = req.body;
-    const updatedConfig = updateAppConfig(appData, newConfig);
-    res.json(updatedConfig);
+    res.json({ success: updateAppConfig(appData, newConfig) });
+}
+
+function realtimeConfigHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    const config = getAppConfig(appData);
+    res.json({
+        serviceId: appData.id,
+        configUpdatedAt: config.configUpdatedAt
+    });
+}
+
+const events = new Map();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function captureEvent(event, app) {
+    if (!events.has(app.id)) {
+        events.set(app.id, []);
+    }
+    events.get(app.id).push(event);
+}
+function listEvents(app) {
+    return events.get(app.id) || [];
+}
+
+function listEventsHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'App is missing' });
+        return;
+    }
+    const events = listEvents(appData);
+    res.json(events);
+}
+
+function captureEventHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'App is missing' });
+        return;
+    }
+    const event = req.body;
+    captureEvent(event, appData);
+    if (event.type === 'detected_attack') {
+        res.json({
+            success: true
+        });
+        return;
+    }
+    res.json(listEvents(appData));
+}
+
+function listsHandler(req, res) {
+    if (!req.appData) {
+        throw new Error('App is missing');
+    }
+    const blockedIps = getBlockedIPAddresses(req.appData);
+    const blockedUserAgents = getBlockedUserAgents(req.appData);
+    const allowedIps = getAllowedIPAddresses(req.appData);
+    const monitoredUserAgents = getMonitoredUserAgents(req.appData);
+    const monitoredIps = getMonitoredIPAddresses(req.appData);
+    const userAgentDetails = getUserAgentDetails(req.appData);
+    res.json({
+        success: true,
+        serviceId: req.appData.id,
+        blockedIPAddresses: blockedIps.length > 0
+            ? [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: blockedIps
+                }
+            ]
+            : [],
+        blockedUserAgents: blockedUserAgents,
+        monitoredUserAgents: monitoredUserAgents,
+        userAgentDetails: userAgentDetails,
+        allowedIPAddresses: allowedIps.length > 0
+            ? [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: allowedIps
+                }
+            ]
+            : [],
+        monitoredIPAddresses: monitoredIps.length > 0
+            ? monitoredIps
+            : [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: monitoredIps
+                }
+            ]
+    });
+}
+
+function updateListsHandler(req, res) {
+    if (!req.appData) {
+        res.status(400).json({
+            message: 'App is missing'
+        });
+        return;
+    }
+    // Insecure input validation - but this is only a mock server
+    if (!req.body ||
+        typeof req.body !== 'object' ||
+        Array.isArray(req.body) ||
+        !Object.keys(req.body).length) {
+        res.status(400).json({
+            message: 'Request body is missing or invalid'
+        });
+        return;
+    }
+    if (!req.body.blockedIPAddresses ||
+        !Array.isArray(req.body.blockedIPAddresses)) {
+        res.status(400).json({
+            message: 'blockedIPAddresses is missing or invalid'
+        });
+        return;
+    }
+    updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses);
+    if (req.body.blockedUserAgents &&
+        typeof req.body.blockedUserAgents === 'string') {
+        updateBlockedUserAgents(req.appData, req.body.blockedUserAgents);
+    }
+    if (req.body.allowedIPAddresses &&
+        Array.isArray(req.body.allowedIPAddresses)) {
+        updateAllowedIPAddresses(req.appData, req.body.allowedIPAddresses);
+    }
+    if (req.body.monitoredUserAgents &&
+        typeof req.body.monitoredUserAgents === 'string') {
+        updateMonitoredUserAgents(req.appData, req.body.monitoredUserAgents);
+    }
+    if (req.body.monitoredIPAddresses &&
+        Array.isArray(req.body.monitoredIPAddresses)) {
+        updateMonitoredIPAddresses(req.appData, req.body.monitoredIPAddresses);
+    }
+    if (req.body.userAgentDetails && Array.isArray(req.body.userAgentDetails)) {
+        updateUserAgentDetails(req.appData, req.body.userAgentDetails);
+    }
+    res.json({ success: true });
 }
 
 const app = express();
@@ -68974,10 +69241,13 @@ let server;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Routes
-app.get('/api/runtime/config', checkToken, getConfig);
-//app.post('/api/runtime/config', checkToken, bumpUpdatedAt)
-app.put('/api/runtime/config/update', checkToken, updateConfig);
-// app.get('/api/runtime/app/events', checkToken, getEvents)
+app.get('/api/runtime/config', checkToken, getConfigHandler);
+app.post('/api/runtime/config', checkToken, updateConfigHandler);
+app.get('/config', checkToken, realtimeConfigHandler);
+app.get('/api/runtime/events', checkToken, listEventsHandler);
+app.post('/api/runtime/events', checkToken, captureEventHandler);
+app.get('/api/runtime/firewall/lists', checkToken, listsHandler);
+app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler);
 app.post('/api/runtime/apps', createApp);
 // Function to start the server
 const startServer = () => {

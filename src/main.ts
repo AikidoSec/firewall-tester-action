@@ -1,33 +1,55 @@
 import * as core from '@actions/core'
 import { wait } from './wait.js'
 import { startServer, stopServer } from './coremock/app.js'
+import { spawn } from 'child_process'
 
-/**
- * The main function for the action.
- *
- * @returns Resolves when the action is complete.
- */
 export async function run(): Promise<void> {
   try {
     // Start the Express server
     startServer()
 
     const dockerfile_path: string = core.getInput('dockerfile_path')
+    // const max_parallel_tests: number = parseInt(
+    //   core.getInput('max_parallel_tests')
+    // )
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
     core.debug(`Dockerfile path: ${dockerfile_path}`)
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
     await wait(1000)
-    core.debug(new Date().toTimeString())
 
-    // Set outputs for other workflow steps to use
+    // Spawn the Python process
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(
+        './venv-python/bin/python3',
+        [
+          './server_tests/run_test.py',
+          '--dockerfile_path',
+          dockerfile_path,
+          '--max_parallel_tests',
+          '10'
+        ],
+        {
+          stdio: 'inherit'
+        }
+      )
+
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`run_test.py exited with code ${code}`))
+        } else {
+          resolve()
+        }
+      })
+
+      proc.on('error', (err) => {
+        reject(err)
+      })
+    })
+
     core.setOutput('time', new Date().toTimeString())
-    // stop the server
-    stopServer()
   } catch (error) {
-    // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
+  } finally {
+    stopServer()
   }
 }

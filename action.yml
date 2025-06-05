@@ -20,4 +20,5 @@ outputs:
 
 runs:
   using: node20
+  pre: pre.js
   main: dist/index.js

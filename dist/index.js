@@ -25,7 +25,7 @@ import require$$1$5 from 'url';
 import require$$3$2 from 'zlib';
 import require$$6$1 from 'string_decoder';
 import require$$0$d from 'diagnostics_channel';
-import require$$2$3 from 'child_process';
+import require$$2$3, { spawn } from 'child_process';
 import require$$6$2 from 'timers';
 import require$$1$7 from 'tty';
 import require$$4$3 from 'node:zlib';
@@ -68894,6 +68894,7 @@ function createApp(req, res) {
 
 function checkToken(req, res, next) {
     const token = req.headers['authorization'];
+    coreExports.debug(`Token: ${token} for ${req.url} method ${req.method}`);
     if (!token) {
         res.status(401).json({
             message: 'Token is required'
@@ -68919,8 +68920,7 @@ function generateConfig(app) {
         endpoints: [],
         blockedUserIds: [],
         allowedIPAddresses: [],
-        receivedAnyStats: true,
-        block: false
+        receivedAnyStats: true
     };
 }
 function getAppConfig(app) {
@@ -69135,7 +69135,7 @@ function captureEventHandler(req, res) {
         });
         return;
     }
-    res.json(listEvents(appData));
+    res.json(getAppConfig(appData));
 }
 
 function listsHandler(req, res) {
@@ -69260,31 +69260,47 @@ const stopServer = () => {
     server?.close();
 };
 
-/**
- * The main function for the action.
- *
- * @returns Resolves when the action is complete.
- */
 async function run() {
     try {
         // Start the Express server
         startServer();
-        const ms = coreExports.getInput('milliseconds');
-        // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-        coreExports.debug(`Waiting ${ms} milliseconds ...`);
-        // Log the current timestamp, wait, then log the new timestamp
-        coreExports.debug(new Date().toTimeString());
-        await wait(parseInt(ms, 10));
-        coreExports.debug(new Date().toTimeString());
-        // Set outputs for other workflow steps to use
+        const dockerfile_path = coreExports.getInput('dockerfile_path');
+        // const max_parallel_tests: number = parseInt(
+        //   core.getInput('max_parallel_tests')
+        // )
+        coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
+        await wait(1000);
+        // Spawn the Python process
+        await new Promise((resolve, reject) => {
+            const proc = spawn('./venv-python/bin/python3', [
+                './server_tests/run_test.py',
+                '--dockerfile_path',
+                dockerfile_path,
+                '--max_parallel_tests',
+                '10'
+            ], {
+                stdio: 'inherit'
+            });
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`run_test.py exited with code ${code}`));
+                }
+                else {
+                    resolve();
+                }
+            });
+            proc.on('error', (err) => {
+                reject(err);
+            });
+        });
         coreExports.setOutput('time', new Date().toTimeString());
-        // stop the server
-        stopServer();
     }
     catch (error) {
-        // Fail the workflow run if an error occurs
         if (error instanceof Error)
             coreExports.setFailed(error.message);
+    }
+    finally {
+        stopServer();
     }
 }
 

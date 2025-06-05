@@ -51,7 +51,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int):
         logger.debug(f"Applied start_config.json")
 
     # 2. run the Docker container
-    command = f"docker run -d --env  AIKIDO_TOKEN={token} -p {start_port}:3000 --name {test_dir} {DOCKER_IMAGE_NAME}"
+    command = f"docker run -d --env-file {os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "test.env")} --env AIKIDO_TOKEN={token} -p {start_port}:3000 --name {test_dir} {DOCKER_IMAGE_NAME}"
     logger.debug(f"Running Docker container: {command}")
     subprocess.run(command, shell=True, check=True)
     # 3. wait for the container to be ready
@@ -59,7 +59,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int):
 
     # 4. TODO: run the test
 
-    
+
   except Exception as e:
     logger.error(f"Error running test: {e}")
     raise e

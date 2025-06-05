@@ -13,8 +13,12 @@ app.get('/', (req, res) => {
 })
 
 // Hello route
-app.get('/hello', (req, res) => {
-  res.json({ message: 'Hello, world!' })
+app.get('/somethingVerySpecific', (req, res) => {
+  res.json({ message: 'Hello, somethingVerySpecific!' })
+})
+
+app.get('/test', (req, res) => {
+  res.json({ message: 'Hello, test!' })
 })
 
 // Start the server

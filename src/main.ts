@@ -20,7 +20,7 @@ export async function run(): Promise<void> {
     // Spawn the Python process
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
-        './venv-python/bin/python3',
+        'python',
         [
           './server_tests/run_test.py',
           '--dockerfile_path',

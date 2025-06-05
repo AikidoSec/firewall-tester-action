@@ -57,7 +57,7 @@ jobs:
         id: test-action
         uses: ./
         with:
-          milliseconds: 2000
+          dockerfile_path: ./temp_test/Dockerfile
 
       - name: Print Output
         id: output

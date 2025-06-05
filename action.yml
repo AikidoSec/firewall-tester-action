@@ -12,6 +12,12 @@ inputs:
   dockerfile_path:
     description: The path to the Dockerfile with the Aikido agent installed
     required: true
+  max_parallel_tests:
+    description:
+      The maximum number of tests to run in parallel (for each test, a new
+      container will be spawned)
+    required: true
+    default: '5'
 
 # Define your outputs here.
 outputs:

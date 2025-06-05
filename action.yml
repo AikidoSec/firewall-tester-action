@@ -9,10 +9,9 @@ branding:
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
+  dockerfile_path:
+    description: The path to the Dockerfile with the Aikido agent installed
     required: true
-    default: '1000'
 
 # Define your outputs here.
 outputs:

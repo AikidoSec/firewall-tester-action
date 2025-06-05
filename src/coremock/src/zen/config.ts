@@ -9,7 +9,6 @@ const configs: {
   blockedUserIds: number[]
   allowedIPAddresses: string[]
   receivedAnyStats: boolean
-  block: boolean
 }[] = []
 
 function generateConfig(app: AppData) {
@@ -21,8 +20,7 @@ function generateConfig(app: AppData) {
     endpoints: [],
     blockedUserIds: [],
     allowedIPAddresses: [],
-    receivedAnyStats: true,
-    block: false
+    receivedAnyStats: true
   }
 }
 

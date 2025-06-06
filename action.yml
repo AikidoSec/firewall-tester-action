@@ -18,6 +18,12 @@ inputs:
       container will be spawned)
     required: true
     default: '5'
+  config_update_delay:
+    description:
+      The delay in seconds to wait after updating the config to ensure the
+      config is applied.
+    required: true
+    default: '60'
 
 # Define your outputs here.
 outputs:

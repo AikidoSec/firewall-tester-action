@@ -44,10 +44,10 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 logger = get_logger()
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int):
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int):
     try:
         # 1. if start_config.json exists, apply it
-        core_api = CoreApi(token=token, core_url=CORE_URL)
+        core_api = CoreApi(token=token, core_url=CORE_URL,  config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
                 config = json.load(f)
@@ -74,7 +74,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int):
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
         
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token}"
+        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay}"
         logger.debug(f"Running test: {command}")
         subprocess.run(command, shell=True, check=True)
 
@@ -104,7 +104,7 @@ def build_docker_image(dockerfile_path: str):
     subprocess.run(docker_build_command, shell=True, check=True)
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path)
@@ -113,7 +113,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int):
         if test_dir.startswith("test_"):
             logger.debug(f"Running test: {test_dir}")
             token = CoreApi.get_app_token(CORE_URL)
-            run_test(test_dir, token, dockerfile_path, start_port)
+            run_test(test_dir, token, dockerfile_path, start_port, config_update_delay)
             start_port += 1
 
 
@@ -122,5 +122,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)
+    parser.add_argument("--config_update_delay", type=int, required=True)
     args = parser.parse_args()
-    run_tests(args.dockerfile_path, args.max_parallel_tests)
+    run_tests(args.dockerfile_path, args.max_parallel_tests, args.config_update_delay)

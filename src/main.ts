@@ -12,6 +12,9 @@ export async function run(): Promise<void> {
     const max_parallel_tests: number = parseInt(
       core.getInput('max_parallel_tests')
     )
+    const config_update_delay: number = parseInt(
+      core.getInput('config_update_delay')
+    )
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
@@ -27,7 +30,9 @@ export async function run(): Promise<void> {
           '--dockerfile_path',
           dockerfile_path,
           '--max_parallel_tests',
-          max_parallel_tests.toString()
+          max_parallel_tests.toString(),
+          '--config_update_delay',
+          config_update_delay.toString()
         ],
         {
           stdio: 'inherit'

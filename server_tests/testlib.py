@@ -31,6 +31,7 @@ def load_test_args():
     parser.add_argument("--server_port", type=int, required=True)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
+    parser.add_argument("--config_update_delay", type=int, default=60)
     args = parser.parse_args()
     return args
 

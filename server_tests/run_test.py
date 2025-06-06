@@ -47,22 +47,39 @@ logger = get_logger()
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int):
     try:
         # 1. if start_config.json exists, apply it
-        core_api = CoreApi(token)
+        core_api = CoreApi(token=token, core_url=CORE_URL)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
                 config = json.load(f)
-                core_api.update_runtime_config(CORE_URL, config)
+                core_api.update_runtime_config_json(config)
                 logger.debug(f"Applied start_config.json")
 
         # 2. run the Docker container
 
-        command = f"docker run -d --env-file {os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, 'test.env')} --env AIKIDO_TOKEN={token} -p {start_port}:3000 --name {test_dir} {DOCKER_IMAGE_NAME}"
+        env_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, 'test.env')
+        if not os.path.exists(env_file_path):
+            raise Exception(f"Env file not found: {env_file_path} for test: {test_dir}")
+        command = (
+            f"docker run -d "
+            f"--env-file {env_file_path} "
+            f"--env AIKIDO_TOKEN={token} "
+            f"-p {start_port}:3001 "
+            f"--name {test_dir} "
+            f"{DOCKER_IMAGE_NAME}"
+        )
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
-        time.sleep(1)
+        time.sleep(10)
+        server_tests_dir = os.path.dirname(os.path.abspath(__file__))
+        # 4. run the test
+        
+        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token}"
+        logger.debug(f"Running test: {command}")
+        subprocess.run(command, shell=True, check=True)
 
-        # 4. TODO: run the test
+
+        
 
     except Exception as e:
         logger.error(f"Error running test: {e}")

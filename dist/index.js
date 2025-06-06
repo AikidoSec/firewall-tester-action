@@ -69265,19 +69265,21 @@ async function run() {
         // Start the Express server
         startServer();
         const dockerfile_path = coreExports.getInput('dockerfile_path');
-        // const max_parallel_tests: number = parseInt(
-        //   core.getInput('max_parallel_tests')
-        // )
+        const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
+        const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
+        coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         await wait(1000);
         // Spawn the Python process
         await new Promise((resolve, reject) => {
-            const proc = spawn('./venv-python/bin/python3', [
+            const proc = spawn('python', [
                 './server_tests/run_test.py',
                 '--dockerfile_path',
                 dockerfile_path,
                 '--max_parallel_tests',
-                '10'
+                max_parallel_tests.toString(),
+                '--config_update_delay',
+                config_update_delay.toString()
             ], {
                 stdio: 'inherit'
             });

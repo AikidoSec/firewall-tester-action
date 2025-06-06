@@ -12,7 +12,7 @@ export function checkToken(
   next: NextFunction
 ): void {
   const token = req.headers['authorization']
-  core.debug(`Token: ${token} for ${req.url} method ${req.method}`)
+  core.info(`Token: ${token} for ${req.url} method ${req.method}`)
   if (!token) {
     res.status(401).json({
       message: 'Token is required'

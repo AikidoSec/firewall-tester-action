@@ -42,7 +42,9 @@ app.get('/test', (req, res) => {
 
 // Start the server
 const server = app.listen(port, async () => {
-  console.log(`Server is running at http://localhost:${port}`)
+  console.log(
+    `Server is running at http://localhost:${port} - AIKIDO_ENDPOINT: ${process.env.AIKIDO_ENDPOINT}`
+  )
   await getFirewallLists()
 })
 

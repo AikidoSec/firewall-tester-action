@@ -33,6 +33,7 @@ app.get('/', (req, res) => {
 
 // Hello route
 app.get('/somethingVerySpecific', (req, res) => {
+  console.log('Endpoint /somethingVerySpecific called')
   res.json({ message: 'Hello, somethingVerySpecific!' })
 })
 

@@ -64,7 +64,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 f"Env file not found: {env_file_path} for test: {test_dir}")
         command = (
             f"docker run -d "
-            f"--network host "
+            # f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"-p {start_port}:3001 "
@@ -86,16 +86,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         logger.error(f"Error running test: {e}")
         raise e
     finally:
-
+        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
+        subprocess.run(f"docker logs {test_dir} > $GITHUB_STEP_SUMMARY",
+                       shell=True, check=False, capture_output=True)
         # stop the container
         subprocess.run(f"docker stop {test_dir}",
                        shell=True, check=True, capture_output=True)
         # remove the container
         subprocess.run(f"docker rm -f {test_dir}",
                        shell=True, check=True, capture_output=True)
-        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
-        subprocess.run(f"docker logs {test_dir} > $GITHUB_STEP_SUMMARY",
-                       shell=True, check=False, capture_output=True)
 
 
 def build_docker_image(dockerfile_path: str):

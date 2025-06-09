@@ -32,8 +32,9 @@ app.get('/', (req, res) => {
 })
 
 // Hello route
-app.get('/somethingVerySpecific', (req, res) => {
+app.get('/somethingVerySpecific', async (req, res) => {
   console.log('Endpoint /somethingVerySpecific called')
+  await getFirewallLists()
   res.json({ message: 'Hello, somethingVerySpecific!' })
 })
 

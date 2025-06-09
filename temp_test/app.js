@@ -3,12 +3,12 @@ const express = require('express')
 const fetch = require('node-fetch')
 const app = express()
 const port = 3001
-const core = require('@actions/core')
+//const core = require('@actions/core')
 
 // Function to fetch firewall lists
 async function getFirewallLists() {
   console.log('getFirewallLists called')
-  core.info('getFirewallLists called')
+  //core.info('getFirewallLists called')
   try {
     const headers = {
       'Content-Type': 'application/json',
@@ -20,11 +20,11 @@ async function getFirewallLists() {
       { headers }
     )
     const data = await response.json()
-    core.info(`Firewall Lists:\n ${JSON.stringify(data, null, 2)}`)
+    console.log(`Firewall Lists:\n ${JSON.stringify(data, null, 2)}`)
   } catch (error) {
-    core.error(`Error fetching firewall lists: ${error}`)
-    core.error(error.stack)
-    core.error(error.message)
+    //core.error(`Error fetching firewall lists: ${error}`)
+    //core.error(error.stack)
+    //core.error(error.message)
   }
 }
 
@@ -37,9 +37,9 @@ app.get('/', (req, res) => {
 })
 
 // Hello route
-app.get('/somethingVerySpecific', async (req, res) => {
+app.get('/somethingVerySpecific', (req, res) => {
   console.log('Endpoint /somethingVerySpecific called')
-  await getFirewallLists()
+  //  await getFirewallLists()
   res.json({ message: 'Hello, somethingVerySpecific!' })
 })
 

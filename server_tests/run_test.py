@@ -47,7 +47,8 @@ logger = get_logger()
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int):
     try:
         # 1. if start_config.json exists, apply it
-        core_api = CoreApi(token=token, core_url=CORE_URL,  config_update_delay=1)
+        core_api = CoreApi(token=token, core_url=CORE_URL,
+                           config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
                 config = json.load(f)
@@ -56,11 +57,14 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         # 2. run the Docker container
 
-        env_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, 'test.env')
+        env_file_path = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), test_dir, 'test.env')
         if not os.path.exists(env_file_path):
-            raise Exception(f"Env file not found: {env_file_path} for test: {test_dir}")
+            raise Exception(
+                f"Env file not found: {env_file_path} for test: {test_dir}")
         command = (
             f"docker run -d "
+            f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"-p {start_port}:3001 "
@@ -73,27 +77,25 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(10)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
-        
+
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay}"
         logger.debug(f"Running test: {command}")
         subprocess.run(command, shell=True, check=True)
-
-
-        
 
     except Exception as e:
         logger.error(f"Error running test: {e}")
         raise e
     finally:
-        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
-        subprocess.run(f"docker logs {test_dir} > $GITHUB_STEP_SUMMARY",
-                       shell=True, check=True, capture_output=True)
+
         # stop the container
         subprocess.run(f"docker stop {test_dir}",
                        shell=True, check=True, capture_output=True)
         # remove the container
         subprocess.run(f"docker rm -f {test_dir}",
                        shell=True, check=True, capture_output=True)
+        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
+        subprocess.run(f"docker logs {test_dir} > $GITHUB_STEP_SUMMARY",
+                       shell=True, check=False, capture_output=True)
 
 
 def build_docker_image(dockerfile_path: str):
@@ -116,7 +118,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
         if test_dir.startswith("test_"):
             logger.debug(f"Running test: {test_dir}")
             token = CoreApi.get_app_token(CORE_URL)
-            run_test(test_dir, token, dockerfile_path, start_port, config_update_delay)
+            run_test(test_dir, token, dockerfile_path,
+                     start_port, config_update_delay)
             start_port += 1
 
 
@@ -127,4 +130,5 @@ if __name__ == "__main__":
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
     args = parser.parse_args()
-    run_tests(args.dockerfile_path, args.max_parallel_tests, args.config_update_delay)
+    run_tests(args.dockerfile_path, args.max_parallel_tests,
+              args.config_update_delay)

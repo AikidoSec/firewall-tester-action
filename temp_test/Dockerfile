@@ -26,7 +26,7 @@ EXPOSE 3000
 
 ENV AIKIDO_BLOCK=true \
     AIKIDO_DEBUG=true \
-    AIKIDO_ENDPOINT=http://host.docker.internal:3000 \
-    AIKIDO_REALTIME_ENDPOINT=http://host.docker.internal:3000
+    AIKIDO_ENDPOINT=http://localhost:3000 \
+    AIKIDO_REALTIME_ENDPOINT=http://localhost:3000
 
 CMD ["node", "app.js"] 

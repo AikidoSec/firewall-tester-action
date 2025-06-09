@@ -1,8 +1,27 @@
 require('@aikidosec/firewall')
-
 const express = require('express')
+const fetch = require('node-fetch')
 const app = express()
 const port = 3001
+
+// Function to fetch firewall lists
+async function getFirewallLists() {
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `${process.env.AIKIDO_TOKEN}`
+    }
+
+    const response = await fetch(
+      `${process.env.AIKIDO_ENDPOINT}/api/runtime/firewall/lists`,
+      { headers }
+    )
+    const data = await response.json()
+    console.log('Firewall Lists:', data)
+  } catch (error) {
+    console.error('Error fetching firewall lists:', error)
+  }
+}
 
 // Middleware to parse JSON
 app.use(express.json())
@@ -22,8 +41,9 @@ app.get('/test', (req, res) => {
 })
 
 // Start the server
-const server = app.listen(port, () => {
+const server = app.listen(port, async () => {
   console.log(`Server is running at http://localhost:${port}`)
+  await getFirewallLists()
 })
 
 // Handle graceful shutdown

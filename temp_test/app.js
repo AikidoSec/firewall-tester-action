@@ -17,7 +17,7 @@ async function getFirewallLists() {
       { headers }
     )
     const data = await response.json()
-    console.log('Firewall Lists:', data)
+    console.info('Firewall Lists:', data)
   } catch (error) {
     console.error('Error fetching firewall lists:', error)
   }

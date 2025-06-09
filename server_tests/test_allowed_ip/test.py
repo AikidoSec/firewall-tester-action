@@ -20,7 +20,7 @@ def run_test(port: int, token: str, config_update_delay: int):
     c = CoreApi(token=token, core_url=f"http://localhost:3000",
                 config_update_delay=config_update_delay)
     response = s.get("/somethingVerySpecific")
-    print(response)
+    print(response.text)
     assert_response_code_is(response, 403)
     assert_response_header_contains(response, "Content-Type", "text")
     assert_response_body_contains(response, "not allowed")

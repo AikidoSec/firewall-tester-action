@@ -52,7 +52,8 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
                 config = json.load(f)
-                core_api.update_runtime_config_json(config)
+                r = core_api.update_runtime_config_json(config)
+                logger.debug(f"Config: {r}")
                 logger.debug(f"Applied start_config.json")
 
         # 2. run the Docker container
@@ -64,7 +65,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 f"Env file not found: {env_file_path} for test: {test_dir}")
         command = (
             f"docker run -d "
-            # f"--network host "
+            f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"-p {start_port}:3001 "

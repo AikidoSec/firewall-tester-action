@@ -19,7 +19,8 @@ def run_test(port: int, token: str, config_update_delay: int):
     s = TestServer(port=port, token=token)
     c = CoreApi(token=token, core_url=f"http://localhost:3000",
                 config_update_delay=config_update_delay)
-    response = s.get("/somethingVerySpecific")
+    response = s.get("/somethingVerySpecific",
+                     headers={"X-Forwarded-For": "1.3.3.7"})
     print(response.text)
     assert_response_code_is(response, 403)
     assert_response_header_contains(response, "Content-Type", "text")
@@ -27,19 +28,22 @@ def run_test(port: int, token: str, config_update_delay: int):
 
     c.update_runtime_config_file(f("change_config_remove_allowed_ip.json"))
 
-    response = s.get("/somethingVerySpecific")
+    response = s.get("/somethingVerySpecific",
+                     headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 200)
     assert_response_body_contains(response, "Hello")
 
     c.update_runtime_config_file(f("start_config.json"))
 
-    response = s.get("/somethingVerySpecific")
+    response = s.get("/somethingVerySpecific",
+                     headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 403)
     assert_response_header_contains(response, "Content-Type", "text")
     assert_response_body_contains(response, "not allowed")
 
     c.update_runtime_config_file(f("config_allow_private.json"))
-    response = s.get("/somethingVerySpecific")
+    response = s.get("/somethingVerySpecific",
+                     headers={"X-Forwarded-For": "127.0.0.1"})
     assert_response_body_contains(response, "Hello")
     assert_response_code_is(response, 200)
 

@@ -22,7 +22,9 @@ async function getFirewallLists() {
     const data = await response.json()
     core.info(`Firewall Lists:\n ${JSON.stringify(data, null, 2)}`)
   } catch (error) {
-    core.error('Error fetching firewall lists:', error)
+    core.error(`Error fetching firewall lists: ${error}`)
+    core.error(error.stack)
+    core.error(error.message)
   }
 }
 

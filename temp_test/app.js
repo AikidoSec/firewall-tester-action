@@ -3,9 +3,12 @@ const express = require('express')
 const fetch = require('node-fetch')
 const app = express()
 const port = 3001
+const core = require('@actions/core')
 
 // Function to fetch firewall lists
 async function getFirewallLists() {
+  console.log('getFirewallLists called')
+  core.info('getFirewallLists called')
   try {
     const headers = {
       'Content-Type': 'application/json',
@@ -17,9 +20,9 @@ async function getFirewallLists() {
       { headers }
     )
     const data = await response.json()
-    console.info('Firewall Lists:', data)
+    core.info(`Firewall Lists:\n ${JSON.stringify(data, null, 2)}`)
   } catch (error) {
-    console.error('Error fetching firewall lists:', error)
+    core.error('Error fetching firewall lists:', error)
   }
 }
 

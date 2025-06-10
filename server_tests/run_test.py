@@ -68,14 +68,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
-            f"-p {start_port}:3001 "
+            f"--env PORT={start_port} "
+            #  f"-p {start_port}:3001 "
             f"--name {test_dir} "
             f"{DOCKER_IMAGE_NAME}"
         )
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
-        time.sleep(10)
+        time.sleep(1)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
 

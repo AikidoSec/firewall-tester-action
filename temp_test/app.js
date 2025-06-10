@@ -2,7 +2,7 @@ require('@aikidosec/firewall')
 const express = require('express')
 const fetch = require('node-fetch')
 const app = express()
-const port = 3001
+const port = process.env.PORT
 //const core = require('@actions/core')
 
 // Function to fetch firewall lists

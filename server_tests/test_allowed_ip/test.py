@@ -22,7 +22,7 @@ def run_test(port: int, token: str, config_update_delay: int):
     response = s.get("/somethingVerySpecific",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     print(response.text)
-    assert_response_code_is(response, 403)
+    assert_response_code_is(response, 402)
     assert_response_header_contains(response, "Content-Type", "text")
     assert_response_body_contains(response, "not allowed")
 

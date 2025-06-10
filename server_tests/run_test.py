@@ -100,7 +100,41 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 4. run the test
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay}"
         logger.debug(f"Running test: {command}")
-        subprocess.run(command, shell=True, check=True)
+
+        # Run the test and capture both stdout and stderr
+        process = subprocess.run(
+            command,
+            shell=True,
+            check=False,  # Don't raise exception on non-zero exit
+            capture_output=True,
+            text=True
+        )
+
+        if process.returncode != 0:
+            # Extract the actual assertion error and stack trace from the output
+            error_lines = process.stderr.split('\n')
+
+            # Find the full assertion error message
+            assertion_error = None
+            for line in error_lines:
+                if 'AssertionError:' in line:
+                    assertion_error = line.strip()
+                    break
+
+            # Find the last stack trace line from test.py
+            test_stack_line = None
+            for line in reversed(error_lines):
+                if 'test.py' in line and 'in run_test' in line:
+                    test_stack_line = line.strip()
+                    break
+
+            if assertion_error and test_stack_line:
+                error_message = f"{test_stack_line}<br>`{assertion_error}`"
+                raise Exception(error_message)
+            else:
+                raise Exception(
+                    f"Test failed with return code {process.returncode}\n{process.stderr}")
+
         result.complete(True)
         return result
 

@@ -7,6 +7,10 @@ from core_api import CoreApi
 import json
 import subprocess
 import time
+import concurrent.futures
+from dataclasses import dataclass
+from typing import List, Optional
+from datetime import datetime
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -44,7 +48,24 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 logger = get_logger()
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int):
+@dataclass
+class TestResult:
+    test_dir: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    success: bool = False
+    error_message: Optional[str] = None
+    duration: Optional[float] = None
+
+    def complete(self, success: bool, error_message: Optional[str] = None):
+        self.end_time = datetime.now()
+        self.success = success
+        self.error_message = error_message
+        self.duration = (self.end_time - self.start_time).total_seconds()
+
+
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int) -> TestResult:
+    result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json exists, apply it
         core_api = CoreApi(token=token, core_url=CORE_URL,
@@ -57,7 +78,6 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 logger.debug(f"Applied start_config.json")
 
         # 2. run the Docker container
-
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
         if not os.path.exists(env_file_path):
@@ -69,7 +89,6 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT={start_port} "
-            #  f"-p {start_port}:3001 "
             f"--name {test_dir} "
             f"{DOCKER_IMAGE_NAME}"
         )
@@ -79,14 +98,16 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(1)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
-
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay}"
         logger.debug(f"Running test: {command}")
         subprocess.run(command, shell=True, check=True)
+        result.complete(True)
+        return result
 
     except Exception as e:
         logger.error(f"Error running test: {e}")
-        raise e
+        result.complete(False, str(e))
+        return result
     finally:
         # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
         subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
@@ -110,22 +131,107 @@ def build_docker_image(dockerfile_path: str):
     subprocess.run(docker_build_command, shell=True, check=True)
 
 
+def write_summary_to_github_step_summary(test_results: List[TestResult]):
+    summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
+    if not summary_path:
+        logger.warning("GITHUB_STEP_SUMMARY environment variable not set")
+        return
+
+    with open(summary_path, 'a') as f:
+        f.write("\n## Test Results Summary\n\n")
+
+        # Write summary statistics
+        total_tests = len(test_results)
+        passed_tests = sum(1 for r in test_results if r.success)
+        failed_tests = total_tests - passed_tests
+        total_duration = sum(
+            r.duration for r in test_results if r.duration is not None)
+
+        f.write("### Overview\n\n")
+        f.write(f"- **Total Tests:** {total_tests}\n")
+        f.write(f"- **Passed:** {passed_tests}\n")
+        f.write(f"- **Failed:** {failed_tests}\n")
+        f.write(f"- **Total Duration:** {total_duration:.2f} seconds\n\n")
+
+        # Write detailed results table
+        f.write("### Detailed Results\n\n")
+        f.write("| Test | Status | Duration | Error Message |\n")
+        f.write("|------|--------|----------|---------------|\n")
+
+        for result in test_results:
+            status = "✅ PASS" if result.success else "❌ FAIL"
+            duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
+            error = result.error_message if result.error_message else "-"
+            # Escape pipe characters in error messages to prevent table formatting issues
+            error = error.replace("|", "\\|")
+            f.write(
+                f"| {result.test_dir} | {status} | {duration} | {error} |\n")
+
+
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path)
-    start_port = 3001
-    for test_dir in os.listdir(os.path.dirname(os.path.abspath(__file__))):
-        if test_dir.startswith("test_"):
-            logger.debug(f"Running test: {test_dir}")
+
+    test_dirs = [d for d in os.listdir(os.path.dirname(
+        os.path.abspath(__file__))) if d.startswith("test_")]
+    test_results: List[TestResult] = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_tests) as executor:
+        future_to_test = {}
+        start_port = 3001
+
+        for test_dir in test_dirs:
             token = CoreApi.get_app_token(CORE_URL)
-            run_test(test_dir, token, dockerfile_path,
-                     start_port, config_update_delay)
+            future = executor.submit(
+                run_test,
+                test_dir,
+                token,
+                dockerfile_path,
+                start_port,
+                config_update_delay
+            )
+            future_to_test[future] = test_dir
             start_port += 1
+
+        for future in concurrent.futures.as_completed(future_to_test):
+            test_dir = future_to_test[future]
+            try:
+                result = future.result()
+                test_results.append(result)
+                status = "PASSED" if result.success else "FAILED"
+                logger.info(
+                    f"Test {test_dir} {status} in {result.duration:.2f} seconds")
+                if not result.success:
+                    logger.error(
+                        f"Error in test {test_dir}: {result.error_message}")
+            except Exception as e:
+                logger.error(f"Test {test_dir} generated an exception: {e}")
+
+    # Write summary to GitHub Step Summary
+    write_summary_to_github_step_summary(test_results)
+
+    # Print summary to console as well
+    logger.info("\nTest Summary:")
+    logger.info("=" * 50)
+    total_tests = len(test_results)
+    passed_tests = sum(1 for r in test_results if r.success)
+    failed_tests = total_tests - passed_tests
+    total_duration = sum(
+        r.duration for r in test_results if r.duration is not None)
+
+    logger.info(f"Total Tests: {total_tests}")
+    logger.info(f"Passed: {passed_tests}")
+    logger.info(f"Failed: {failed_tests}")
+    logger.info(f"Total Duration: {total_duration:.2f} seconds")
+    logger.info("=" * 50)
+
+    # Exit with error if any tests failed
+    if failed_tests > 0:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)

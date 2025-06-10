@@ -176,14 +176,18 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 
         # Write summary statistics
         total_tests = len(test_results)
-        passed_tests = sum(1 for r in test_results if r.success)
-        failed_tests = total_tests - passed_tests
+        passed_tests = sum(
+            1 for r in test_results if r.success and r.error_message != "Skipped")
+        skipped_tests = sum(
+            1 for r in test_results if r.error_message == "Skipped")
+        failed_tests = total_tests - passed_tests - skipped_tests
         total_duration = sum(
             r.duration for r in test_results if r.duration is not None)
 
         f.write("### Overview\n\n")
         f.write(f"- **Total Tests:** {total_tests}\n")
         f.write(f"- **Passed:** {passed_tests}\n")
+        f.write(f"- **Skipped:** {skipped_tests}\n")
         f.write(f"- **Failed:** {failed_tests}\n")
         f.write(f"- **Total Duration:** {total_duration:.2f} seconds\n\n")
 
@@ -193,7 +197,10 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write("|------|--------|----------|---------------|\n")
 
         for result in test_results:
-            status = "✅ PASS" if result.success else "❌ FAIL"
+            if result.error_message == "Skipped":
+                status = "⏭️ SKIP"
+            else:
+                status = "✅ PASS" if result.success else "❌ FAIL"
             duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
             error = result.error_message if result.error_message else "-"
             # Escape pipe characters in error messages to prevent table formatting issues
@@ -202,7 +209,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path)
@@ -211,11 +218,23 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
         os.path.abspath(__file__))) if d.startswith("test_")]
     test_results: List[TestResult] = []
 
+    # Parse skip_tests into a set for O(1) lookup
+    tests_to_skip = set(skip_tests.split(',')) if skip_tests else set()
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_tests) as executor:
         future_to_test = {}
         start_port = 3001
 
         for test_dir in test_dirs:
+            # Skip tests that are in the skip list
+            if test_dir in tests_to_skip:
+                result = TestResult(test_dir=test_dir,
+                                    start_time=datetime.now())
+                result.complete(True, "Skipped")
+                test_results.append(result)
+                logger.info(f"Test {test_dir} ⏭️ SKIPPED")
+                continue
+
             token = CoreApi.get_app_token(CORE_URL)
             future = executor.submit(
                 run_test,
@@ -249,13 +268,17 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
     logger.info("\nTest Summary:")
     logger.info("=" * 50)
     total_tests = len(test_results)
-    passed_tests = sum(1 for r in test_results if r.success)
-    failed_tests = total_tests - passed_tests
+    passed_tests = sum(
+        1 for r in test_results if r.success and r.error_message != "Skipped")
+    skipped_tests = sum(
+        1 for r in test_results if r.error_message == "Skipped")
+    failed_tests = total_tests - passed_tests - skipped_tests
     total_duration = sum(
         r.duration for r in test_results if r.duration is not None)
 
     logger.info(f"Total Tests: {total_tests}")
     logger.info(f"Passed: {passed_tests}")
+    logger.info(f"Skipped: {skipped_tests}")
     logger.info(f"Failed: {failed_tests}")
     logger.info(f"Total Duration: {total_duration:.2f} seconds")
     logger.info("=" * 50)
@@ -270,6 +293,7 @@ if __name__ == "__main__":
     parser.add_argument("--dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
+    parser.add_argument("--skip_tests", type=str, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay)
+              args.config_update_delay, args.skip_tests)

@@ -24,6 +24,12 @@ inputs:
       config is applied.
     required: true
     default: '60'
+  skip_tests:
+    description:
+      Comma-separated list of test names to skip (e.g.
+      "test_allowed_ip,test2,test3")
+    required: false
+    default: ''
 
 # Define your outputs here.
 outputs:

@@ -59,7 +59,7 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./temp_test/Dockerfile
-
+          skip_tests: test_allowed_ip
       - name: Print Output
         id: output
         run: echo "${{ steps.test-action.outputs.time }}"

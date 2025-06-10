@@ -69267,8 +69267,10 @@ async function run() {
         const dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
         const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
+        const skip_tests = coreExports.getInput('skip_tests');
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
+        coreExports.debug(`Skip tests: ${skip_tests}`);
         await wait(1000);
         // Spawn the Python process
         await new Promise((resolve, reject) => {
@@ -69279,7 +69281,9 @@ async function run() {
                 '--max_parallel_tests',
                 max_parallel_tests.toString(),
                 '--config_update_delay',
-                config_update_delay.toString()
+                config_update_delay.toString(),
+                '--skip_tests',
+                skip_tests
             ], {
                 stdio: 'inherit'
             });

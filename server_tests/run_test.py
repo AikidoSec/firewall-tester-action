@@ -144,8 +144,8 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         return result
     finally:
         # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
-        subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
-                       shell=True, check=False, capture_output=True)
+        # subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
+        #               shell=True, check=False, capture_output=True)
         # stop the container
         subprocess.run(f"docker stop {test_dir}",
                        shell=True, check=True, capture_output=True)

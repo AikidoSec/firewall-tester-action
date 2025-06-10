@@ -68894,7 +68894,7 @@ function createApp(req, res) {
 
 function checkToken(req, res, next) {
     const token = req.headers['authorization'];
-    coreExports.info(`Token: ${token} for ${req.url} method ${req.method}`);
+    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method}`);
     if (!token) {
         res.status(401).json({
             message: 'Token is required'

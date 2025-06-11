@@ -133,7 +133,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 raise Exception(error_message)
             else:
                 raise Exception(
-                    f"Test failed with return code {process.returncode}\n{process.stderr}")
+                    f"Test failed with return code {process.returncode}\n```\n{process.stderr}\n```")
 
         result.complete(True)
         return result

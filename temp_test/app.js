@@ -3,6 +3,7 @@ const express = require('express')
 const fetch = require('node-fetch')
 const app = express()
 const port = process.env.PORT
+const { exec } = require('child_process')
 
 // Middleware to parse JSON
 app.use(express.json())
@@ -20,6 +21,14 @@ app.get('/somethingVerySpecific', (req, res) => {
 
 app.get('/test', (req, res) => {
   res.json({ message: 'Hello, test!' })
+})
+
+app.post('/shell_injection', (req, res) => {
+  console.log('Endpoint /shell_injection called')
+  const command = req.body.command
+  const fullCommand = `binary --domain www.example${command}.com`
+  const result = exec(fullCommand)
+  res.json({ message: 'Shell executed!' })
 })
 
 // Start the server

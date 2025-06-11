@@ -1,0 +1,22 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "body": "{\"command\": \"`whoami`\"}",
+    "route": "/shell_injection"
+  },
+  "attack": {
+    "kind": "shell_injection",
+    "blocked": false,
+    "source": "body",
+    "path": ".command",
+    "payload": "\"`whoami`\"",
+    "metadata": {
+      "command": "binary --domain www.example`whoami`.com"
+    }
+  },
+  "agent": {
+    "dryMode": true
+  }
+}

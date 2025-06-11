@@ -41,3 +41,16 @@ class CoreApi:
         with open(config_file, "r") as f:
             config = json.load(f)
         return self.update_runtime_config_json(config)
+
+    def get_events(self) -> list:
+        response = requests.get(
+            f"{self.core_url}/api/runtime/events", headers={"Authorization": f"{self.token}"})
+        return response.json()
+
+    def wait_for_new_events(self, max_wait_time: int, old_events_length: int):
+        while max_wait_time > 0:
+            if len(self.get_events()) > old_events_length:
+                return True
+            time.sleep(1)
+            max_wait_time -= 1
+        return False

@@ -1,6 +1,7 @@
 import logging
 import sys
 import argparse
+import traceback
 import requests
 import os
 from core_api import CoreApi
@@ -72,10 +73,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
-                config = json.load(f)
-                r = core_api.update_runtime_config_json(config)
-                logger.debug(f"Config: {r}")
-                logger.debug(f"Applied start_config.json")
+                try:
+                    config = json.load(f)
+                    r = core_api.update_runtime_config_json(config)
+                    logger.debug(f"Config: {r}")
+                except Exception as e:
+                    logger.error(
+                        f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
+                    raise Exception(
+                        f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
         env_file_path = os.path.join(os.path.dirname(
@@ -259,7 +265,14 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                     logger.error(
                         f"Error in test {test_dir}: {result.error_message}")
             except Exception as e:
-                logger.error(f"Test {test_dir} generated an exception: {e}")
+                logger.error(
+                    f"Test {test_dir} generated an exception: {e} \n{traceback.format_exc()}")
+                result = TestResult(test_dir=test_dir,
+                                    start_time=datetime.now())
+                result.complete(
+                    False, f"{e} \n```\n{traceback.format_exc()}\n```")
+                test_results.append(result)
+                break
 
     # Write summary to GitHub Step Summary
     write_summary_to_github_step_summary(test_results)

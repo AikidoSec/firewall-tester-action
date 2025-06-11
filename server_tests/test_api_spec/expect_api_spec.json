@@ -1,0 +1,20 @@
+{
+  "type": "heartbeat",
+  "routes": [
+    {
+      "path": "/api/v1/orders",
+      "method": "POST",
+      "hits": 3,
+      "apispec": {
+        "query": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    }
+  ],
+  "agent": {
+    "dryMode": false
+  },
+  "middlewareInstalled": false
+}

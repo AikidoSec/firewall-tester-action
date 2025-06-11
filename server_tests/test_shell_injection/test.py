@@ -26,10 +26,6 @@ def check_shell_injection(response_code, response_body, event_id, expected_json)
     c.wait_for_new_events(5, old_events_length=len(start_events))
 
     all_events = c.get_events()
-    # save events to file
-    with open("events.json", "w") as f:
-        json.dump(all_events, f, indent=4)
-
     new_events = all_events[len(start_events):]
 
 #    assert_events_length_is_at_least(new_events, event_id + 1)

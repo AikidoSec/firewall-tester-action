@@ -1,0 +1,71 @@
+{
+  "method": "POST",
+  "path": "/api/v1/orders",
+  "hits": 3,
+  "apispec": {
+    "body": {
+      "type": "json",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "orderId": { "type": "string", "optional": true },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": { "type": "string" },
+                "quantity": { "type": "number" },
+                "price": { "type": "number" },
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "color": { "type": "string" },
+                    "size": { "type": "string" }
+                  }
+                }
+              }
+            },
+            "optional": true
+          },
+          "shippingAddress": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "street": { "type": "string" },
+              "city": { "type": "string" },
+              "state": { "type": "string" },
+              "zip": { "type": "string" },
+              "country": { "type": "string" }
+            },
+            "optional": true
+          },
+          "paymentMethod": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "provider": { "type": "string" },
+              "cardNumber": { "type": "string" },
+              "expiryDate": { "type": "string" }
+            },
+            "optional": true
+          },
+          "total": { "type": "number", "optional": true },
+          "orderPlaced": { "type": "boolean", "optional": true }
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "status": { "type": "string" },
+        "orderId": { "type": "string", "optional": true }
+      }
+    },
+    "auth": [
+      { "type": "http", "scheme": "bearer" },
+      { "type": "apiKey", "in": "header", "name": "x-api-key" }
+    ]
+  }
+}

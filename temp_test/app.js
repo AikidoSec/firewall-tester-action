@@ -38,6 +38,10 @@ const server = app.listen(port, async () => {
   )
 })
 
+app.post('/api/v1/orders', (req, res) => {
+  res.json({ message: 'Hello, orders!' })
+})
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. Performing graceful shutdown...')

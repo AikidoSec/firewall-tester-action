@@ -1,0 +1,51 @@
+{
+  "path": "/api/v1/orders",
+  "method": "POST",
+  "hits": 3,
+  "apispec": {
+    "body": {
+      "type": "json",
+      "schema": {
+        "type": ["object"],
+        "properties": {
+          "items": {
+            "type": ["array"],
+            "items": {
+              "type": ["object"],
+              "properties": {
+                "details": {
+                  "type": ["object"],
+                  "properties": {
+                    "color": {
+                      "type": ["string"]
+                    },
+                    "size": {
+                      "type": ["string"]
+                    }
+                  }
+                },
+                "itemId": {
+                  "type": ["string"]
+                },
+                "price": {
+                  "type": ["number"]
+                },
+                "quantity": {
+                  "type": ["number"]
+                }
+              }
+            },
+            "optional": true
+          },
+          "orderId": {
+            "type": ["string"],
+            "optional": true
+          },
+          "orderPlaced": {
+            "type": ["boolean"]
+          }
+        }
+      }
+    }
+  }
+}

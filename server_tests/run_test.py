@@ -98,7 +98,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(1)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay}"
+        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
         logger.debug(f"Running test: {command}")
 
         # Run the test and capture both stdout and stderr

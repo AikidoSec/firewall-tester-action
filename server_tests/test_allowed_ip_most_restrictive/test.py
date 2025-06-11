@@ -17,11 +17,8 @@ def f(config_file: str):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
 
 
-def run_test(port: int, token: str, config_update_delay: int):
-    s = TestServer(port=port, token=token)
-    c = CoreApi(token=token, core_url=f"http://localhost:3000",
-                config_update_delay=config_update_delay)
-
+def run_test(s: TestServer, c: CoreApi):
+    # Using global ts and c from testlib
     response = s.get("/somethingVerySpecific",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 403)
@@ -47,5 +44,5 @@ def run_test(port: int, token: str, config_update_delay: int):
 
 
 if __name__ == "__main__":
-    args = load_test_args()
-    run_test(args.server_port, args.token, args.config_update_delay)
+    args, s, c = init_server_and_core()
+    run_test(s, c)

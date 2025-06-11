@@ -2,7 +2,9 @@ import datetime
 import time
 import requests
 import argparse
+from core_api import CoreApi
 from requests.adapters import HTTPAdapter, Retry
+
 s = requests.Session()
 retries = Retry(connect=10,
                 backoff_factor=1)
@@ -28,14 +30,19 @@ def localhost_get_request(port, route="", headers={}, benchmark=False):
     return r
 
 
-def load_test_args():
+def init_server_and_core():
     parser = argparse.ArgumentParser()
     parser.add_argument("--server_port", type=int, required=True)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
     parser.add_argument("--config_update_delay", type=int, default=60)
     args = parser.parse_args()
-    return args
+
+    server = TestServer(port=args.server_port, token=args.token)
+    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}",
+                   config_update_delay=args.config_update_delay)
+
+    return args, server, core
 
 
 class TestServer:

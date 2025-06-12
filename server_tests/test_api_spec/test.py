@@ -90,7 +90,7 @@ def run_api_spec_tests(fns, expected_json, s: TestServer, c: CoreApi):
         response = s.post(*fn())
         assert_response_code_is(response, 200)
 
-    c.wait_for_new_events(1070, old_events_length=len(start_events))
+    c.wait_for_new_events(70, old_events_length=len(start_events))
 
     all_events = c.get_events()
     new_events = all_events[len(start_events):]

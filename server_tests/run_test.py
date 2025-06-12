@@ -97,12 +97,16 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         if not os.path.exists(env_file_path):
             raise Exception(
                 f"Env file not found: {env_file_path} for test: {test_dir}")
+        create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
+        subprocess.run(create_database_command, shell=True, check=True)
+        time.sleep(1)
         command = (
             f"docker run -d "
             f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT={start_port} "
+            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@localhost:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"{DOCKER_IMAGE_NAME}"
         )

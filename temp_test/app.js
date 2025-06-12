@@ -42,6 +42,10 @@ app.post('/api/v1/orders', (req, res) => {
   res.json({ message: 'Hello, orders!' })
 })
 
+app.get('/api/pets/', (req, res) => {
+  res.json([])
+})
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. Performing graceful shutdown...')

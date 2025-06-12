@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres
+    container_name: postgres
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_USER=myuser
+      - POSTGRES_DB=mydb
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  python-backend:
+    build:
+      context: ./zen-demo/zen-demo-python
+      dockerfile: Dockerfile
+    container_name: python-backend
+    ports:
+      - '3001:3001'
+    environment:
+      - DATABASE_URL=postgresql://myuser:mysecretpassword@host.docker.internal:5432/mydb?sslmode=disable
+      - PORT=3001
+      - AIKIDO_TOKEN=
+      - AIKIDO_ENDPOINT=http://host.docker.internal:3000
+      - AIKIDO_REALTIME_ENDPOINT=http://host.docker.internal:3000
+    env_file:
+      - ./server_tests/test_allowed_ip/test.env
+    networks:
+      - app-network
+
+  nodejs-backend:
+    build:
+      context: ./zen-demo/zen-demo-nodejs
+      dockerfile: Dockerfile
+    container_name: nodejs-backend
+    ports:
+      - '3002:3002'
+    environment:
+      - DATABASE_URL=postgresql://myuser:mysecretpassword@host.docker.internal:5432/mydb?sslmode=disable
+      - PORT=3002
+      - AIKIDO_TOKEN=
+      - AIKIDO_ENDPOINT=http://host.docker.internal:3000
+      - AIKIDO_REALTIME_ENDPOINT=http://host.docker.internal:3000
+    env_file:
+      - ./server_tests/test_allowed_ip/test.env
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

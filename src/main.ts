@@ -5,6 +5,7 @@ import { spawn } from 'child_process'
 export async function run(): Promise<void> {
   try {
     // Start the Express server
+    startPostgres()
     startServer()
     const dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
@@ -61,5 +62,49 @@ export async function run(): Promise<void> {
     if (error instanceof Error) core.setFailed(error.message)
   } finally {
     stopServer()
+    stopPostgres()
   }
+}
+
+function startPostgres() {
+  const proc = spawn(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '--network',
+      'host',
+      '--name',
+      'postgres',
+      '-e',
+      'POSTGRES_PASSWORD=mysecretpassword',
+      '-e',
+      'POSTGRES_USER=myuser',
+      '-e',
+      'POSTGRES_DB=mydb',
+      '-p',
+      '5432:5432',
+      '-d',
+      'postgres'
+    ],
+    {
+      stdio: 'inherit'
+    }
+  )
+  proc.on('close', (code) => {
+    if (code !== 0) {
+      core.setFailed(`Failed to start Postgres: ${code}`)
+    }
+  })
+}
+
+function stopPostgres() {
+  const proc = spawn('docker', ['stop', 'postgres'], {
+    stdio: 'inherit'
+  })
+  proc.on('close', (code) => {
+    if (code !== 0) {
+      core.warning(`Failed to stop Postgres: ${code}`)
+    }
+  })
 }

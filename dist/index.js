@@ -27256,20 +27256,6 @@ function requireCore () {
 
 var coreExports = requireCore();
 
-/**
- * Waits for a number of milliseconds.
- *
- * @param milliseconds The number of milliseconds to wait.
- * @returns Resolves with 'done!' after the wait is over.
- */
-async function wait(milliseconds) {
-    return new Promise((resolve) => {
-        if (isNaN(milliseconds))
-            throw new Error('milliseconds is not a number');
-        setTimeout(() => resolve('done!'), milliseconds);
-    });
-}
-
 var express$2 = {exports: {}};
 
 var bodyParser = {exports: {}};
@@ -69268,10 +69254,11 @@ async function run() {
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
         const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
         const skip_tests = coreExports.getInput('skip_tests');
+        const test_timeout = parseInt(coreExports.getInput('test_timeout'));
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
-        await wait(1000);
+        coreExports.debug(`Test timeout: ${test_timeout}`);
         // Spawn the Python process
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
@@ -69283,7 +69270,9 @@ async function run() {
                 '--config_update_delay',
                 config_update_delay.toString(),
                 '--skip_tests',
-                skip_tests
+                skip_tests,
+                '--test_timeout',
+                test_timeout.toString()
             ], {
                 stdio: 'inherit'
             });

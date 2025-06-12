@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import { wait } from './wait.js'
 import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
 
@@ -7,7 +6,6 @@ export async function run(): Promise<void> {
   try {
     // Start the Express server
     startServer()
-
     const dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
       core.getInput('max_parallel_tests')
@@ -16,12 +14,12 @@ export async function run(): Promise<void> {
       core.getInput('config_update_delay')
     )
     const skip_tests: string = core.getInput('skip_tests')
+    const test_timeout: number = parseInt(core.getInput('test_timeout'))
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
     core.debug(`Skip tests: ${skip_tests}`)
-
-    await wait(1000)
+    core.debug(`Test timeout: ${test_timeout}`)
 
     // Spawn the Python process
     await new Promise<void>((resolve, reject) => {
@@ -36,7 +34,9 @@ export async function run(): Promise<void> {
           '--config_update_delay',
           config_update_delay.toString(),
           '--skip_tests',
-          skip_tests
+          skip_tests,
+          '--test_timeout',
+          test_timeout.toString()
         ],
         {
           stdio: 'inherit'

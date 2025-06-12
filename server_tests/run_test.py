@@ -12,6 +12,7 @@ import concurrent.futures
 from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
+from enum import Enum
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -49,23 +50,30 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 logger = get_logger()
 
 
+class TestStatus(Enum):
+    PASSED = "PASSED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+    TIMEOUT = "TIMEOUT"
+
+
 @dataclass
 class TestResult:
     test_dir: str
     start_time: datetime
     end_time: Optional[datetime] = None
-    success: bool = False
+    status: TestStatus = TestStatus.FAILED
     error_message: Optional[str] = None
     duration: Optional[float] = None
 
-    def complete(self, success: bool, error_message: Optional[str] = None):
+    def complete(self, status: TestStatus, error_message: Optional[str] = None):
         self.end_time = datetime.now()
-        self.success = success
+        self.status = status
         self.error_message = error_message
         self.duration = (self.end_time - self.start_time).total_seconds()
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json exists, apply it
@@ -107,46 +115,53 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
         logger.debug(f"Running test: {command}")
 
-        # Run the test and capture both stdout and stderr
-        process = subprocess.run(
-            command,
-            shell=True,
-            check=False,  # Don't raise exception on non-zero exit
-            capture_output=True,
-            text=True
-        )
+        # Run the test with timeout
+        try:
+            process = subprocess.run(
+                command,
+                shell=True,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=test_timeout
+            )
 
-        if process.returncode != 0:
-            # Extract the actual assertion error and stack trace from the output
-            error_lines = process.stderr.split('\n')
+            if process.returncode != 0:
+                # Extract the actual assertion error and stack trace from the output
+                error_lines = process.stderr.split('\n')
 
-            # Find the full assertion error message
-            assertion_error = None
-            for line in error_lines:
-                if 'AssertionError:' in line:
-                    assertion_error = line.strip()
-                    break
+                # Find the full assertion error message
+                assertion_error = None
+                for line in error_lines:
+                    if 'AssertionError:' in line:
+                        assertion_error = line.strip()
+                        break
 
-            # Find the last stack trace line from test.py
-            test_stack_line = None
-            for line in reversed(error_lines):
-                if 'test.py' in line and 'in run_test' in line:
-                    test_stack_line = line.strip()
-                    break
+                # Find the last stack trace line from test.py
+                test_stack_line = None
+                for line in reversed(error_lines):
+                    if 'test.py' in line and 'in run_test' in line:
+                        test_stack_line = line.strip()
+                        break
 
-            if assertion_error and test_stack_line:
-                error_message = f"{test_stack_line}<br>`{assertion_error}`"
-                raise Exception(error_message)
-            else:
-                raise Exception(
-                    f"Test failed with return code {process.returncode}\n```\n{process.stderr}\n```")
+                if assertion_error and test_stack_line:
+                    error_message = f"{test_stack_line}<br>`{assertion_error}`"
+                    raise Exception(error_message)
+                else:
+                    raise Exception(
+                        f"Test failed with return code {process.returncode}\n```\n{process.stderr}\n```")
 
-        result.complete(True)
-        return result
+            result.complete(TestStatus.PASSED)
+            return result
+
+        except subprocess.TimeoutExpired:
+            result.complete(TestStatus.TIMEOUT,
+                            f"Test timed out after {test_timeout} seconds")
+            return result
 
     except Exception as e:
         logger.error(f"Error running test: {e}")
-        result.complete(False, str(e))
+        result.complete(TestStatus.FAILED, str(e))
         return result
     finally:
         # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
@@ -183,10 +198,13 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         # Write summary statistics
         total_tests = len(test_results)
         passed_tests = sum(
-            1 for r in test_results if r.success and r.error_message != "Skipped")
+            1 for r in test_results if r.status == TestStatus.PASSED)
         skipped_tests = sum(
-            1 for r in test_results if r.error_message == "Skipped")
-        failed_tests = total_tests - passed_tests - skipped_tests
+            1 for r in test_results if r.status == TestStatus.SKIPPED)
+        timeout_tests = sum(
+            1 for r in test_results if r.status == TestStatus.TIMEOUT)
+        failed_tests = sum(
+            1 for r in test_results if r.status == TestStatus.FAILED)
         total_duration = sum(
             r.duration for r in test_results if r.duration is not None)
 
@@ -194,6 +212,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write(f"- **Total Tests:** {total_tests}\n")
         f.write(f"- **Passed:** {passed_tests}\n")
         f.write(f"- **Skipped:** {skipped_tests}\n")
+        f.write(f"- **Timed Out:** {timeout_tests}\n")
         f.write(f"- **Failed:** {failed_tests}\n")
         f.write(f"- **Total Duration:** {total_duration:.2f} seconds\n\n")
 
@@ -203,10 +222,13 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write("|------|--------|----------|---------------|\n")
 
         for result in test_results:
-            if result.error_message == "Skipped":
-                status = "⏭️ SKIP"
-            else:
-                status = "✅ PASS" if result.success else "❌ FAIL"
+            status_emoji = {
+                TestStatus.PASSED: "✅ PASS",
+                TestStatus.FAILED: "❌ FAIL",
+                TestStatus.SKIPPED: "⏭️ SKIP",
+                TestStatus.TIMEOUT: "⏰ TIMEOUT"
+            }
+            status = status_emoji[result.status]
             duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
             error = result.error_message if result.error_message else "-"
             # Escape pipe characters in error messages to prevent table formatting issues
@@ -215,7 +237,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path)
@@ -236,7 +258,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
             if test_dir in tests_to_skip:
                 result = TestResult(test_dir=test_dir,
                                     start_time=datetime.now())
-                result.complete(True, "Skipped")
+                result.complete(TestStatus.SKIPPED, "Skipped")
                 test_results.append(result)
                 logger.info(f"Test {test_dir} ⏭️ SKIPPED")
                 continue
@@ -248,7 +270,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 token,
                 dockerfile_path,
                 start_port,
-                config_update_delay
+                config_update_delay,
+                test_timeout
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -258,10 +281,15 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
             try:
                 result = future.result()
                 test_results.append(result)
-                status = "PASSED" if result.success else "FAILED"
+                status_emoji = {
+                    TestStatus.PASSED: "✅ PASSED",
+                    TestStatus.FAILED: "❌ FAILED",
+                    TestStatus.SKIPPED: "⏭️ SKIPPED",
+                    TestStatus.TIMEOUT: "⏰ TIMED OUT"
+                }
                 logger.info(
-                    f"Test {test_dir} {status} in {result.duration:.2f} seconds")
-                if not result.success:
+                    f"Test {test_dir} {status_emoji[result.status]} in {result.duration:.2f} seconds")
+                if result.status == TestStatus.FAILED:
                     logger.error(
                         f"Error in test {test_dir}: {result.error_message}")
             except Exception as e:
@@ -270,7 +298,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 result = TestResult(test_dir=test_dir,
                                     start_time=datetime.now())
                 result.complete(
-                    False, f"{e} \n```\n{traceback.format_exc()}\n```")
+                    TestStatus.FAILED, f"{e} \n```\n{traceback.format_exc()}\n```")
                 test_results.append(result)
                 break
 
@@ -282,22 +310,26 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
     logger.info("=" * 50)
     total_tests = len(test_results)
     passed_tests = sum(
-        1 for r in test_results if r.success and r.error_message != "Skipped")
+        1 for r in test_results if r.status == TestStatus.PASSED)
     skipped_tests = sum(
-        1 for r in test_results if r.error_message == "Skipped")
-    failed_tests = total_tests - passed_tests - skipped_tests
+        1 for r in test_results if r.status == TestStatus.SKIPPED)
+    timeout_tests = sum(
+        1 for r in test_results if r.status == TestStatus.TIMEOUT)
+    failed_tests = sum(
+        1 for r in test_results if r.status == TestStatus.FAILED)
     total_duration = sum(
         r.duration for r in test_results if r.duration is not None)
 
     logger.info(f"Total Tests: {total_tests}")
     logger.info(f"Passed: {passed_tests}")
     logger.info(f"Skipped: {skipped_tests}")
+    logger.info(f"Timed Out: {timeout_tests}")
     logger.info(f"Failed: {failed_tests}")
     logger.info(f"Total Duration: {total_duration:.2f} seconds")
     logger.info("=" * 50)
 
-    # Exit with error if any tests failed
-    if failed_tests > 0:
+    # Exit with error if any tests failed or timed out
+    if failed_tests > 0 or timeout_tests > 0:
         sys.exit(1)
 
 
@@ -307,6 +339,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
     parser.add_argument("--skip_tests", type=str, required=False)
+    parser.add_argument("--test_timeout", type=int, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests)
+              args.config_update_delay, args.skip_tests, args.test_timeout)

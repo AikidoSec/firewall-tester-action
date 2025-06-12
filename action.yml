@@ -15,13 +15,13 @@ inputs:
   max_parallel_tests:
     description:
       The maximum number of tests to run in parallel (for each test, a new
-      container will be spawned)
+      container will be spawned). Default is 5.
     required: true
     default: '5'
   config_update_delay:
     description:
       The delay in seconds to wait after updating the config to ensure the
-      config is applied.
+      config is applied. Default is 60 seconds.
     required: true
     default: '60'
   skip_tests:
@@ -30,6 +30,10 @@ inputs:
       "test_allowed_ip,test2,test3")
     required: false
     default: ''
+  test_timeout:
+    description: The timeout in seconds for each test. Default is 60 seconds.
+    required: false
+    default: '300'
 
 # Define your outputs here.
 outputs:

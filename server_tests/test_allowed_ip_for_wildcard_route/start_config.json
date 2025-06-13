@@ -2,7 +2,7 @@
   "endpoints": [
     {
       "method": "GET",
-      "route": "/pages/create",
+      "route": "/api/pets/",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],
@@ -14,7 +14,7 @@
     },
     {
       "method": "*",
-      "route": "/pages/*",
+      "route": "/api/p*",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": ["185.245.255.212"],

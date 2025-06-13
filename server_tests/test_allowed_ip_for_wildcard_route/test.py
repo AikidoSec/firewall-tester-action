@@ -19,7 +19,7 @@ def f(config_file: str):
 
 def run_test(s: TestServer, c: CoreApi):
     # Using global ts and c from testlib
-    response = s.get("/somethingVerySpecific",
+    response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 403)
     assert_response_header_contains(response, "Content-Type", "text")
@@ -28,14 +28,14 @@ def run_test(s: TestServer, c: CoreApi):
 
     c.update_runtime_config_file(f("change_config_remove_allowed_ip.json"))
 
-    response = s.get("/somethingVerySpecific",
+    response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 200)
-    assert_response_body_contains(response, "Hello")
+    assert_response_body_contains(response, "[]")
 
     c.update_runtime_config_file(f("start_config.json"))
 
-    response = s.get("/somethingVerySpecific",
+    response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 403)
     assert_response_header_contains(response, "Content-Type", "text")

@@ -28,7 +28,7 @@ def check_shell_injection(response_code, response_body, event_id, expected_json)
     all_events = c.get_events()
     new_events = all_events[len(start_events):]
 
-#    assert_events_length_is_at_least(new_events, event_id + 1)
+    assert_events_length_is(new_events, 1)
     assert_started_event_is_valid(all_events[0])
     assert_event_contains_subset_file(new_events[0], expected_json)
 

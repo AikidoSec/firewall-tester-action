@@ -2,7 +2,7 @@
   "endpoints": [
     {
       "method": "GET",
-      "route": "/somethingVerySpecific",
+      "route": "/api/pets/",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],
@@ -14,7 +14,7 @@
     },
     {
       "method": "*",
-      "route": "/something*",
+      "route": "/api/p*",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],

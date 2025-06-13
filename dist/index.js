@@ -69249,6 +69249,7 @@ const stopServer = () => {
 async function run() {
     try {
         // Start the Express server
+        startPostgres();
         startServer();
         const dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
@@ -69296,7 +69297,45 @@ async function run() {
     }
     finally {
         stopServer();
+        stopPostgres();
     }
+}
+function startPostgres() {
+    const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '--network',
+        'host',
+        '--name',
+        'postgres',
+        '-e',
+        'POSTGRES_PASSWORD=mysecretpassword',
+        '-e',
+        'POSTGRES_USER=myuser',
+        '-e',
+        'POSTGRES_DB=mydb',
+        '-p',
+        '5432:5432',
+        '-d',
+        'postgres'
+    ], {
+        stdio: 'inherit'
+    });
+    proc.on('close', (code) => {
+        if (code !== 0) {
+            coreExports.setFailed(`Failed to start Postgres: ${code}`);
+        }
+    });
+}
+function stopPostgres() {
+    const proc = spawn('docker', ['stop', 'postgres'], {
+        stdio: 'inherit'
+    });
+    proc.on('close', (code) => {
+        if (code !== 0) {
+            coreExports.warning(`Failed to stop Postgres: ${code}`);
+        }
+    });
 }
 
 /**

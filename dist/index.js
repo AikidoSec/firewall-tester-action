@@ -69246,6 +69246,19 @@ const stopServer = () => {
     server?.close();
 };
 
+// Handle process termination signals
+process.on('SIGINT', () => {
+    console.log('\nReceived SIGINT. Cleaning up...');
+    stopServer();
+    stopPostgres();
+    process.exit(0);
+});
+process.on('SIGTERM', () => {
+    console.log('\nReceived SIGTERM. Cleaning up...');
+    stopServer();
+    stopPostgres();
+    process.exit(0);
+});
 async function run() {
     try {
         // Start the Express server

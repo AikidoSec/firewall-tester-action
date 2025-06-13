@@ -23,9 +23,9 @@ app.get('/test', (req, res) => {
   res.json({ message: 'Hello, test!' })
 })
 
-app.post('/shell_injection', (req, res) => {
-  console.log('Endpoint /shell_injection called')
-  const command = req.body.command
+app.post('/api/execute', (req, res) => {
+  console.log('Endpoint /api/execute called')
+  const command = req.body.userCommand
   const fullCommand = `binary --domain www.example${command}.com`
   const result = exec(fullCommand)
   res.json({ message: 'Shell executed!' })

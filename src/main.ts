@@ -2,6 +2,21 @@ import * as core from '@actions/core'
 import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
 
+// Handle process termination signals
+process.on('SIGINT', () => {
+  console.log('\nReceived SIGINT. Cleaning up...')
+  stopServer()
+  stopPostgres()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  console.log('\nReceived SIGTERM. Cleaning up...')
+  stopServer()
+  stopPostgres()
+  process.exit(0)
+})
+
 export async function run(): Promise<void> {
   try {
     // Start the Express server

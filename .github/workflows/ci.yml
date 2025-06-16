@@ -12,6 +12,46 @@ permissions:
   contents: read
 
 jobs:
+  test-python:
+    name: Python Tests (zen-demo-python)
+    runs-on: ubuntu-latest
+
+    steps:
+      #https://github.com/Aikido-demo-apps/zen-demo-python
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-python
+          path: zen-demo/zen-demo-python
+
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/zen-demo-python/Dockerfile
+  test-nodejs:
+    name: Node.js Tests (zen-demo-nodejs)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-nodejs
+          path: zen-demo/zen-demo-nodejs
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/zen-demo-nodejs/Dockerfile
+
   # test-typescript:
   #   name: TypeScript Tests
   #   runs-on: ubuntu-latest

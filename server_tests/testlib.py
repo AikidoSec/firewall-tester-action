@@ -5,6 +5,7 @@ import argparse
 from core_api import CoreApi
 from requests.adapters import HTTPAdapter, Retry
 import json
+import subprocess
 
 s = requests.Session()
 retries = Retry(connect=10,
@@ -73,6 +74,12 @@ class TestServer:
 
     def post(self, route="", data={}, headers={}, benchmark=False):
         return localhost_post_request(self.port, route, data, headers, benchmark)
+
+    def get_logs(self, container_name: str):
+        # this gets the logs from the server (docker logs <container_name>)
+        logs = subprocess.check_output(
+            ["docker", "logs", container_name], stderr=subprocess.STDOUT)
+        return logs.decode("utf-8")
 
 
 def assert_event_contains_subset(event, event_subset, dry_mode=False):

@@ -23,6 +23,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-python
           path: zen-demo/zen-demo-python
+          ref: main
 
       - name: Checkout action
         id: checkout
@@ -43,6 +44,8 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: zen-demo/zen-demo-nodejs
+          ref: main
+
       - name: Checkout action
         id: checkout
         uses: actions/checkout@v4

@@ -19,9 +19,9 @@ jobs:
     steps:
       #https://github.com/AikidoSec/zen-demo-python
       - name: Checkout demo app
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
-          repository: AikidoSec/firewall-ruby
+          repository: AikidoSec/zen-demo-python
           path: zen-demo-python
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}

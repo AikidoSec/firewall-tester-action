@@ -25,7 +25,7 @@ jobs:
         id: test-action
         uses: ./
         with:
-          dockerfile_path: ./zen-demo/zen-demo-python/Dockerfile
+          dockerfile_path: ./zen-demo-apps/zen-demo-python/Dockerfile
   # test-nodejs:
   #   name: Node.js Tests (zen-demo-nodejs)
   #   runs-on: ubuntu-latest

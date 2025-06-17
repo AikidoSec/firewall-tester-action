@@ -21,7 +21,8 @@ jobs:
         id: checkout
         uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
+          token: ${{ secrets.ACCESS_TOKEN }}
 
       - name: Test Local Action
         id: test-action

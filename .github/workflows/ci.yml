@@ -24,6 +24,7 @@ jobs:
           repository: AikidoSec/zen-demo-python
           path: zen-demo/zen-demo-python
           ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout action
         id: checkout

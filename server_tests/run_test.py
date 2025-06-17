@@ -192,6 +192,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
 def build_docker_image(dockerfile_path: str):
     if not os.path.exists(dockerfile_path):
+        # list files from dockerfile_path root
+        logger.debug(f"Dockerfile not found: {dockerfile_path}")
+        logger.debug(
+            f"Files in {os.path.dirname(dockerfile_path)}: {os.listdir(os.path.dirname(dockerfile_path))}")
         raise Exception(f"Dockerfile not found: {dockerfile_path}")
 
     # Get the directory containing the Dockerfile

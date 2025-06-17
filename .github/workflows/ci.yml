@@ -21,7 +21,7 @@ jobs:
       - name: Checkout demo app
         uses: actions/checkout@v4
         with:
-          repository: AikidoSec/zen-demo-python
+          repository: AikidoSec/firewall-node
           path: zen-demo-python
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}

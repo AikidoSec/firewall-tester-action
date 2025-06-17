@@ -17,24 +17,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      #https://github.com/AikidoSec/zen-demo-python
-      - name: Checkout demo app
-        uses: actions/checkout@v3
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
         with:
-          repository: AikidoSec/zen-demo-python
-          path: zen-demo-python
-          ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Checkout action
-      #   id: checkout
-      #   uses: actions/checkout@v4
-
-      # - name: Test Local Action
-      #   id: test-action
-      #   uses: ./
-      #   with:
-      #     dockerfile_path: ./zen-demo/zen-demo-python/Dockerfile
+          dockerfile_path: ./zen-demo/zen-demo-python/Dockerfile
   # test-nodejs:
   #   name: Node.js Tests (zen-demo-nodejs)
   #   runs-on: ubuntu-latest

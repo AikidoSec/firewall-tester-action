@@ -69269,10 +69269,12 @@ async function run() {
         const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
         const skip_tests = coreExports.getInput('skip_tests');
         const test_timeout = parseInt(coreExports.getInput('test_timeout'));
+        const extra_args = coreExports.getInput('extra_args');
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
         coreExports.debug(`Test timeout: ${test_timeout}`);
+        coreExports.debug(`Extra args: ${extra_args}`);
         // Spawn the Python process
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
@@ -69286,7 +69288,9 @@ async function run() {
                 '--skip_tests',
                 skip_tests,
                 '--test_timeout',
-                test_timeout.toString()
+                test_timeout.toString(),
+                '--extra_args',
+                extra_args
             ], {
                 stdio: 'inherit'
             });

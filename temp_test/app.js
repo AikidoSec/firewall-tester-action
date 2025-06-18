@@ -26,9 +26,9 @@ app.get('/test', (req, res) => {
 app.post('/api/execute', (req, res) => {
   console.log('Endpoint /api/execute called')
   const command = req.body.userCommand
-  const fullCommand = `binary --domain www.example${command}.com`
+  const fullCommand = `${command}`
   const result = exec(fullCommand)
-  res.json({ message: 'Shell executed!' })
+  res.json({ success: true, output: result })
 })
 
 // Start the server

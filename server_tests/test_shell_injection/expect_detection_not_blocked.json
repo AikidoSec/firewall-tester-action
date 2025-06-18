@@ -3,7 +3,7 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "body": "{\"userCommand\": \"`whoami`\"}",
+    "body": "{\"userCommand\": \"whoami\"}",
     "route": "/api/execute"
   },
   "attack": {
@@ -11,9 +11,9 @@
     "blocked": false,
     "source": "body",
     "path": ".userCommand",
-    "payload": "\"`whoami`\"",
+    "payload": "\"whoami\"",
     "metadata": {
-      "command": "binary --domain www.example`whoami`.com"
+      "command": "whoami"
     }
   },
   "agent": {

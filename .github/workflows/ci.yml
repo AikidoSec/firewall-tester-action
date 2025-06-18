@@ -20,15 +20,20 @@ jobs:
       - name: Checkout action
         id: checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          token: ${{ secrets.ACCESS_TOKEN }}
-
+        #with:
+        #  submodules: recursive
+        #  token: ${{ secrets.ACCESS_TOKEN }}
       - name: Test Local Action
         id: test-action
         uses: ./
         with:
-          dockerfile_path: ./zen-demo-apps/zen-demo-python/Dockerfile
+          dockerfile_path: ./temp_test/Dockerfile
+
+      # - name: Test Local Action
+      #   id: test-action
+      #   uses: ./
+      #   with:
+      #     dockerfile_path: ./zen-demo-apps/zen-demo-python/Dockerfile
   # test-nodejs:
   #   name: Node.js Tests (zen-demo-nodejs)
   #   runs-on: ubuntu-latest

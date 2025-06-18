@@ -73,6 +73,11 @@ class TestResult:
         self.duration = (self.end_time - self.start_time).total_seconds()
 
 
+DOCKER_HOST_IP = subprocess.check_output(
+    "ip route | awk '/default/ {print $3}'", shell=True
+).decode().strip()
+
+
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
@@ -102,13 +107,12 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         command = (
             f"docker run -d "
             f"{extra_args} "
-            # f"--network aikido-network "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT=3001 "
-            f"--env AIKIDO_ENDPOINT=http://host.docker.internal:3000 "
-            f"--env AIKIDO_REALTIME_ENDPOINT=http://host.docker.internal:3000 "
-            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@host.docker.internal:5432/{test_dir}?sslmode=disable "
+            f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
+            f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
+            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:3001 "
             f"{DOCKER_IMAGE_NAME}"

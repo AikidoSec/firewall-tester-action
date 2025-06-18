@@ -69086,10 +69086,34 @@ function realtimeConfigHandler(req, res) {
 }
 
 const events = new Map();
+function normalizeTypesInApiSpec(schema) {
+    const clone = { ...schema };
+    // Convert single-element array type to string
+    if (Array.isArray(clone.type) && clone.type.length === 1) {
+        clone.type = clone.type[0];
+    }
+    // Recurse into properties
+    if (clone.properties) {
+        const newProps = {};
+        for (const [key, value] of Object.entries(clone.properties)) {
+            newProps[key] = normalizeTypesInApiSpec(value);
+        }
+        clone.properties = newProps;
+    }
+    if (clone.items) {
+        clone.items = normalizeTypesInApiSpec(clone.items);
+    }
+    return clone;
+}
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureEvent(event, app) {
     if (!events.has(app.id)) {
         events.set(app.id, []);
+    }
+    if (event.type === 'heartbeat') {
+        event.routes.forEach((route) => {
+            route.apispec = normalizeTypesInApiSpec(route.apispec);
+        });
     }
     events.get(app.id).push(event);
 }
@@ -69321,8 +69345,6 @@ function startPostgres() {
     const proc = spawn('docker', [
         'run',
         '--rm',
-        '--network',
-        'host',
         '--name',
         'postgres',
         '-e',

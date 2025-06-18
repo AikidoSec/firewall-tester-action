@@ -84,7 +84,6 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 try:
                     config = json.load(f)
                     r = core_api.update_runtime_config_json(config)
-                    logger.debug(f"Config: {r}")
                 except Exception as e:
                     logger.error(
                         f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
@@ -103,12 +102,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         command = (
             f"docker run -d "
             f"{extra_args} "
-            f"--network host "
+            # f"--network aikido-network "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
-            f"--env PORT={start_port} "
-            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@localhost:5432/{test_dir}?sslmode=disable "
+            f"--env PORT=3001 "
+            f"--env AIKIDO_ENDPOINT=http://host.docker.internal:3000 "
+            f"--env AIKIDO_REALTIME_ENDPOINT=http://host.docker.internal:3000 "
+            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@host.docker.internal:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
+            f"-p {start_port}:3001 "
             f"{DOCKER_IMAGE_NAME}"
         )
         logger.debug(f"Running Docker container: {command}")

@@ -90,8 +90,6 @@ function startPostgres() {
     [
       'run',
       '--rm',
-      '--network',
-      'host',
       '--name',
       'postgres',
       '-e',

@@ -12,6 +12,10 @@ inputs:
   dockerfile_path:
     description: The path to the Dockerfile with the Aikido agent installed
     required: true
+  extra_args:
+    description: Extra arguments to pass to the docker run command
+    required: false
+    default: ''
   max_parallel_tests:
     description:
       The maximum number of tests to run in parallel (for each test, a new

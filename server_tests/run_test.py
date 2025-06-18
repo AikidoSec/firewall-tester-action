@@ -73,7 +73,7 @@ class TestResult:
         self.duration = (self.end_time - self.start_time).total_seconds()
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json exists, apply it
@@ -102,6 +102,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(1)
         command = (
             f"docker run -d "
+            f"{extra_args} "
             f"--network host "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
@@ -256,7 +257,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path)
@@ -290,7 +291,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 dockerfile_path,
                 start_port,
                 config_update_delay,
-                test_timeout
+                test_timeout,
+                extra_args
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -359,6 +361,7 @@ if __name__ == "__main__":
     parser.add_argument("--config_update_delay", type=int, required=True)
     parser.add_argument("--skip_tests", type=str, required=False)
     parser.add_argument("--test_timeout", type=int, required=False)
+    parser.add_argument("--extra_args", type=str, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args)

@@ -73,9 +73,11 @@ class TestResult:
         self.duration = (self.end_time - self.start_time).total_seconds()
 
 
-DOCKER_HOST_IP = subprocess.check_output(
-    "ip route | awk '/default/ {print $3}'", shell=True
-).decode().strip()
+# DOCKER_HOST_IP = subprocess.check_output(
+#     "ip route | awk '/default/ {print $3}'", shell=True
+# ).decode().strip()
+
+DOCKER_HOST_IP = "172.17.0.1"
 
 
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:

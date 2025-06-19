@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
-          path: zen-demo
+          path: ./zen-demo
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
@@ -34,7 +34,7 @@ jobs:
         id: test-action
         uses: ./
         with:
-          dockerfile_path: zen-demo-nodejs/Dockerfile
+          dockerfile_path: ./zen-demo/zen-demo-nodejs/Dockerfile
 
   # test-typescript:
   #   name: TypeScript Tests

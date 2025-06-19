@@ -34,7 +34,7 @@ jobs:
         id: test-action
         uses: ./
         with:
-          dockerfile_path: ./zen-demo/zen-demo-nodejs/Dockerfile
+          dockerfile_path: ./zen-demo/Dockerfile
 
   # test-typescript:
   #   name: TypeScript Tests

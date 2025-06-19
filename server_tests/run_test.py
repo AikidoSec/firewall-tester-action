@@ -16,6 +16,8 @@ from enum import Enum
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
+    "GITHUB_ACTIONS") == "true" else "172.17.0.2"
 
 
 class GitHubActionsFormatter(logging.Formatter):
@@ -71,13 +73,6 @@ class TestResult:
         self.status = status
         self.error_message = error_message
         self.duration = (self.end_time - self.start_time).total_seconds()
-
-
-# DOCKER_HOST_IP = subprocess.check_output(
-#     "ip route | awk '/default/ {print $3}'", shell=True
-# ).decode().strip()
-
-DOCKER_HOST_IP = "172.17.0.1"
 
 
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:

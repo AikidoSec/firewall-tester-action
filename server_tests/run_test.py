@@ -109,7 +109,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json exists, apply it
@@ -140,12 +140,12 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
-            f"--env PORT=3000 "
+            f"--env PORT={app_port} "
             f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
             f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
             f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
-            f"-p {start_port}:3000 "
+            f"-p {start_port}:{app_port} "
             f"{DOCKER_IMAGE_NAME}"
         )
         logger.debug(f"Running Docker container: {command}")
@@ -308,7 +308,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -343,7 +343,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 start_port,
                 config_update_delay,
                 test_timeout,
-                extra_args
+                extra_args,
+                app_port
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -414,6 +415,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_timeout", type=int, required=False)
     parser.add_argument("--extra_args", type=str, required=False)
     parser.add_argument("--extra_build_args", type=str, required=False)
+    parser.add_argument("--app_port", type=int, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port)

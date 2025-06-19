@@ -33,6 +33,7 @@ export async function run(): Promise<void> {
     const test_timeout: number = parseInt(core.getInput('test_timeout'))
     const extra_args: string = core.getInput('extra_args')
     const extra_build_args: string = core.getInput('extra_build_args')
+    const app_port: number = parseInt(core.getInput('app_port'))
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
@@ -40,6 +41,7 @@ export async function run(): Promise<void> {
     core.debug(`Test timeout: ${test_timeout}`)
     core.debug(`Extra args: ${extra_args}`)
     core.debug(`Extra build args: ${extra_build_args}`)
+    core.debug(`App port: ${app_port}`)
     // Spawn the Python process
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
@@ -59,7 +61,9 @@ export async function run(): Promise<void> {
           '--extra_args',
           extra_args,
           '--extra_build_args',
-          extra_build_args
+          extra_build_args,
+          '--app_port',
+          app_port.toString()
         ],
         {
           stdio: 'inherit'

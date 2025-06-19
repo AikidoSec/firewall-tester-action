@@ -24,6 +24,12 @@ inputs:
       APP_VERSION=2.0.1")
     required: false
     default: ''
+  app_port:
+    description:
+      The port of the application to test, the one that is open when docker is
+      running
+    required: true
+    default: '8080'
   max_parallel_tests:
     description:
       The maximum number of tests to run in parallel (for each test, a new

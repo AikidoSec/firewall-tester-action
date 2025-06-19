@@ -35,6 +35,7 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
+          app_port: 3000
 
   # test-typescript:
   #   name: TypeScript Tests

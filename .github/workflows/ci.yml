@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
-          path: zen-demo/zen-demo-nodejs
+          path: zen-demo
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive

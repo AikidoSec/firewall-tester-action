@@ -14,8 +14,8 @@ inputs:
     required: true
   extra_args:
     description:
-      Extra arguments to pass to the docker run command (only --env and -e are
-      allowed)
+      Extra arguments to pass to the docker run command (only --env, -e and
+      --env-file are allowed)
     required: false
     default: ''
   extra_build_args:
@@ -52,6 +52,12 @@ inputs:
     description: The timeout in seconds for each test. Default is 60 seconds.
     required: false
     default: '300'
+  sleep_before_test:
+    description:
+      The number of seconds to sleep before starting the test. Default is 1
+      second.
+    required: false
+    default: '1'
 
 # Define your outputs here.
 outputs:

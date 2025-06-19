@@ -77,7 +77,7 @@ class TestResult:
 
 
 def sanitize_extra_run_args(extra_args: str):
-    allowed_prefixes = ("--env", "-e")
+    allowed_prefixes = ("--env", "-e", "--env-file")
     result = []
 
     if not extra_args:
@@ -93,13 +93,24 @@ def sanitize_extra_run_args(extra_args: str):
             # Handle both "--env=VAR=value" and "--env VAR=value"
             if "=" in arg:
                 # Single argument form: --env=VAR=value or -e=VAR=value
-                result.append(arg)
+                if arg.startswith("--env-file="):
+                    # Convert relative path to absolute path for --env-file
+                    file_path = arg.split("=", 1)[1]
+                    abs_path = os.path.abspath(file_path)
+                    result.append(f"--env-file={abs_path}")
+                else:
+                    result.append(arg)
             else:
                 # Separate form: --env VAR=value or -e VAR=value
                 if i + 1 >= len(args):
                     raise ValueError(f"Missing value for {arg}")
                 value = args[i + 1]
-                result.extend([arg, value])
+                if arg == "--env-file":
+                    # Convert relative path to absolute path for --env-file
+                    abs_path = os.path.abspath(value)
+                    result.extend([arg, abs_path])
+                else:
+                    result.extend([arg, value])
                 i += 1
         else:
             raise ValueError(f"Disallowed argument: {arg}")
@@ -109,7 +120,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json exists, apply it
@@ -151,7 +162,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
-        time.sleep(1)
+        time.sleep(sleep_before_test)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
@@ -308,7 +319,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -344,7 +355,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 config_update_delay,
                 test_timeout,
                 extra_args,
-                app_port
+                app_port,
+                sleep_before_test
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -416,6 +428,7 @@ if __name__ == "__main__":
     parser.add_argument("--extra_args", type=str, required=False)
     parser.add_argument("--extra_build_args", type=str, required=False)
     parser.add_argument("--app_port", type=int, required=False)
+    parser.add_argument("--sleep_before_test", type=int, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test)

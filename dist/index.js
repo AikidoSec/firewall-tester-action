@@ -69296,6 +69296,7 @@ async function run() {
         const extra_args = coreExports.getInput('extra_args');
         const extra_build_args = coreExports.getInput('extra_build_args');
         const app_port = parseInt(coreExports.getInput('app_port'));
+        const sleep_before_test = parseInt(coreExports.getInput('sleep_before_test'));
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
@@ -69303,6 +69304,7 @@ async function run() {
         coreExports.debug(`Extra args: ${extra_args}`);
         coreExports.debug(`Extra build args: ${extra_build_args}`);
         coreExports.debug(`App port: ${app_port}`);
+        coreExports.debug(`Sleep before test: ${sleep_before_test}`);
         // Spawn the Python process
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
@@ -69322,7 +69324,9 @@ async function run() {
                 '--extra_build_args',
                 extra_build_args,
                 '--app_port',
-                app_port.toString()
+                app_port.toString(),
+                '--sleep_before_test',
+                sleep_before_test.toString()
             ], {
                 stdio: 'inherit'
             });

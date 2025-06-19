@@ -72,7 +72,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
-          ref: main
+          ref: docker-fixes
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 

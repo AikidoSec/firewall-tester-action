@@ -6,15 +6,25 @@
       "method": "POST",
       "hits": 3,
       "apispec": {
-        "query": {
-          "type": "object",
-          "properties": {}
-        }
+        "body": {
+          "type": "json"
+        },
+
+        "auth": [
+          {
+            "type": "http",
+            "scheme": "bearer"
+          },
+          {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key"
+          }
+        ]
       }
     }
   ],
   "agent": {
     "dryMode": false
-  },
-  "middlewareInstalled": false
+  }
 }

@@ -13,7 +13,15 @@ inputs:
     description: The path to the Dockerfile with the Aikido agent installed
     required: true
   extra_args:
-    description: Extra arguments to pass to the docker run command
+    description:
+      Extra arguments to pass to the docker run command (only --env and -e are
+      allowed)
+    required: false
+    default: ''
+  extra_build_args:
+    description:
+      Extra arguments to pass to the docker build command (e.g. "--build-arg
+      APP_VERSION=2.0.1")
     required: false
     default: ''
   max_parallel_tests:

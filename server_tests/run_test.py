@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
 from enum import Enum
+import shlex
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -75,6 +76,39 @@ class TestResult:
         self.duration = (self.end_time - self.start_time).total_seconds()
 
 
+def sanitize_extra_run_args(extra_args: str):
+    allowed_prefixes = ("--env", "-e")
+    result = []
+
+    if not extra_args:
+        return ""
+
+    args = shlex.split(extra_args)
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+
+        if arg.startswith(allowed_prefixes):
+            # Handle both "--env=VAR=value" and "--env VAR=value"
+            if "=" in arg:
+                # Single argument form: --env=VAR=value or -e=VAR=value
+                result.append(arg)
+            else:
+                # Separate form: --env VAR=value or -e VAR=value
+                if i + 1 >= len(args):
+                    raise ValueError(f"Missing value for {arg}")
+                value = args[i + 1]
+                result.extend([arg, value])
+                i += 1
+        else:
+            raise ValueError(f"Disallowed argument: {arg}")
+
+        i += 1
+
+    return " ".join(result)
+
+
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
@@ -103,7 +137,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(1)
         command = (
             f"docker run -d "
-            f"{extra_args} "
+            f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT=3001 "
@@ -194,7 +228,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                        shell=True, check=True, capture_output=True)
 
 
-def build_docker_image(dockerfile_path: str):
+def build_docker_image(dockerfile_path: str, extra_build_args: str):
     if not os.path.exists(dockerfile_path):
         # list files from dockerfile_path root
         logger.debug(f"Dockerfile not found: {dockerfile_path}")
@@ -204,9 +238,23 @@ def build_docker_image(dockerfile_path: str):
 
     # Get the directory containing the Dockerfile
     dockerfile_dir = os.path.dirname(dockerfile_path)
-    docker_build_command = f"docker build -t {DOCKER_IMAGE_NAME} -f {dockerfile_path} {dockerfile_dir}"
-    logger.debug(f"Building Docker image: {docker_build_command}")
-    subprocess.run(docker_build_command, shell=True, check=True)
+    command = ["docker", "build", "-t",
+               DOCKER_IMAGE_NAME, "-f", dockerfile_path]
+    if extra_build_args:
+        try:
+            args = shlex.split(extra_build_args)
+            # Optionally, validate only allowed build args (see below)
+            for arg in args:
+                if not arg.startswith("--build-arg="):
+                    raise ValueError(f"Disallowed build argument: {arg}")
+            command.extend(args)
+        except ValueError as e:
+            print(f"Invalid build args: {e}")
+            return
+
+    command.append(dockerfile_dir)
+    logger.debug(f"Building Docker image: {command}")
+    subprocess.run(" ".join(command), shell=True, check=True)
 
 
 def write_summary_to_github_step_summary(test_results: List[TestResult]):
@@ -260,10 +308,10 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    build_docker_image(dockerfile_path)
+    build_docker_image(dockerfile_path, extra_build_args)
 
     test_dirs = [d for d in os.listdir(os.path.dirname(
         os.path.abspath(__file__))) if d.startswith("test_")]
@@ -365,6 +413,7 @@ if __name__ == "__main__":
     parser.add_argument("--skip_tests", type=str, required=False)
     parser.add_argument("--test_timeout", type=int, required=False)
     parser.add_argument("--extra_args", type=str, required=False)
+    parser.add_argument("--extra_build_args", type=str, required=False)
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args)

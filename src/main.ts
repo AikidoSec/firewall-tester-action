@@ -32,12 +32,14 @@ export async function run(): Promise<void> {
     const skip_tests: string = core.getInput('skip_tests')
     const test_timeout: number = parseInt(core.getInput('test_timeout'))
     const extra_args: string = core.getInput('extra_args')
+    const extra_build_args: string = core.getInput('extra_build_args')
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
     core.debug(`Skip tests: ${skip_tests}`)
     core.debug(`Test timeout: ${test_timeout}`)
     core.debug(`Extra args: ${extra_args}`)
+    core.debug(`Extra build args: ${extra_build_args}`)
     // Spawn the Python process
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
@@ -55,7 +57,9 @@ export async function run(): Promise<void> {
           '--test_timeout',
           test_timeout.toString(),
           '--extra_args',
-          extra_args
+          extra_args,
+          '--extra_build_args',
+          extra_build_args
         ],
         {
           stdio: 'inherit'

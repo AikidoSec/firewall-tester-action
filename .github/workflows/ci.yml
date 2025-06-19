@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.DEMOS_APPS_DOWNLOAD_TOKEN }}
+          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           ref: main
           path: zen-demo-apps/zen-demo-python
 

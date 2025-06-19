@@ -36,6 +36,28 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
+  test-python:
+    name: Python Tests (zen-demo-python)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-python
+          path: ./zen-demo
+          ref: main
+          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
+          submodules: recursive
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
 
   # test-typescript:
   #   name: TypeScript Tests

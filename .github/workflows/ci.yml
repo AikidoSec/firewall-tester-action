@@ -26,14 +26,15 @@ jobs:
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
-      # - name: Checkout action
-      #   id: checkout
-      #   uses: actions/checkout@v4
-      # - name: Test Local Action
-      #   id: test-action
-      #   uses: ./
-      #   with:
-      #     dockerfile_path: ./zen-demo/zen-demo-nodejs/Dockerfile
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/zen-demo-nodejs/Dockerfile
 
   # test-typescript:
   #   name: TypeScript Tests

@@ -35,7 +35,7 @@ def run_test(s: TestServer, c: CoreApi):
 
     c.update_runtime_config_file(f("start_config.json"))
 
-    response = s.get("//api/pets/",
+    response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_body_contains(
         response, " not allowed ")

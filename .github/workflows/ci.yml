@@ -29,7 +29,6 @@ jobs:
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
-          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
@@ -37,6 +36,8 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
+          skip_tests: test_api_spec
+
   test-python:
     name: Python Tests (zen-demo-python)
     runs-on: ubuntu-latest
@@ -53,13 +54,13 @@ jobs:
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
-          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
+          skip_tests: test_api_spec
 
   test-php:
     name: PHP Tests (zen-demo-php)
@@ -77,7 +78,6 @@ jobs:
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
-          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
@@ -88,6 +88,7 @@ jobs:
             '--env-file=./zen-demo/.env.example -e
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
           sleep_before_test: 20
+          skip_tests: test_api_spec
 
   # test-typescript:
   #   name: TypeScript Tests

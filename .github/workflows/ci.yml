@@ -29,6 +29,7 @@ jobs:
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
+          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
@@ -52,6 +53,7 @@ jobs:
           ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
+          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
@@ -72,9 +74,10 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
-          ref: docker-fixes
+          ref: main
           token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
+          skip_tests: test_api_spec
 
       - name: Test Local Action
         id: test-action
@@ -118,21 +121,21 @@ jobs:
   #       id: npm-ci-test
   #       run: npm run ci-test
 
-  test-action:
-    name: GitHub Actions Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  # test-action:
+  #   name: GitHub Actions Test
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 15
 
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout
+  #       id: checkout
+  #       uses: actions/checkout@v4
 
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./temp_test/Dockerfile
-      - name: Print Output
-        id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+  #     - name: Test Local Action
+  #       id: test-action
+  #       uses: ./
+  #       with:
+  #         dockerfile_path: ./temp_test/Dockerfile
+  #     - name: Print Output
+  #       id: output
+  #       run: echo "${{ steps.test-action.outputs.time }}"

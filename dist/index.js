@@ -69342,7 +69342,6 @@ async function run() {
                 reject(err);
             });
         });
-        coreExports.setOutput('time', new Date().toTimeString());
     }
     catch (error) {
         if (error instanceof Error)

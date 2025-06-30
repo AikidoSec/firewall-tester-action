@@ -5,30 +5,35 @@
 [![Check dist/](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml)
 [![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
 
-1. :hammer_and_wrench: Install the dependencies
+## 🚀 Usage
 
-   ```bash
-   npm install
-   ```
+```yaml
+jobs:
+  run-firewall-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-1. :building_construction: Package the TypeScript for distribution
+      - name: Run Firewall QA Tests
+        uses: AikidoSec/firewall-tester-action@v1
+        with:
+          dockerfile_path: ./test-app-dockerfiles/Dockerfile.hono
+```
 
-   ```bash
-   npm run bundle
-   ```
+## 🧩 Inputs
 
-1. :white_check_mark: Run the tests
-
-   ```bash
-   $ npm test
-
-   PASS  ./index.test.js
-     ✓ throws invalid number (3ms)
-     ✓ wait 500 ms (504ms)
-     ✓ test runs (95ms)
-
-   ...
-   ```
+| Name                  | Description                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed (required)                                      |
+| `extra_args`          | Extra arguments to pass to the `docker run` command (`--env`, `-e`, and `--env-file` only are allowed) |
+| `extra_build_args`    | Extra arguments to pass to the `docker build` command (e.g. `--build-arg APP_VERSION=2.0.1`)           |
+| `app_port`            | The port exposed by the application during Docker runtime                                              |
+| `max_parallel_tests`  | Maximum number of tests to run in parallel (default: `5`)                                              |
+| `config_update_delay` | Delay (in seconds) after updating the config to ensure it's applied (default: `60`)                    |
+| `skip_tests`          | Comma-separated list of tests to skip (e.g. `test_allowed_ip,test_sql_injection`)                      |
+| `test_timeout`        | Timeout (in seconds) for each test (default: `60`)                                                     |
+| `sleep_before_test`   | Number of seconds to wait before starting the test (default: `1`)                                      |
 
 ## Update the Action Code
 

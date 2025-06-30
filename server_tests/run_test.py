@@ -18,7 +18,7 @@ import shlex
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
-    "GITHUB_ACTIONS") == "true" else "172.17.0.2"
+    "GITHUB_ACTIONS") == "true" else "host.docker.internal"
 
 
 class GitHubActionsFormatter(logging.Formatter):

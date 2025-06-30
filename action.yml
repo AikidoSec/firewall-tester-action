@@ -1,6 +1,6 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Aikido Firewall Tester
+description: Aikido Firewall Tester
+author: AikidoSec
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
@@ -58,11 +58,6 @@ inputs:
       second.
     required: false
     default: '1'
-
-# Define your outputs here.
-outputs:
-  time:
-    description: Your output description here
 
 runs:
   using: node20

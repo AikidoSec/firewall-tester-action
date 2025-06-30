@@ -88,8 +88,6 @@ export async function run(): Promise<void> {
         reject(err)
       })
     })
-
-    core.setOutput('time', new Date().toTimeString())
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
   } finally {

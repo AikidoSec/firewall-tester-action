@@ -18,7 +18,7 @@ import shlex
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
-    "GITHUB_ACTIONS") == "true" else "host.docker.internal"
+    "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
 
 class GitHubActionsFormatter(logging.Formatter):
@@ -253,12 +253,8 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
                DOCKER_IMAGE_NAME, "-f", dockerfile_path]
     if extra_build_args:
         try:
-            args = shlex.split(extra_build_args)
-            # Optionally, validate only allowed build args (see below)
-            for arg in args:
-                if not arg.startswith("--build-arg="):
-                    raise ValueError(f"Disallowed build argument: {arg}")
-            command.extend(args)
+            # extra_build_args is a string of arguments separated by spaces (e.g. "--build-arg APP_VERSION=2.0.1 --build-arg PHP_FIREWALL_VERSION=1.0.123")
+            command.extend(extra_build_args.split(" "))
         except ValueError as e:
             print(f"Invalid build args: {e}")
             return

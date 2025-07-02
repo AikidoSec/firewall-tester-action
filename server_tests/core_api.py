@@ -30,6 +30,17 @@ class CoreApi:
             config = json.load(f)
         return self.update_runtime_config_json(config)
 
+    def update_runtime_firewall_json(self, firewall: dict) -> dict:
+        response = requests.post(f"{self.core_url}/api/runtime/firewall/lists",
+                                 headers={"Authorization": f"{self.token}"}, json=firewall)
+        time.sleep(self.config_update_delay)
+        return response.json()
+
+    def update_runtime_firewall_file(self, firewall_file: str) -> dict:
+        with open(firewall_file, "r") as f:
+            firewall = json.load(f)
+        return self.update_runtime_firewall_json(firewall)
+
     def get_events(self) -> list:
         response = requests.get(
             f"{self.core_url}/api/runtime/events", headers={"Authorization": f"{self.token}"})

@@ -19,14 +19,14 @@ def f(config_file: str):
 
 def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/")
-    assert_response_code_is(response, 403)
+    assert_response_code_is(response, 200)
     assert_response_body_contains(response, "[]")
 
     c.update_runtime_config_file(f("change_config_remove_bypassed_ip.json"))
 
     response = s.get("/api/pets/")
     assert_response_code_is(response, 403)
-    assert_response_body_contains(response, "not allowed")
+    assert_response_body_contains(response, "is blocked")
 
     c.update_runtime_config_file(f("start_config.json"))
 

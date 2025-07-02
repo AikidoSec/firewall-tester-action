@@ -123,7 +123,7 @@ def sanitize_extra_run_args(extra_args: str):
 def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
-        # 1. if start_config.json exists, apply it
+        # 1. if start_config.json and start_firewall.json exists, apply them
         core_api = CoreApi(token=token, core_url=CORE_URL,
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
@@ -136,6 +136,17 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
                     raise Exception(
                         f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
+
+        if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_firewall.json")):
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_firewall.json"), "r") as f:
+                try:
+                    config = json.load(f)
+                    r = core_api.update_runtime_firewall_json(config)
+                except Exception as e:
+                    logger.error(
+                        f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
+                    raise Exception(
+                        f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
         env_file_path = os.path.join(os.path.dirname(

@@ -1,0 +1,16 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "route": "/test",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
+        "windowSizeInMS": 60000
+      }
+    }
+  ]
+}

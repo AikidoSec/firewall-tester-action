@@ -1,0 +1,30 @@
+{
+  "type": "heartbeat",
+  "routes": [
+    {
+      "path": "/api/v1/orders",
+      "method": "POST",
+      "hits": 3,
+      "apispec": {
+        "body": {
+          "type": "json"
+        },
+
+        "auth": [
+          {
+            "type": "http",
+            "scheme": "bearer"
+          },
+          {
+            "type": "apiKey",
+            "in": "header",
+            "name": "x-api-key"
+          }
+        ]
+      }
+    }
+  ],
+  "agent": {
+    "dryMode": false
+  }
+}

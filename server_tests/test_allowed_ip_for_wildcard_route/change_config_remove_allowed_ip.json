@@ -1,0 +1,28 @@
+{
+  "endpoints": [
+    {
+      "method": "GET",
+      "route": "/api/pets",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
+        "windowSizeInMS": 60000
+      }
+    },
+    {
+      "method": "*",
+      "route": "/api/p*",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
+        "windowSizeInMS": 60000
+      }
+    }
+  ]
+}

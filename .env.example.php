@@ -9,14 +9,17 @@ ACTIONS_STEP_DEBUG=true
 
 # GitHub Actions inputs should follow `INPUT_<name>` format (case-sensitive).
 # Hyphens should not be converted to underscores!
-INPUT_DOCKERFILE_PATH=temp_test/Dockerfile
+INPUT_DOCKERFILE_PATH=zen-demo/zen-demo-php/Dockerfile
 INPUT_MAX_PARALLEL_TEST=5
 INPUT_CONFIG_UPDATE_DELAY=60
-INPUT_SKIP_TESTS=test_allowed_ip
+INPUT_SKIP_TESTS=test1
 INPUT_TEST_TIMEOUT=300 
-INPUT_EXTRA_ARGS=""
+INPUT_EXTRA_ARGS="--env-file=./zen-demo/zen-demo-php/.env.example -e APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM="
 INPUT_EXTRA_BUILD_ARGS=""
-INPUT_APP_PORT=3000
+INPUT_APP_PORT=8080
+INPUT_SLEEP_BEFORE_TEST=20
+
+
 # GitHub Actions default environment variables. These are set for every run of a
 # workflow and can be used in your actions. Setting the value here will override
 # any value set by the local-action tool.

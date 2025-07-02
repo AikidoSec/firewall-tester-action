@@ -30,11 +30,15 @@
     "format:check": "npx prettier --check .",
     "lint": "npx eslint .",
     "local-action": "npx @github/local-action . src/main.ts .env",
+    "local-action-php": "npx @github/local-action . src/main.ts .env.example.php",
+    "local-action-python": "npx @github/local-action . src/main.ts .env.example.python",
+    "local-action-nodejs": "npx @github/local-action . src/main.ts .env.example.nodejs",
     "package": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
     "package:watch": "npm run package -- --watch",
     "test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
     "all": "npm run format:write && npm run lint && npm run test && npm run coverage && npm run package",
-    "start": "node --loader ts-node/esm src/core/app.ts"
+    "start": "node --loader ts-node/esm src/core/app.ts",
+    "start-core": "node --loader ts-node/esm -e \"import { startServer } from './src/coremock/app.js'; startServer();\""
   },
   "license": "MIT",
   "dependencies": {

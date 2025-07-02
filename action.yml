@@ -1,6 +1,6 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Aikido Firewall Tester
+description: Aikido Firewall Tester
+author: AikidoSec
 
 # Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
@@ -9,15 +9,55 @@ branding:
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
+  dockerfile_path:
+    description: The path to the Dockerfile with the Aikido agent installed
     required: true
-    default: '1000'
-
-# Define your outputs here.
-outputs:
-  time:
-    description: Your output description here
+  extra_args:
+    description:
+      Extra arguments to pass to the docker run command (only --env, -e and
+      --env-file are allowed)
+    required: false
+    default: ''
+  extra_build_args:
+    description:
+      Extra arguments to pass to the docker build command (e.g. "--build-arg
+      APP_VERSION=2.0.1")
+    required: false
+    default: ''
+  app_port:
+    description:
+      The port of the application to test, the one that is open when docker is
+      running
+    required: true
+    default: '8080'
+  max_parallel_tests:
+    description:
+      The maximum number of tests to run in parallel (for each test, a new
+      container will be spawned). Default is 5.
+    required: true
+    default: '5'
+  config_update_delay:
+    description:
+      The delay in seconds to wait after updating the config to ensure the
+      config is applied. Default is 60 seconds.
+    required: true
+    default: '60'
+  skip_tests:
+    description:
+      Comma-separated list of test names to skip (e.g.
+      "test_allowed_ip,test2,test3")
+    required: false
+    default: ''
+  test_timeout:
+    description: The timeout in seconds for each test. Default is 60 seconds.
+    required: false
+    default: '300'
+  sleep_before_test:
+    description:
+      The number of seconds to sleep before starting the test. Default is 1
+      second.
+    required: false
+    default: '1'
 
 runs:
   using: node20

@@ -1,0 +1,22 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "body": "{\"userCommand\": \"whoami\"}",
+    "route": "/api/execute"
+  },
+  "attack": {
+    "kind": "shell_injection",
+    "blocked": true,
+    "source": "body",
+    "path": ".userCommand",
+    "payload": "\"whoami\"",
+    "metadata": {
+      "command": "whoami"
+    }
+  },
+  "agent": {
+    "dryMode": false
+  }
+}

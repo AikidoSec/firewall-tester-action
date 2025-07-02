@@ -1,5 +1,5 @@
 import require$$0$3 from 'os';
-import require$$0$4 from 'crypto';
+import require$$0$4, { timingSafeEqual, randomInt } from 'crypto';
 import require$$1$1 from 'fs';
 import require$$1$6 from 'path';
 import require$$2$1 from 'http';
@@ -25,7 +25,7 @@ import require$$1$5 from 'url';
 import require$$3$2 from 'zlib';
 import require$$6$1 from 'string_decoder';
 import require$$0$d from 'diagnostics_channel';
-import require$$2$3 from 'child_process';
+import require$$2$3, { spawn } from 'child_process';
 import require$$6$2 from 'timers';
 import require$$1$7 from 'tty';
 import require$$4$3 from 'node:zlib';
@@ -22286,11 +22286,11 @@ function requireSymbols () {
 	return symbols;
 }
 
-var events;
+var events$1;
 var hasRequiredEvents;
 
 function requireEvents () {
-	if (hasRequiredEvents) return events;
+	if (hasRequiredEvents) return events$1;
 	hasRequiredEvents = 1;
 
 	const { webidl } = requireWebidl();
@@ -22589,12 +22589,12 @@ function requireEvents () {
 	  }
 	]);
 
-	events = {
+	events$1 = {
 	  MessageEvent,
 	  CloseEvent,
 	  ErrorEvent
 	};
-	return events;
+	return events$1;
 }
 
 var util;
@@ -27255,20 +27255,6 @@ function requireCore () {
 }
 
 var coreExports = requireCore();
-
-/**
- * Waits for a number of milliseconds.
- *
- * @param milliseconds The number of milliseconds to wait.
- * @returns Resolves with 'done!' after the wait is over.
- */
-async function wait(milliseconds) {
-    return new Promise((resolve) => {
-        if (isNaN(milliseconds))
-            throw new Error('milliseconds is not a number');
-        setTimeout(() => resolve('done!'), milliseconds);
-    });
-}
 
 var express$2 = {exports: {}};
 
@@ -68852,6 +68838,412 @@ function requireExpress () {
 var expressExports = requireExpress();
 var express = /*@__PURE__*/getDefaultExportFromCjs(expressExports);
 
+const apps = [];
+let id = 1;
+function createZenApp() {
+    const appId = id++;
+    const token = `AIK_RUNTIME_1_${appId}_${generateRandomString(48)}`;
+    const app = {
+        id: appId,
+        token: token,
+        configUpdatedAt: Date.now()
+    };
+    apps.push(app);
+    return token;
+}
+function getByToken(token) {
+    return apps.find((app) => {
+        if (app.token.length !== token.length) {
+            return false;
+        }
+        return timingSafeEqual(Buffer.from(app.token), Buffer.from(token));
+    });
+}
+function generateRandomString(length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const size = chars.length;
+    let str = '';
+    for (let i = 0; i < length; i++) {
+        const randomIndex = randomInt(0, size);
+        str += chars[randomIndex];
+    }
+    return str;
+}
+
+function createApp(req, res) {
+    const token = createZenApp();
+    coreExports.info(`Created app with token: ${token}`);
+    res.json({
+        token
+    });
+}
+
+function checkToken(req, res, next) {
+    const token = req.headers['authorization'];
+    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method}`);
+    if (!token) {
+        res.status(401).json({
+            message: 'Token is required'
+        });
+        return;
+    }
+    const app = getByToken(token);
+    if (!app) {
+        res.status(401).json({ message: 'Invalid token' });
+        return;
+    }
+    req.appData = app;
+    next();
+}
+
+const configs = [];
+function generateConfig(app) {
+    return {
+        success: true,
+        serviceId: app.id,
+        configUpdatedAt: app.configUpdatedAt,
+        heartbeatIntervalInMS: 10 * 60 * 1000,
+        endpoints: [],
+        blockedUserIds: [],
+        allowedIPAddresses: [],
+        receivedAnyStats: true
+    };
+}
+function getAppConfig(app) {
+    const existingConf = configs.find((config) => config.serviceId === app.id);
+    if (existingConf) {
+        return existingConf;
+    }
+    const newConf = generateConfig(app);
+    configs.push(newConf);
+    return newConf;
+}
+function updateAppConfig(app, newConfig // eslint-disable-line @typescript-eslint/no-explicit-any
+) {
+    let index = configs.findIndex((config) => config.serviceId === app.id);
+    if (index === -1) {
+        getAppConfig(app);
+        index = configs.length - 1;
+    }
+    configs[index] = {
+        ...configs[index],
+        ...newConfig,
+        configUpdatedAt: Date.now()
+    };
+    return true;
+}
+const blockedIPAddresses = [];
+const allowedIPAddresses = [];
+const blockedUserAgents = [];
+const monitoredUserAgents = [];
+const monitoredIPAddresses = [];
+const userAgentDetails = [];
+function updateBlockedIPAddresses(app, ips) {
+    let entry = blockedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        blockedIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getBlockedIPAddresses(app) {
+    const entry = blockedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateAllowedIPAddresses(app, ips) {
+    let entry = allowedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        allowedIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getAllowedIPAddresses(app) {
+    const entry = allowedIPAddresses.find((ip) => ip.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateBlockedUserAgents(app, uas) {
+    let entry = blockedUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        blockedUserAgents.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getBlockedUserAgents(app) {
+    const entry = blockedUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return '';
+}
+function updateMonitoredUserAgents(app, uas) {
+    let entry = monitoredUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        monitoredUserAgents.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getMonitoredUserAgents(app) {
+    const entry = monitoredUserAgents.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return '';
+}
+function updateMonitoredIPAddresses(app, ips) {
+    let entry = monitoredIPAddresses.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.ipAddresses = ips;
+    }
+    else {
+        entry = { serviceId: app.id, ipAddresses: ips };
+        monitoredIPAddresses.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getMonitoredIPAddresses(app) {
+    const entry = monitoredIPAddresses.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.ipAddresses;
+    }
+    return [];
+}
+function updateUserAgentDetails(app, uas) {
+    let entry = userAgentDetails.find((e) => e.serviceId === app.id);
+    if (entry) {
+        entry.userAgents = uas;
+    }
+    else {
+        entry = { serviceId: app.id, userAgents: uas };
+        userAgentDetails.push(entry);
+    }
+    // Bump lastUpdatedAt
+    updateAppConfig(app, {});
+}
+function getUserAgentDetails(app) {
+    const entry = userAgentDetails.find((e) => e.serviceId === app.id);
+    if (entry) {
+        return entry.userAgents;
+    }
+    return [];
+}
+
+function getConfigHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    res.json(getAppConfig(appData));
+}
+
+function updateConfigHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    const newConfig = req.body;
+    res.json({ success: updateAppConfig(appData, newConfig) });
+}
+
+function realtimeConfigHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+    }
+    const config = getAppConfig(appData);
+    res.json({
+        serviceId: appData.id,
+        configUpdatedAt: config.configUpdatedAt
+    });
+}
+
+const events = new Map();
+function normalizeTypesInApiSpec(schema) {
+    const clone = { ...schema };
+    // Convert single-element array type to string
+    if (Array.isArray(clone.type) && clone.type.length === 1) {
+        clone.type = clone.type[0];
+    }
+    // Recurse into properties
+    if (clone.properties) {
+        const newProps = {};
+        for (const [key, value] of Object.entries(clone.properties)) {
+            newProps[key] = normalizeTypesInApiSpec(value);
+        }
+        clone.properties = newProps;
+    }
+    if (clone.items) {
+        clone.items = normalizeTypesInApiSpec(clone.items);
+    }
+    return clone;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function captureEvent(event, app) {
+    if (!events.has(app.id)) {
+        events.set(app.id, []);
+    }
+    if (event.type === 'heartbeat') {
+        event.routes.forEach((route) => {
+            route.apispec = normalizeTypesInApiSpec(route.apispec);
+        });
+    }
+    events.get(app.id).push(event);
+}
+function listEvents(app) {
+    return events.get(app.id) || [];
+}
+
+function listEventsHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'App is missing' });
+        return;
+    }
+    const events = listEvents(appData);
+    res.json(events);
+}
+
+function captureEventHandler(req, res) {
+    const appData = req.appData;
+    if (!appData) {
+        res.status(401).json({ message: 'App is missing' });
+        return;
+    }
+    const event = req.body;
+    captureEvent(event, appData);
+    if (event.type === 'detected_attack') {
+        res.json({
+            success: true
+        });
+        return;
+    }
+    res.json(getAppConfig(appData));
+}
+
+function listsHandler(req, res) {
+    if (!req.appData) {
+        throw new Error('App is missing');
+    }
+    const blockedIps = getBlockedIPAddresses(req.appData);
+    const blockedUserAgents = getBlockedUserAgents(req.appData);
+    const allowedIps = getAllowedIPAddresses(req.appData);
+    const monitoredUserAgents = getMonitoredUserAgents(req.appData);
+    const monitoredIps = getMonitoredIPAddresses(req.appData);
+    const userAgentDetails = getUserAgentDetails(req.appData);
+    res.json({
+        success: true,
+        serviceId: req.appData.id,
+        blockedIPAddresses: blockedIps.length > 0
+            ? [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: blockedIps
+                }
+            ]
+            : [],
+        blockedUserAgents: blockedUserAgents,
+        monitoredUserAgents: monitoredUserAgents,
+        userAgentDetails: userAgentDetails,
+        allowedIPAddresses: allowedIps.length > 0
+            ? [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: allowedIps
+                }
+            ]
+            : [],
+        monitoredIPAddresses: monitoredIps.length > 0
+            ? monitoredIps
+            : [
+                {
+                    key: 'geoip/Belgium;BE',
+                    source: 'geoip',
+                    description: 'geo restrictions',
+                    ips: monitoredIps
+                }
+            ]
+    });
+}
+
+function updateListsHandler(req, res) {
+    if (!req.appData) {
+        res.status(400).json({
+            message: 'App is missing'
+        });
+        return;
+    }
+    // Insecure input validation - but this is only a mock server
+    if (!req.body ||
+        typeof req.body !== 'object' ||
+        Array.isArray(req.body) ||
+        !Object.keys(req.body).length) {
+        res.status(400).json({
+            message: 'Request body is missing or invalid'
+        });
+        return;
+    }
+    if (!req.body.blockedIPAddresses ||
+        !Array.isArray(req.body.blockedIPAddresses)) {
+        res.status(400).json({
+            message: 'blockedIPAddresses is missing or invalid'
+        });
+        return;
+    }
+    updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses);
+    if (req.body.blockedUserAgents &&
+        typeof req.body.blockedUserAgents === 'string') {
+        updateBlockedUserAgents(req.appData, req.body.blockedUserAgents);
+    }
+    if (req.body.allowedIPAddresses &&
+        Array.isArray(req.body.allowedIPAddresses)) {
+        updateAllowedIPAddresses(req.appData, req.body.allowedIPAddresses);
+    }
+    if (req.body.monitoredUserAgents &&
+        typeof req.body.monitoredUserAgents === 'string') {
+        updateMonitoredUserAgents(req.appData, req.body.monitoredUserAgents);
+    }
+    if (req.body.monitoredIPAddresses &&
+        Array.isArray(req.body.monitoredIPAddresses)) {
+        updateMonitoredIPAddresses(req.appData, req.body.monitoredIPAddresses);
+    }
+    if (req.body.userAgentDetails && Array.isArray(req.body.userAgentDetails)) {
+        updateUserAgentDetails(req.appData, req.body.userAgentDetails);
+    }
+    res.json({ success: true });
+}
+
 const app = express();
 const port = process.env.PORT || 3000;
 let server;
@@ -68859,13 +69251,14 @@ let server;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Routes
-app.get('/', (req, res) => {
-    res.json({ message: 'Welcome to the Express API' });
-});
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
-});
+app.get('/api/runtime/config', checkToken, getConfigHandler);
+app.post('/api/runtime/config', checkToken, updateConfigHandler);
+app.get('/config', checkToken, realtimeConfigHandler);
+app.get('/api/runtime/events', checkToken, listEventsHandler);
+app.post('/api/runtime/events', checkToken, captureEventHandler);
+app.get('/api/runtime/firewall/lists', checkToken, listsHandler);
+app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler);
+app.post('/api/runtime/apps', createApp);
 // Function to start the server
 const startServer = () => {
     server = app.listen(port, () => {
@@ -68877,32 +69270,122 @@ const stopServer = () => {
     server?.close();
 };
 
-/**
- * The main function for the action.
- *
- * @returns Resolves when the action is complete.
- */
+// Handle process termination signals
+process.on('SIGINT', () => {
+    console.log('\nReceived SIGINT. Cleaning up...');
+    stopServer();
+    stopPostgres();
+    process.exit(0);
+});
+process.on('SIGTERM', () => {
+    console.log('\nReceived SIGTERM. Cleaning up...');
+    stopServer();
+    stopPostgres();
+    process.exit(0);
+});
 async function run() {
     try {
         // Start the Express server
+        startPostgres();
         startServer();
-        const ms = coreExports.getInput('milliseconds');
-        // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-        coreExports.debug(`Waiting ${ms} milliseconds ...`);
-        // Log the current timestamp, wait, then log the new timestamp
-        coreExports.debug(new Date().toTimeString());
-        await wait(parseInt(ms, 10));
-        coreExports.debug(new Date().toTimeString());
-        // Set outputs for other workflow steps to use
-        coreExports.setOutput('time', new Date().toTimeString());
-        // stop the server
-        stopServer();
+        const dockerfile_path = coreExports.getInput('dockerfile_path');
+        const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
+        const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
+        const skip_tests = coreExports.getInput('skip_tests');
+        const test_timeout = parseInt(coreExports.getInput('test_timeout'));
+        const extra_args = coreExports.getInput('extra_args');
+        const extra_build_args = coreExports.getInput('extra_build_args');
+        const app_port = parseInt(coreExports.getInput('app_port'));
+        const sleep_before_test = parseInt(coreExports.getInput('sleep_before_test'));
+        coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
+        coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
+        coreExports.debug(`Skip tests: ${skip_tests}`);
+        coreExports.debug(`Test timeout: ${test_timeout}`);
+        coreExports.debug(`Extra args: ${extra_args}`);
+        coreExports.debug(`Extra build args: ${extra_build_args}`);
+        coreExports.debug(`App port: ${app_port}`);
+        coreExports.debug(`Sleep before test: ${sleep_before_test}`);
+        // Spawn the Python process
+        await new Promise((resolve, reject) => {
+            const proc = spawn('python', [
+                './server_tests/run_test.py',
+                '--dockerfile_path',
+                dockerfile_path,
+                '--max_parallel_tests',
+                max_parallel_tests.toString(),
+                '--config_update_delay',
+                config_update_delay.toString(),
+                '--skip_tests',
+                skip_tests,
+                '--test_timeout',
+                test_timeout.toString(),
+                '--extra_args',
+                extra_args,
+                '--extra_build_args',
+                extra_build_args,
+                '--app_port',
+                app_port.toString(),
+                '--sleep_before_test',
+                sleep_before_test.toString()
+            ], {
+                stdio: 'inherit'
+            });
+            proc.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`run_test.py exited with code ${code}`));
+                }
+                else {
+                    resolve();
+                }
+            });
+            proc.on('error', (err) => {
+                reject(err);
+            });
+        });
     }
     catch (error) {
-        // Fail the workflow run if an error occurs
         if (error instanceof Error)
             coreExports.setFailed(error.message);
     }
+    finally {
+        stopServer();
+        stopPostgres();
+    }
+}
+function startPostgres() {
+    const proc = spawn('docker', [
+        'run',
+        '--rm',
+        '--name',
+        'postgres',
+        '-e',
+        'POSTGRES_PASSWORD=mysecretpassword',
+        '-e',
+        'POSTGRES_USER=myuser',
+        '-e',
+        'POSTGRES_DB=mydb',
+        '-p',
+        '5432:5432',
+        '-d',
+        'postgres'
+    ], {
+        stdio: 'inherit'
+    });
+    proc.on('close', (code) => {
+        if (code !== 0) {
+            coreExports.setFailed(`Failed to start Postgres: ${code}`);
+        }
+    });
+}
+function stopPostgres() {
+    const proc = spawn('docker', ['stop', 'postgres'], {
+        stdio: 'inherit'
+    });
+    proc.on('close', (code) => {
+        if (code !== 0) {
+            coreExports.warning(`Failed to stop Postgres: ${code}`);
+        }
+    });
 }
 
 /**

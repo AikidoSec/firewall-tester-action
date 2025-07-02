@@ -1,7 +1,11 @@
 {
   "name": "GitHub Actions (TypeScript)",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm install && pip install -r requirements.txt --break-system-packages",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/python:1": {}
+  },
   "customizations": {
     "codespaces": {
       "openFiles": ["README.md"]

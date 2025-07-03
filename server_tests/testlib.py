@@ -6,6 +6,8 @@ from core_api import CoreApi
 from requests.adapters import HTTPAdapter, Retry
 import json
 import subprocess
+import random
+import string
 
 s = requests.Session()
 retries = Retry(connect=10,
@@ -135,6 +137,10 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
             return result(AssertionError(f"Value mismatch: {event_subset} != {event}"))
 
     return True
+
+
+def generate_random_string(length):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
 def assert_response_code_is(response, status_code):

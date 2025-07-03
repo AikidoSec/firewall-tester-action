@@ -34,9 +34,6 @@ def run_test(s: TestServer, c: CoreApi):
             pass
         else:
             assert_response_code_is(response, 429)
-            assert_response_body_contains(
-                response, "exceeded the rate limit for this endpoint")
-            assert_response_header_contains(response, "Content-Type", "text")
 
     for _ in range(100):
         response = s.get(

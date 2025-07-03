@@ -1,17 +1,22 @@
 {
-  "allowedIPAddresses": ["2.16.53.5"],
+  "success": true,
+  "configUpdatedAt": 1751547125,
+  "heartbeatIntervalInMS": 600000,
   "endpoints": [
     {
       "method": "GET",
-      "route": "/api/pets/",
+      "route": "/api/pets",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],
       "rateLimiting": {
         "enabled": true,
         "maxRequests": 10,
-        "windowSizeInMS": 600000
+        "windowSizeInMS": 60000
       }
     }
-  ]
+  ],
+  "blockedUserIds": [],
+  "allowedIPAddresses": ["2.16.53.5"],
+  "receivedAnyStats": true
 }

@@ -13,10 +13,6 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def run_test(s: TestServer, c: CoreApi):
     for i in range(5):
         response = s.get(

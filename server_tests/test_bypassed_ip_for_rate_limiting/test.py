@@ -13,17 +13,13 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def run_test(s: TestServer, c: CoreApi):
     for _ in range(100):
         response = s.get(
             "/api/pets/",  headers={"X-Forwarded-For": "2.16.53.5"})
         assert_response_code_is(response, 200)
 
-    c.update_runtime_config_file(f("change_config_remove_bypassed_ip.json"))
+    c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
 
     for i in range(100):
         response = s.get(
@@ -33,7 +29,7 @@ def run_test(s: TestServer, c: CoreApi):
         else:
             assert_response_code_is(response, 429)
 
-    c.update_runtime_config_file(f("start_config.json"))
+    c.update_runtime_config_file("start_config.json")
 
     for _ in range(100):
         response = s.get(

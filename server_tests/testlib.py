@@ -8,6 +8,8 @@ import json
 import subprocess
 import random
 import string
+import inspect
+import os
 
 s = requests.Session()
 retries = Retry(connect=10,
@@ -53,6 +55,7 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False):
 
 def init_server_and_core():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test_name", type=str, required=True)
     parser.add_argument("--server_port", type=int, required=True)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
@@ -60,7 +63,7 @@ def init_server_and_core():
     args = parser.parse_args()
 
     server = TestServer(port=args.server_port, token=args.token)
-    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}",
+    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
                    config_update_delay=args.config_update_delay)
 
     return args, server, core
@@ -167,8 +170,10 @@ def assert_started_event_is_valid(event):
 
 
 def assert_event_contains_subset_file(event, event_subset_file):
+    caller_frame = inspect.currentframe().f_back
+    caller_filename = caller_frame.f_code.co_filename
     event_subset = None
-    with open(event_subset_file, 'r') as file:
+    with open(os.path.join(os.path.dirname(caller_filename), event_subset_file), 'r') as file:
         event_subset = json.load(file)
     assert event_subset
     assert_event_contains_subset(event, event_subset)

@@ -13,10 +13,6 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def check_shell_injection(response_code, response_body, event_id, expected_json):
     start_events = c.get_events()
     response = s.post("/api/execute", {"userCommand": "whoami"})
@@ -34,14 +30,14 @@ def check_shell_injection(response_code, response_body, event_id, expected_json)
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_shell_injection(500, "", 1, f("expect_detection_blocked.json"))
+    check_shell_injection(500, "", 1, "expect_detection_blocked.json")
 
-    c.update_runtime_config_file(f("change_config_disable_blocking.json"))
+    c.update_runtime_config_file("change_config_disable_blocking.json")
     check_shell_injection(200, "success\":true", 2,
-                          f("expect_detection_not_blocked.json"))
+                          "expect_detection_not_blocked.json")
 
-    c.update_runtime_config_file(f("start_config.json"))
-    check_shell_injection(500, "", 3, f("expect_detection_blocked.json"))
+    c.update_runtime_config_file("start_config.json")
+    check_shell_injection(500, "", 3, "expect_detection_blocked.json")
 
 
 if __name__ == "__main__":

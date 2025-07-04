@@ -13,10 +13,6 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def get_api_spec_with_no_body():
     url = "/api/v1/orders?userId=12345&status=pending"
     headers = {
@@ -105,7 +101,7 @@ def run_test(s: TestServer, c: CoreApi):
         get_api_spec_with_no_body,
         get_api_spec_simple,
         get_api_spec_merge,
-    ], f("expect_api_spec.json"), s, c)
+    ], "expect_api_spec.json", s, c)
 
 
 if __name__ == "__main__":

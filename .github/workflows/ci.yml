@@ -87,7 +87,7 @@ jobs:
           extra_args:
             '--env-file=./zen-demo/.env.example -e
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
-          extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.124'
+          extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.125'
           sleep_before_test: 20
           skip_tests: test_api_spec
 

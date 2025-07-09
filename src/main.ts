@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
+import path from 'path'
 
 // Handle process termination signals
 process.on('SIGINT', () => {
@@ -47,12 +48,12 @@ export async function run(): Promise<void> {
     core.debug(`App port: ${app_port}`)
     core.debug(`Sleep before test: ${sleep_before_test}`)
     // Spawn the Python process
-    const current_dir = process.cwd()
+    const this_file_dir = path.dirname(new URL(import.meta.url).pathname)
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
         [
-          `${current_dir}/server_tests/run_test.py`,
+          `${this_file_dir}/../server_tests/run_test.py`,
           '--dockerfile_path',
           dockerfile_path,
           '--max_parallel_tests',

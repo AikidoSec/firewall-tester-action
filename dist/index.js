@@ -69306,10 +69306,10 @@ async function run() {
         coreExports.debug(`App port: ${app_port}`);
         coreExports.debug(`Sleep before test: ${sleep_before_test}`);
         // Spawn the Python process
-        const current_dir = process.cwd();
+        const this_file_dir = require$$1$6.dirname(new URL(import.meta.url).pathname);
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
-                `${current_dir}/server_tests/run_test.py`,
+                `${this_file_dir}/../server_tests/run_test.py`,
                 '--dockerfile_path',
                 dockerfile_path,
                 '--max_parallel_tests',

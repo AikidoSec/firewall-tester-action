@@ -1,7 +1,4 @@
 {
-  "success": true,
-  "configUpdatedAt": 1751547125,
-  "heartbeatIntervalInMS": 600000,
   "endpoints": [
     {
       "method": "GET",
@@ -16,7 +13,5 @@
       }
     }
   ],
-  "blockedUserIds": [],
-  "allowedIPAddresses": ["2.16.53.5"],
-  "receivedAnyStats": true
+  "allowedIPAddresses": ["2.16.53.5"]
 }

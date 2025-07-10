@@ -27,7 +27,6 @@ jobs:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
           ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
       - name: Test Local Action
@@ -52,7 +51,6 @@ jobs:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
           ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
       - name: Test Local Action
@@ -75,8 +73,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
-          ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
+          ref: dynamic-firewall-version
           submodules: recursive
 
       - name: Test Local Action
@@ -87,6 +84,7 @@ jobs:
           extra_args:
             '--env-file=./zen-demo/.env.example -e
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
+          extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.125'
           sleep_before_test: 20
           skip_tests: test_api_spec,test_shell_injection
 

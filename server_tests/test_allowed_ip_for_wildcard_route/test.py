@@ -13,10 +13,6 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def run_test(s: TestServer, c: CoreApi):
     # Using global ts and c from testlib
     response = s.get("/api/pets/",
@@ -26,14 +22,14 @@ def run_test(s: TestServer, c: CoreApi):
     assert_response_body_contains(
         response, " not allowed ")
 
-    c.update_runtime_config_file(f("change_config_remove_allowed_ip.json"))
+    c.update_runtime_config_file("change_config_remove_allowed_ip.json")
 
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 200)
     assert_response_body_contains(response, "[]")
 
-    c.update_runtime_config_file(f("start_config.json"))
+    c.update_runtime_config_file("start_config.json")
 
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})

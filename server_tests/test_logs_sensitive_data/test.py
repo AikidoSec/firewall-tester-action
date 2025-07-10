@@ -6,10 +6,6 @@ from core_api import CoreApi
 import os
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def run_test(s: TestServer, c: CoreApi):
     # curl -H "Authorization: Basic dXNlcjpwYXNzd29yZA==" https://example.com/api/login
 

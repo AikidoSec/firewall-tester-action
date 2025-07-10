@@ -1,9 +1,9 @@
 # Firewall Tester Action
 
-[![GitHub Super-Linter](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/linter.yml/badge.svg)](https://github.com/super-linter/super-linter)
-![CI](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/ci.yml/badge.svg)
-[![Check dist/](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml/badge.svg)](https://github.com/AikidoSec/firewall-tester-action/actions/workflows/check-dist.yml)
-[![Coverage](./badges/coverage.svg)](./badges/coverage.svg)
+This is an **internal validation framework** used to validate that firewall
+agents work correctly.  
+It runs QA tests against firewall agents in a Dockerized environment and checks
+expected behaviors like startup events, heartbeats, runtime protection.
 
 ## 🚀 Usage
 

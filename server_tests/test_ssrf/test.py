@@ -14,11 +14,8 @@ import logging
 
 
 def check_ssrf(ip, expected_json):
-    response = s.post("/api/request", {"url": ip})
-    if response.status_code == 500:
-        return
-    else:
-        raise Exception(f"SSRF check failed for {ip}: {response.status_code} {response.text}")
+    response = s.post("/api/request", {"url": ip}, timeout=10)
+    assert_response_code_is(response, 500, f"SSRF check failed for {ip}")
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -44,6 +41,10 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[::]:8081",
         "http://[0:0:0:0:0:0:0:1]:8081",
         "http://[::ffff:127.0.0.1]:8081",
+        "http://ssrf-rédirects.testssandbox.com/ssrf-test",
+        "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test",
+        "http://ssrf-redirects.testssandbox.com/ssrf-test",
+
     ]
     for ip in ips:
         check_ssrf(ip, "expect_detection_blocked.json")

@@ -36,12 +36,12 @@ def localhost_get_request(port, route="", headers={}, benchmark=False):
     return r
 
 
-def localhost_post_request(port, route, data, headers={}, benchmark=False):
+def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
-    r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers)
+    r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
     end_time = datetime.datetime.now()
     delta = end_time - start_time
     elapsed_ms = delta.total_seconds() * 1000
@@ -77,8 +77,8 @@ class TestServer:
     def get(self, route="", headers={}, benchmark=False):
         return localhost_get_request(self.port, route, headers, benchmark)
 
-    def post(self, route="", data={}, headers={}, benchmark=False):
-        return localhost_post_request(self.port, route, data, headers, benchmark)
+    def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
+        return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
 
     def get_logs(self, container_name: str):
         # this gets the logs from the server (docker logs <container_name>)
@@ -146,8 +146,8 @@ def generate_random_string(length):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
-def assert_response_code_is(response, status_code):
-    assert response.status_code == status_code, f"Status codes are not the same: {response.status_code} vs {status_code}"
+def assert_response_code_is(response, status_code, message=None):
+    assert response.status_code == status_code, f"Status codes are not the same: {response.status_code} vs {status_code} {message}"
 
 
 def assert_response_header_contains(response, header, value):

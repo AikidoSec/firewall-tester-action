@@ -1,0 +1,22 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "body": "{\"name\": \"Malicious Pet', 'Gru from the Minions') --\"}",
+    "route": "/api/create"
+  },
+  "attack": {
+    "kind": "sql_injection",
+    "blocked": true,
+    "source": "body",
+    "path": ".name",
+    "payload": "\"Malicious Pet', 'Gru from the Minions') --\"",
+    "metadata": {
+      "sql": "INSERT INTO pets (pet_name, owner) VALUES ('Malicious Pet', 'Gru from the Minions') --', 'Aikido Security')"
+    }
+  },
+  "agent": {
+    "dryMode": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "body": "{\"url\": \"http://127.0.0.1:9081\"}",
+    "route": "/api/request"
+  },
+  "attack": {
+    "kind": "ssrf",
+    "blocked": true,
+    "source": "body",
+    "path": ".url",
+    "metadata": {
+      "hostname": "127.0.0.1",
+      "port": "9081"
+    }
+  }
+}

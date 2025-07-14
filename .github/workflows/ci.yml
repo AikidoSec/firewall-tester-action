@@ -26,7 +26,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
-          ref: main
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action

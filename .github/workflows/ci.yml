@@ -50,7 +50,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
-          ref: main
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action

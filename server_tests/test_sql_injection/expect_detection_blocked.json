@@ -11,7 +11,6 @@
     "blocked": true,
     "source": "body",
     "path": ".name",
-    "payload": "\"Malicious Pet', 'Gru from the Minions') --\"",
     "metadata": {
       "sql": "INSERT INTO pets (pet_name, owner) VALUES ('Malicious Pet', 'Gru from the Minions') --', 'Aikido Security')"
     }

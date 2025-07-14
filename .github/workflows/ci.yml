@@ -36,6 +36,7 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
           skip_tests: test_api_spec,test_bypassed_ip_for_geo_blocking
+          sleep_before_test: 5
 
   test-python:
     name: Python Tests (zen-demo-python)

@@ -73,7 +73,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
-          ref: dynamic-firewall-version
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action

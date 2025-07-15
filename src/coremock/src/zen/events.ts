@@ -32,6 +32,9 @@ export function captureEvent(event: any, app: AppData) {
   if (!events.has(app.id)) {
     events.set(app.id, [])
   }
+  if (event.type === 'started') {
+    events.set(app.id, [])
+  }
 
   if (event.type === 'heartbeat') {
     event.routes.forEach((route: any) => {

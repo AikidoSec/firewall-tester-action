@@ -36,7 +36,7 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
           skip_tests: test_api_spec,test_bypassed_ip_for_geo_blocking
-          sleep_before_test: 5
+          sleep_before_test: 15
 
   test-python:
     name: Python Tests (zen-demo-python)
@@ -89,54 +89,3 @@ jobs:
           extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.125'
           sleep_before_test: 20
           skip_tests: test_api_spec,test_shell_injection
-
-  # test-typescript:
-  #   name: TypeScript Tests
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout
-  #       id: checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Setup Node.js
-  #       id: setup-node
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version-file: .node-version
-  #         cache: npm
-
-  #     - name: Install Dependencies
-  #       id: npm-ci
-  #       run: npm ci
-
-  #     - name: Check Format
-  #       id: npm-format-check
-  #       run: npm run format:check
-
-  #     - name: Lint
-  #       id: npm-lint
-  #       run: npm run lint
-
-  #     - name: Test
-  #       id: npm-ci-test
-  #       run: npm run ci-test
-
-  # test-action:
-  #   name: GitHub Actions Test
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-
-  #   steps:
-  #     - name: Checkout
-  #       id: checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Test Local Action
-  #       id: test-action
-  #       uses: ./
-  #       with:
-  #         dockerfile_path: ./temp_test/Dockerfile
-  #     - name: Print Output
-  #       id: output
-  #       run: echo "${{ steps.test-action.outputs.time }}"

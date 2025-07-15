@@ -3,7 +3,6 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "body": "{\"url\": \"http://127.0.0.1:9081\"}",
     "route": "/api/request"
   },
   "attack": {

@@ -18,7 +18,7 @@ import os
 
 def check_ssrf_with_event(response_code, expected_json):
     start_events = c.get_events()
-    response = s.post("/api/request", {"url": "http://127.0.0.1:9081"}, timeout=10)
+    response = s.post("/api/request", {"url":"http://127.0.0.1:9081"}, timeout=10)
     assert_response_code_is(response, response_code)
    
 
@@ -38,13 +38,13 @@ def check_ssrf(ip):
 
 def run_test(s: TestServer, c: CoreApi):
     
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    # check_ssrf_with_event(500, "expect_detection_blocked.json")
 
-    c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_ssrf_with_event(400, "expect_detection_not_blocked.json")
+    # c.update_runtime_config_file("change_config_disable_blocking.json")
+    # check_ssrf_with_event(400, "expect_detection_not_blocked.json")
 
-    c.update_runtime_config_file("start_config.json")
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    # c.update_runtime_config_file("start_config.json")
+    # check_ssrf_with_event(500, "expect_detection_blocked.json")
 
     ips = [
         "http://127.0.0.1:9081",

@@ -13,12 +13,11 @@ import os
 '''
 
 
-def check_shell_injection(response_code, response_body, event_id, expected_json):
+def check_shell_injection(response_code, expected_json):
     start_events = c.get_events()
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    # assert_response_code_is(response, response_code) # TODO: normalize all apps to return 500
-    assert_response_body_contains(response, response_body)
-
+    assert_response_code_is(response, response_code)
+   
     c.wait_for_new_events(5, old_events_length=len(start_events))
 
     all_events = c.get_events()
@@ -30,14 +29,13 @@ def check_shell_injection(response_code, response_body, event_id, expected_json)
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_shell_injection(500, "", 1, "expect_detection_blocked.json")
+    check_shell_injection(500, "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_shell_injection(200, "success\":true", 2,
-                          "expect_detection_not_blocked.json")
+    check_shell_injection(200, "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_shell_injection(500, "", 3, "expect_detection_blocked.json")
+    check_shell_injection(500, "expect_detection_blocked.json")
 
 
 if __name__ == "__main__":

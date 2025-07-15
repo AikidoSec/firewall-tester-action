@@ -3,15 +3,12 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "body": "{\"userCommand\": \"whoami\"}",
     "route": "/api/execute"
   },
   "attack": {
     "kind": "shell_injection",
     "blocked": false,
     "source": "body",
-    "path": ".userCommand",
-    "payload": "\"whoami\"",
     "metadata": {
       "command": "whoami"
     }

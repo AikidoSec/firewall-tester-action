@@ -37,6 +37,15 @@ def check_ssrf(ip):
     assert_response_code_is(response, 500, f"SSRF check failed for {ip} {response.text}")
 
 def run_test(s: TestServer, c: CoreApi):
+    
+    check_ssrf_with_event(500, "expect_detection_blocked.json")
+
+    c.update_runtime_config_file("change_config_disable_blocking.json")
+    check_ssrf_with_event(400, "expect_detection_not_blocked.json")
+
+    c.update_runtime_config_file("start_config.json")
+    check_ssrf_with_event(500, "expect_detection_blocked.json")
+
     ips = [
         "http://127.0.0.1:9081",
         "http://this.is.not.a.domain.com:8081", # This is not a domain, but it will return 500 
@@ -56,25 +65,12 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[::]:8081",
         "http://[0:0:0:0:0:0:0:1]:8081",
         "http://[::ffff:127.0.0.1]:8081",
-        "http://[::]:8081",
-        "http://[0:0:0:0:0:0:0:1]:8081",
-        "http://[::ffff:127.0.0.1]:8081",
         "http://ssrf-redirects.testssandbox.com/ssrf-test",
         "http://ssrf-rédirects.testssandbox.com/ssrf-test",
         "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test", 
     ]
     for ip in ips:
         check_ssrf(ip)
-    
-
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
-
-    c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_ssrf_with_event(400, "expect_detection_not_blocked.json")
-
-    c.update_runtime_config_file("start_config.json")
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
-
 
 
 if __name__ == "__main__":

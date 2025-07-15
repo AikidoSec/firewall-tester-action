@@ -1,0 +1,21 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "GET",
+    "route": "/api/read"
+  },
+  "attack": {
+    "kind": "path_traversal",
+    "blocked": true,
+    "source": "query",
+    "path": ".path",
+    "payload": "\"../../../../../etc/passwd\"",
+    "metadata": {
+      "filename": "../../../../../etc/passwd"
+    }
+  },
+  "agent": {
+    "dryMode": false
+  }
+}

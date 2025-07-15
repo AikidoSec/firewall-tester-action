@@ -9,11 +9,7 @@
     "kind": "path_traversal",
     "blocked": false,
     "source": "query",
-    "path": ".path",
-    "payload": "\"../../../../../etc/passwd\"",
-    "metadata": {
-      "filename": "../../../../../etc/passwd"
-    }
+    "metadata": {}
   },
   "agent": {
     "dryMode": true

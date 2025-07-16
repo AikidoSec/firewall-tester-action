@@ -23,8 +23,11 @@ def localhost_get_request(port, route="", headers={}, benchmark=False):
 
     start_time = datetime.datetime.now()
 
-    #r = s.get(f"http://localhost:{port}{route}", headers=headers)
-    r = requests.get(f"http://localhost:{port}{route}", headers=headers)
+    try:
+        r = s.get(f"http://localhost:{port}{route}", headers=headers)
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
     end_time = datetime.datetime.now()
     delta = end_time - start_time
@@ -42,8 +45,12 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
 
     start_time = datetime.datetime.now()
 
-    #r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
-    r = requests.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
+    try:
+        r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
     end_time = datetime.datetime.now()
     delta = end_time - start_time
     elapsed_ms = delta.total_seconds() * 1000

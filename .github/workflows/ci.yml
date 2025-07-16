@@ -61,7 +61,8 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           skip_tests: test_api_spec,test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_shell_injection,test_bypassed_ip_for_geo_blocking
           sleep_before_test: 15
-          max_parallel_tests: 1
+          max_parallel_tests: 5
+
   test-php:
     name: PHP Tests (zen-demo-php)
     runs-on: ubuntu-latest

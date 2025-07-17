@@ -6,6 +6,10 @@ from core_api import CoreApi
 from requests.adapters import HTTPAdapter, Retry
 import json
 import subprocess
+import random
+import string
+import inspect
+import os
 
 s = requests.Session()
 retries = Retry(connect=10,
@@ -19,7 +23,11 @@ def localhost_get_request(port, route="", headers={}, benchmark=False):
 
     start_time = datetime.datetime.now()
 
-    r = s.get(f"http://localhost:{port}{route}", headers=headers)
+    try:
+        r = s.get(f"http://localhost:{port}{route}", headers=headers)
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
     end_time = datetime.datetime.now()
     delta = end_time - start_time
@@ -32,12 +40,17 @@ def localhost_get_request(port, route="", headers={}, benchmark=False):
     return r
 
 
-def localhost_post_request(port, route, data, headers={}, benchmark=False):
+def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
-    r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers)
+    try:
+        r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
     end_time = datetime.datetime.now()
     delta = end_time - start_time
     elapsed_ms = delta.total_seconds() * 1000
@@ -51,6 +64,7 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False):
 
 def init_server_and_core():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test_name", type=str, required=True)
     parser.add_argument("--server_port", type=int, required=True)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
@@ -58,7 +72,7 @@ def init_server_and_core():
     args = parser.parse_args()
 
     server = TestServer(port=args.server_port, token=args.token)
-    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}",
+    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
                    config_update_delay=args.config_update_delay)
 
     return args, server, core
@@ -72,8 +86,8 @@ class TestServer:
     def get(self, route="", headers={}, benchmark=False):
         return localhost_get_request(self.port, route, headers, benchmark)
 
-    def post(self, route="", data={}, headers={}, benchmark=False):
-        return localhost_post_request(self.port, route, data, headers, benchmark)
+    def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
+        return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
 
     def get_logs(self, container_name: str):
         # this gets the logs from the server (docker logs <container_name>)
@@ -137,8 +151,12 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
     return True
 
 
-def assert_response_code_is(response, status_code):
-    assert response.status_code == status_code, f"Status codes are not the same: {response.status_code} vs {status_code}"
+def generate_random_string(length):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+
+
+def assert_response_code_is(response, status_code, message=None):
+    assert response.status_code == status_code, f"Status codes are not the same: {response.status_code} vs {status_code} {message}"
 
 
 def assert_response_header_contains(response, header, value):
@@ -161,8 +179,10 @@ def assert_started_event_is_valid(event):
 
 
 def assert_event_contains_subset_file(event, event_subset_file):
+    caller_frame = inspect.currentframe().f_back
+    caller_filename = caller_frame.f_code.co_filename
     event_subset = None
-    with open(event_subset_file, 'r') as file:
+    with open(os.path.join(os.path.dirname(caller_filename), event_subset_file), 'r') as file:
         event_subset = json.load(file)
     assert event_subset
     assert_event_contains_subset(event, event_subset)

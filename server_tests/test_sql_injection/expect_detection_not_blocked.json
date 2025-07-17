@@ -3,10 +3,10 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "route": "/api/execute"
+    "route": "/api/create"
   },
   "attack": {
-    "kind": "shell_injection",
+    "kind": "sql_injection",
     "blocked": false,
     "source": "body",
     "metadata": {}

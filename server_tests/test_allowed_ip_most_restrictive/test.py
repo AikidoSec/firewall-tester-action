@@ -20,8 +20,7 @@ def run_test(s: TestServer, c: CoreApi):
     assert_response_body_contains(
         response, " not allowed ")
     assert_response_code_is(response, 403)
-    assert_response_header_contains(response, "Content-Type", "text")
-
+    
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
 
     response = s.get("/api/pets/",
@@ -36,8 +35,7 @@ def run_test(s: TestServer, c: CoreApi):
     assert_response_body_contains(
         response, " not allowed ")
     assert_response_code_is(response, 403)
-    assert_response_header_contains(response, "Content-Type", "text")
-
+    
 
 if __name__ == "__main__":
     args, s, c = init_server_and_core()

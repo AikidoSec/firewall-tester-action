@@ -9,9 +9,7 @@
     "kind": "shell_injection",
     "blocked": false,
     "source": "body",
-    "metadata": {
-      "command": "whoami"
-    }
+    "metadata": {}
   },
   "agent": {
     "dryMode": true

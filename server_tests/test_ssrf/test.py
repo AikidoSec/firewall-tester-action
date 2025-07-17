@@ -32,9 +32,9 @@ def check_ssrf_with_event(response_code, expected_json):
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def check_ssrf(ip):
-    response = s.post("/api/request", {"url": ip}, timeout=10)
-    assert_response_code_is(response, 500, f"SSRF check failed for {ip} {response.text}")
+def check_ssrf(route, ip):
+    response = s.post(route, {"url": ip}, timeout=10)
+    assert_response_code_is(response, 500, f"[{route}] SSRF check failed for {ip} {response.text}")
 
 def run_test(s: TestServer, c: CoreApi):
     
@@ -68,9 +68,11 @@ def run_test(s: TestServer, c: CoreApi):
         "http://ssrf-redirects.testssandbox.com/ssrf-test",
         "http://ssrf-rédirects.testssandbox.com/ssrf-test",
         "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test", 
+        "http://ssrf-r%C3%A9directs.testssandbox.com/ssrf-test"
     ]
     for ip in ips:
-        check_ssrf(ip)
+        check_ssrf("/api/request", ip)
+        check_ssrf("/api/request2", ip)
 
 
 if __name__ == "__main__":

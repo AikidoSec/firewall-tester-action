@@ -9,9 +9,7 @@
     "kind": "sql_injection",
     "blocked": true,
     "source": "body",
-    "metadata": {
-      "sql": "INSERT INTO pets (pet_name, owner) VALUES ('Malicious Pet', 'Gru from the Minions') --', 'Aikido Security')"
-    }
+    "metadata": {}
   },
   "agent": {
     "dryMode": false

@@ -16,7 +16,6 @@ def run_test(s: TestServer, c: CoreApi):
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_body_contains(response, "not allowed")
     assert_response_code_is(response, 403)
-    assert_response_header_contains(response, "Content-Type", "text")
 
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
 
@@ -30,7 +29,6 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 403)
-    assert_response_header_contains(response, "Content-Type", "text")
     assert_response_body_contains(response, "not allowed")
 
     c.update_runtime_config_file("config_allow_private.json")

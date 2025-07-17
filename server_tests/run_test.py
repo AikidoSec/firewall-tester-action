@@ -165,7 +165,9 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             f"--env PORT={app_port} "
             f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
             f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
+            f"--env AIKIDO_URL=http://{DOCKER_HOST_IP}:3000 " # temp for dotnet 
+            f"--env AIKIDO_REALTIME_URL=http://{DOCKER_HOST_IP}:3000 " # temp for dotnet 
+            f"--env DATABASE_URL=postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
             f"{DOCKER_IMAGE_NAME}"

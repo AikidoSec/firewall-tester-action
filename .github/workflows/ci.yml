@@ -104,7 +104,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-dotnet-core
           path: ./zen-demo
-          ref: main
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action

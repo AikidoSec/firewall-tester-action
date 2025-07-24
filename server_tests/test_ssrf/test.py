@@ -3,6 +3,7 @@ import time
 import sys
 from testlib import *
 from core_api import CoreApi
+import itertools
 import os
 
 '''
@@ -14,6 +15,48 @@ import os
 6. Change the config to enable blocking
 7. Test that the firewall blocks SSRF attacks
 '''
+
+
+def prefixnum(num, base):
+    prefixes = {8: '0', 16: '0x'}
+    if base == 8:
+        return f"{prefixes[8]}{num:o}"
+    elif base == 10:
+        return str(num)
+    elif base == 16:
+        return f"{prefixes[16]}{num:x}"
+
+
+def classify(addr, classN):
+    if classN == 'C':
+        return [addr[0], addr[1], addr[2], addr[3]]
+    elif classN == 'B':
+        val = (addr[2] << 8) | addr[3]
+        return [addr[0], addr[1], val]
+    elif classN == 'A':
+        val = (addr[1] << 16) | (addr[2] << 8) | addr[3]
+        return [addr[0], val]
+    elif classN == '(whole network)':
+        val = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) | addr[3]
+        return [val]
+
+
+def generate_combinations(ip_str):
+    addr = [int(x) for x in ip_str.strip().split('.')]
+    classes = ['C', 'B', 'A', '(whole network)']
+    all_results = []
+    bases = [8, 10, 16]
+
+    for cls in classes:
+        parts = classify(addr, cls)
+        n = len(parts)
+        # all combinations of bases for each part
+        for base_combo in itertools.product(bases, repeat=n):
+            rep = '.'.join(prefixnum(num, base)
+                           for num, base in zip(parts, base_combo))
+            all_results.append(rep)
+
+    return all_results
 
 
 def check_ssrf_with_event(response_code, expected_json):
@@ -49,18 +92,11 @@ def run_test(s: TestServer, c: CoreApi):
     check_ssrf_with_event(500, "expect_detection_blocked.json")
 
     ips = [
-        "http://127.0.0.1:9081",
         # This is not a domain, but it will return 500
-        # "http://this.is.not.a.domain.com:8081",
+        "http://this.is.not.a.domain.com:8081",
         "http://localhost:8081",
-        "http://2130706433:8081",  # mere
-        "http://0x7f000001:8081",
-        "http://0177.0.0.01:8081",
-        "http://0x7f.0x0.0x0.0x1:8081",
         "http://LOCALHOST:8081",
         "http://loopback:8081",
-        "http://127.1:8081",
-        "http://0x7f.1:8081",
         "http://0:8081",
         "http://0.0.0.0:8081",
         "http://[::1]:8081",
@@ -68,18 +104,29 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[::]:8081",
         "http://[0:0:0:0:0:0:0:1]:8081",
         "http://[::ffff:127.0.0.1]:8081",
+        "http://[0:0::1]:8081",
+        "http://127%2E0%2E0%2E1:8081",
+        "http://%30:8080"
         "http://ssrf-redirects.testssandbox.com/ssrf-test",
         "http://ssrf-rédirects.testssandbox.com/ssrf-test",
         "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test",
         "http://ssrf-r%C3%A9directs.testssandbox.com/ssrf-test",
+
         # AWS metadata service
         "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
         "http://0251.0376.0251.0376/latest/meta-data/iam/security-credentials/",
+        "http://[fd00:0ec2:0000:0000:0000:0000:0000:0254]:7000/latest/meta-data/iam/security-credentials/",
+        "http://0xa9.0xfe.0xa9.0xfe/latest/meta-data/iam/security-credentials/",
+        "http://0251.0376.0124776/latest/meta-data/iam/security-credentials/",
         "http://0xA9FEA9FE/latest/meta-data/iam/security-credentials/",
         "http://2852039166/latest/meta-data/iam/security-credentials/",
         "http://[::ffff:169.254.169.254]:8081/latest/meta-data/iam/security-credentials/",
         "http://[fd00:ec2::254]/latest/meta-data/iam/security-credentials/"
     ]
+    ips.extend(
+        [f"http://{ip}:4000" for ip in generate_combinations("169.254.169.254")])
+    ips.extend(
+        [f"http://{ip}:4000" for ip in generate_combinations("127.0.0.1")])
     for ip in ips:
         check_ssrf("/api/request", ip)
         check_ssrf("/api/request2", ip)

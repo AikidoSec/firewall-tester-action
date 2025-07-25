@@ -3,7 +3,6 @@ import time
 import requests
 import argparse
 from core_api import CoreApi
-from requests.adapters import HTTPAdapter, Retry
 import json
 import subprocess
 import random
@@ -11,23 +10,22 @@ import string
 import inspect
 import os
 
-s = requests.Session()
-retries = Retry(connect=10,
-                backoff_factor=1)
-
-s.mount('http://', HTTPAdapter(max_retries=retries))
-
 
 def localhost_get_request(port, route="", headers={}, benchmark=False):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
-    try:
-        r = s.get(f"http://localhost:{port}{route}", headers=headers)
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+    for attempt in range(3):
+        try:
+            r = requests.get(
+                f"http://localhost:{port}{route}", headers=headers)
+            break  # Success, exit retry loop
+        except Exception as e:
+            print(f"Error (attempt {attempt + 1}/3): {e}")
+            if attempt == 2:  # Last attempt
+                return None
+            time.sleep(0.1)  # Brief delay before retry
 
     end_time = datetime.datetime.now()
     delta = end_time - start_time
@@ -45,11 +43,16 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
 
     start_time = datetime.datetime.now()
 
-    try:
-        r = s.post(f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+    for attempt in range(3):
+        try:
+            r = requests.post(f"http://localhost:{port}{route}",
+                              json=data, headers=headers, timeout=timeout)
+            break  # Success, exit retry loop
+        except Exception as e:
+            print(f"Error (attempt {attempt + 1}/3): {e}")
+            if attempt == 2:  # Last attempt
+                return requests.Response()
+            time.sleep(0.1)  # Brief delay before retry
 
     end_time = datetime.datetime.now()
     delta = end_time - start_time

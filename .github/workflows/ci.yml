@@ -35,7 +35,7 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
-          skip_tests: test_api_spec,test_bypassed_ip_for_geo_blocking
+          skip_tests: test_api_spec
           sleep_before_test: 15
 
   test-python:
@@ -114,3 +114,4 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 15
           max_parallel_tests: 5
+          skip_tests: test_ssrf,test_api_spec

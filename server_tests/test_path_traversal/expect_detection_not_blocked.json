@@ -2,13 +2,13 @@
   "type": "detected_attack",
   "request": {
     "headers": {},
-    "method": "POST",
-    "route": "/api/execute"
+    "method": "GET",
+    "route": "/api/read"
   },
   "attack": {
-    "kind": "shell_injection",
+    "kind": "path_traversal",
     "blocked": false,
-    "source": "body",
+    "source": "query",
     "metadata": {}
   },
   "agent": {

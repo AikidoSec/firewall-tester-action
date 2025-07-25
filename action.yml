@@ -51,7 +51,7 @@ inputs:
   test_timeout:
     description: The timeout in seconds for each test. Default is 60 seconds.
     required: false
-    default: '300'
+    default: '600'
   sleep_before_test:
     description:
       The number of seconds to sleep before starting the test. Default is 1

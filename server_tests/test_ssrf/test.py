@@ -106,7 +106,7 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[::ffff:127.0.0.1]:8081",
         "http://[0:0::1]:8081",
         "http://127%2E0%2E0%2E1:8081",
-        "http://%30:8080"
+        "http://%30:8080",
         "http://ssrf-redirects.testssandbox.com/ssrf-test",
         "http://ssrf-rédirects.testssandbox.com/ssrf-test",
         "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test",

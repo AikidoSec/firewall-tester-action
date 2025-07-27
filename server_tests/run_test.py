@@ -330,7 +330,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -426,7 +426,11 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
     # Exit with error if any tests failed or timed out
     if failed_tests > 0 or timeout_tests > 0:
-        sys.exit(0)  # temp
+        if ignore_failures == "true":
+            logger.warning("Tests failed but ignoring failures as requested")
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -440,6 +444,9 @@ if __name__ == "__main__":
     parser.add_argument("--extra_build_args", type=str, required=False)
     parser.add_argument("--app_port", type=int, required=False)
     parser.add_argument("--sleep_before_test", type=int, required=False)
+    parser.add_argument("--ignore_failures", type=str,
+                        required=False, default="false")
+
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures)

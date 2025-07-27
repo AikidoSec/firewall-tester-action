@@ -58,6 +58,12 @@ inputs:
       second.
     required: false
     default: '1'
+  ignore_failures:
+    description:
+      If true, the action will exit with code 0 even if tests fail. Default is
+      false.
+    required: false
+    default: 'false'
 
 runs:
   using: node20

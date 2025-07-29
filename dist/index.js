@@ -72431,23 +72431,26 @@ function realtimeConfigHandler(req, res) {
 
 const events = new Map();
 function normalizeTypesInApiSpec(schema) {
-    const clone = { ...schema };
-    // Convert single-element array type to string
-    if (Array.isArray(clone.type) && clone.type.length === 1) {
-        clone.type = clone.type[0];
+    if (Array.isArray(schema)) {
+        return schema.map(normalizeTypesInApiSpec);
     }
-    // Recurse into properties
-    if (clone.properties) {
-        const newProps = {};
-        for (const [key, value] of Object.entries(clone.properties)) {
-            newProps[key] = normalizeTypesInApiSpec(value);
+    if (typeof schema === 'object' && schema !== null) {
+        const clone = {};
+        for (const key in schema) {
+            if (key === 'type') {
+                let value = schema[key];
+                if (Array.isArray(value) && value.length === 1) {
+                    value = value[0];
+                }
+                clone[key] = value;
+            }
+            else {
+                clone[key] = normalizeTypesInApiSpec(schema[key]);
+            }
         }
-        clone.properties = newProps;
+        return clone;
     }
-    if (clone.items) {
-        clone.items = normalizeTypesInApiSpec(clone.items);
-    }
-    return clone;
+    return schema;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureEvent(event, app) {
@@ -72458,6 +72461,8 @@ function captureEvent(event, app) {
         events.set(app.id, []);
     }
     if (event.type === 'heartbeat') {
+        // save event to file
+        require$$1$1.writeFileSync('event.json', JSON.stringify(event, null, 2));
         event.routes.forEach((route) => {
             route.apispec = normalizeTypesInApiSpec(route.apispec);
         });
@@ -72644,6 +72649,7 @@ async function run() {
         const extra_build_args = coreExports.getInput('extra_build_args');
         const app_port = parseInt(coreExports.getInput('app_port'));
         const sleep_before_test = parseInt(coreExports.getInput('sleep_before_test'));
+        const ignore_failures = coreExports.getInput('ignore_failures') === 'true';
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
@@ -72652,6 +72658,7 @@ async function run() {
         coreExports.debug(`Extra build args: ${extra_build_args}`);
         coreExports.debug(`App port: ${app_port}`);
         coreExports.debug(`Sleep before test: ${sleep_before_test}`);
+        coreExports.debug(`Ignore failures: ${ignore_failures}`);
         // Spawn the Python process
         const this_file_dir = require$$1$8.dirname(new URL(import.meta.url).pathname);
         await new Promise((resolve, reject) => {
@@ -72674,7 +72681,9 @@ async function run() {
                 '--app_port',
                 app_port.toString(),
                 '--sleep_before_test',
-                sleep_before_test.toString()
+                sleep_before_test.toString(),
+                '--ignore_failures',
+                ignore_failures.toString()
             ], {
                 stdio: 'inherit'
             });

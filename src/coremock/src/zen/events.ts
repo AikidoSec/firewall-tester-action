@@ -1,30 +1,34 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AppData } from '../types.js'
+import fs from 'fs'
 
 const events = new Map()
 
-function normalizeTypesInApiSpec(schema: any) {
-  const clone = { ...schema }
-
-  // Convert single-element array type to string
-  if (Array.isArray(clone.type) && clone.type.length === 1) {
-    clone.type = clone.type[0]
+function normalizeTypesInApiSpec(schema: any): any {
+  if (Array.isArray(schema)) {
+    return schema.map(normalizeTypesInApiSpec)
   }
 
-  // Recurse into properties
-  if (clone.properties) {
-    const newProps: { [key: string]: any } = {}
-    for (const [key, value] of Object.entries(clone.properties)) {
-      newProps[key] = normalizeTypesInApiSpec(value)
+  if (typeof schema === 'object' && schema !== null) {
+    const clone: any = {}
+
+    for (const key in schema) {
+      if (key === 'type') {
+        let value = schema[key]
+        if (Array.isArray(value) && value.length === 1) {
+          value = value[0]
+        }
+
+        clone[key] = value
+      } else {
+        clone[key] = normalizeTypesInApiSpec(schema[key])
+      }
     }
-    clone.properties = newProps
+
+    return clone
   }
 
-  if (clone.items) {
-    clone.items = normalizeTypesInApiSpec(clone.items)
-  }
-
-  return clone
+  return schema
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -37,6 +41,8 @@ export function captureEvent(event: any, app: AppData) {
   }
 
   if (event.type === 'heartbeat') {
+    // save event to file
+    fs.writeFileSync('event.json', JSON.stringify(event, null, 2))
     event.routes.forEach((route: any) => {
       route.apispec = normalizeTypesInApiSpec(route.apispec)
     })

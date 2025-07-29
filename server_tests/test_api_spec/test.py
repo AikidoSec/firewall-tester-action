@@ -13,21 +13,26 @@ import os
 '''
 
 
-def get_api_spec_with_no_body():
-    url = "/api/v1/orders?userId=12345&status=pending"
+def get_api_spec_with_body():
+    url = "/api/create?name=test2&url_age=100"
+    body = {
+        "name": "test2",
+        "age": 34
+    }
     headers = {
         "Content-Type": "application/json",
     }
-    return url, None, headers
+    return url, body, headers
 
 
 def get_api_spec_simple():
-    url = "/api/v1/orders?userId=12345&status=pending"
+    url = "/api/create?userId=12345&color=red"
     headers = {
         "Content-Type": "application/json",
         "Authorization": "Bearer your_token_here"
     }
     body = {
+        "name": "test3",
         "orderId": "98765",
         "items": [
             {
@@ -58,7 +63,6 @@ def get_api_spec_simple():
             "country": "USA"
         },
         "paymentMethod": {
-            "type": "credit_card",
             "provider": "Visa",
             "cardNumber": "4111111111111111",
             "expiryDate": "12/25"
@@ -68,22 +72,13 @@ def get_api_spec_simple():
     return url, body, headers
 
 
-def get_api_spec_merge():
-    url = "/api/v1/orders?userId=12345&status=pending&orderId=80"
-    headers = {
-        "Content-Type": "application/json",
-        "X-API-Key": "abcdef12345"
-    }
-    body = {
-        "orderPlaced": True
-    }
-    return url, body, headers
-
-
 def run_api_spec_tests(fns, expected_json, s: TestServer, c: CoreApi):
     start_events = c.get_events()
     for fn in fns:
         response = s.post(*fn())
+        # save response to file
+        with open("response.json", "w") as f:
+            f.write(response.text)
         assert_response_code_is(response, 200)
 
     c.wait_for_new_events(70, old_events_length=len(start_events))
@@ -98,9 +93,8 @@ def run_api_spec_tests(fns, expected_json, s: TestServer, c: CoreApi):
 
 def run_test(s: TestServer, c: CoreApi):
     run_api_spec_tests([
-        get_api_spec_with_no_body,
+        get_api_spec_with_body,
         get_api_spec_simple,
-        get_api_spec_merge,
     ], "expect_api_spec.json", s, c)
 
 

@@ -3,15 +3,16 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "route": "/api/execute"
+    "route": "/api/request"
   },
   "attack": {
-    "kind": "shell_injection",
+    "kind": "ssrf",
     "blocked": false,
     "source": "body",
-    "metadata": {}
-  },
-  "agent": {
-    "dryMode": true
+    "path": ".url",
+    "metadata": {
+      "hostname": "127.0.0.1",
+      "port": "9081"
+    }
   }
 }

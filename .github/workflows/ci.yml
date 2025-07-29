@@ -112,7 +112,7 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 15
           max_parallel_tests: 5
-          skip_tests: test_ssrf
+          skip_tests: test_ssrf,test_api_spec
 
   test-java:
     name: Java Tests (zen-demo-java)

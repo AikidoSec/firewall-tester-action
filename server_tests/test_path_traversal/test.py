@@ -33,7 +33,7 @@ def check_path_traversal_with_event(response_code, expected_json):
 
 
 def check_path_traversal(query_string):
-    response = s.get(f"/api/read?{query_string}")
+    response = s.get(query_string)
     assert_response_code_is(response, 500, f"Path traversal check failed for {query_string} {response.text}")
 
 def run_test(s: TestServer, c: CoreApi):
@@ -47,6 +47,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_path_traversal_with_event(500, "expect_detection_blocked.json")
 
     paths = [
+        "////etc/passwd",
         "../secrets/key.txt",
         "../../../etc/passwd",
         "./../secrets/key.txt",
@@ -64,14 +65,14 @@ def run_test(s: TestServer, c: CoreApi):
         "////../secrets/key.txt",
         "..;/secrets/key.txt",
         "..%3B/secrets/key.txt",
-        "..%u2216secrets%u2216key.txt",      
+        "..%u2216secrets%u2216key.txt",
         "..//secrets//key.txt",
         "..%c0%afsecrets%c0%afkey.txt",
         "..\\\\secrets\\\\key.txt",
         "/../../../../etc/shadow",
         "..//..//..//etc/passwd",
         "..\\\\..\\\\..\\\\windows\\\\win.ini",
-        "/ｅｔｃ/ｐａｓｓｗｄ",  #Unicode homoglyphs (lookalike characters)
+        "/ｅｔｃ/ｐａｓｓｗｄ",  # Unicode homoglyphs (lookalike characters)
         "..%252F..%252F..%252Fetc%252Fpasswd",  # URL-encoded with %252F
         "clean_path.txt",
     ]
@@ -119,10 +120,8 @@ def run_test(s: TestServer, c: CoreApi):
         ]
 
         for variant in variants:
-            check_path_traversal(variant)
-    
-
-   
+            check_path_traversal("/api/read?" + variant)
+            check_path_traversal("/api/read2?" + variant)
 
 
 if __name__ == "__main__":

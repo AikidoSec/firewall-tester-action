@@ -36,6 +36,25 @@ def run_test(s: TestServer, c: CoreApi):
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
         assert_response_code_is(response, 200)
 
+    # check that the rate limiting is working
+    for i in range(10):
+        response = s.get(
+            "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
+        assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
+
+    tests = [
+        "/../api/pets/",
+        "/api/./pets/",
+        "/api/pets/./",
+        "/api/pets/../pets/",
+        "/api/../api/pets/../pets/"
+    ]
+
+    for test in tests:
+        response = s.get(test, headers={"X-Forwarded-For": "2.16.53.5"})
+        assert_response_code_is(
+            response, 429, f"Expected 429 for {test} ")
+
 
 if __name__ == "__main__":
     args, s, c = init_server_and_core()

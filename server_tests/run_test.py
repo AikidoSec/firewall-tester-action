@@ -275,7 +275,7 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
             return
 
     command.append(dockerfile_dir)
-    logger.debug(f"Building Docker image: {command}")
+    logger.debug(f"Building Docker image: {' '.join(command)}")
     subprocess.run(" ".join(command), shell=True, check=True)
 
 

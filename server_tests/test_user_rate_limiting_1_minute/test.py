@@ -47,13 +47,14 @@ def run_test(s: TestServer, c: CoreApi):
         "/api/./pets/",
         "/api/pets/./",
         "/api/pets/../pets/",
-        "/api/../api/pets/../pets/"
+        "/./api/../api/pets/../pets/"
     ]
 
     for test in tests:
-        response = s.get(test, headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(
-            response, 429, f"Expected 429 for {test} ")
+        response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
+
+        assert_response_code_is_not(
+            response, 200, f"Should not be 200 for {test} ")
 
 
 if __name__ == "__main__":

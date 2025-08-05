@@ -9,17 +9,23 @@ import random
 import string
 import inspect
 import os
+import http.client
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False):
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
     for attempt in range(3):
         try:
-            r = requests.get(
-                f"http://localhost:{port}{route}", headers=headers)
+            if raw:
+                conn = http.client.HTTPConnection("localhost", port)
+                conn.request("GET", route, headers=headers)
+                r = conn.getresponse()
+            else:
+                r = requests.get(
+                    f"http://localhost:{port}{route}", headers=headers)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
@@ -88,6 +94,9 @@ class TestServer:
 
     def get(self, route="", headers={}, benchmark=False):
         return localhost_get_request(self.port, route, headers, benchmark)
+
+    def get_raw(self, route="", headers={}, benchmark=False):
+        return localhost_get_request(self.port, route, headers, benchmark, raw=True)
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
@@ -158,8 +167,21 @@ def generate_random_string(length):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 
+def get_response_status_code(response):
+    if isinstance(response, http.client.HTTPResponse):
+        return response.status
+    else:
+        return response.status_code
+
+
 def assert_response_code_is(response, status_code, message=None):
-    assert response.status_code == status_code, f"Status codes are not the same: {response.status_code} vs {status_code} {message}"
+    assert get_response_status_code(
+        response) == status_code, f"Status codes are not the same: {get_response_status_code(response)} vs {status_code} {message}"
+
+
+def assert_response_code_is_not(response, status_code, message=None):
+    assert get_response_status_code(
+        response) != status_code, f"Status codes should not be the same: {get_response_status_code(response)} vs {status_code} {message}"
 
 
 def assert_response_header_contains(response, header, value):

@@ -43,6 +43,7 @@ def run_test(s: TestServer, c: CoreApi):
         assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
 
     tests = [
+        "/api/pets",
         "/../api/pets/",
         "/api/./pets/",
         "/api/pets/./",
@@ -53,6 +54,27 @@ def run_test(s: TestServer, c: CoreApi):
     for test in tests:
         response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
 
+        assert_response_code_is_not(
+            response, 200, f"Should not be 200 for {test} ")
+
+    for i in range(10):
+        response = s.get_raw(
+            "/test_ratelimiting_1", headers={"X-Forwarded-For": "2.16.53.5"})
+        assert_response_code_is(
+            response, 200, "Expected 200 for /test_ratelimiting_1")
+
+    tests = [
+        "/test_ratelimiting_1",
+        "/../test_ratelimiting_1",
+        "/test_ratelimiting_1/",
+        "/test_ratelimiting_1/./",
+        "/./test_ratelimiting_1/./",
+        "/test_ratelimiting_1/../test_ratelimiting_1",
+        "/test_ratelimiting_1/../test_ratelimiting_1/."
+    ]
+
+    for test in tests:
+        response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
         assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
 

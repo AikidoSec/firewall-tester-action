@@ -43,12 +43,24 @@ def run_test(s: TestServer, c: CoreApi):
         assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
 
     tests = [
-        "/api/pets",
-        "/../api/pets/",
-        "/api/./pets/",
-        "/api/pets/./",
-        "/api/pets/../pets/",
-        "/./api/../api/pets/../pets/"
+        "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
+        "/api/./pets", "/api/pets/.", "/api/pets/../pets",
+        "/API/pets", "/api/PETS",
+        "/api/%70ets", "/%61pi/pets", "/api/p%65ts", "/api/pet%73",
+        "/api/%2570ets", "/api/p%2565ts", "/api/pet%2573",
+        "/%61pi/%70%65ts", "/%2fapi%2fpets", "/api/%2E/pets", "/api/pets%2F",
+        "/api/././pets", "/api/alpha/../pets", "/api/alpha/../../api/pets",
+        "/api///pets", "///api///pets///",
+        "\\api\\pets", "/api\\pets", "\\api/pets",
+        "/api/pets?id=1", "/api/pets?name=fluffy", "/api/pets?x=1&y=2", "/api/pets?y=2&x=1",
+        "/api/pets?x=1&x=1", "/api/pets?", "/api/pets?#fragment",
+        "/api/pets?x=%2F", "/api/pets?%78=1", "/api/pets?x=%2570",
+        "/api/pets;v=1", "/api;v=1/pets", "/api/pets;foo=bar",
+        "/api/péts", "/api/péts", "/api/pets%C3%A9",
+        "https://example.com/api/pets", "http://example.com/api/pets",
+        "/api/pets%00", "/api/pets(%20)", "/api/pets..",
+        "/api/pets.;", "/api/pets.%2E", "/api/pets.json",
+        "/api/pets%2f..%2fsecret", "/api/pets%2f/", "/api/%2e%2e/pets"
     ]
 
     for test in tests:
@@ -64,13 +76,23 @@ def run_test(s: TestServer, c: CoreApi):
             response, 200, "Expected 200 for /test_ratelimiting_1")
 
     tests = [
-        "/test_ratelimiting_1",
-        "/../test_ratelimiting_1",
-        "/test_ratelimiting_1/",
-        "/test_ratelimiting_1/./",
-        "/./test_ratelimiting_1/./",
-        "/test_ratelimiting_1/../test_ratelimiting_1",
-        "/test_ratelimiting_1/../test_ratelimiting_1/."
+        "/test_ratelimiting_1", "/test_ratelimiting_1/", "/test__ratelimiting_1", "//test_ratelimiting_1",
+        "/test_ratelimiting_1/.", "/test_ratelimiting_1/../test_ratelimiting_1", "/TEST_RATELIMITING_1", "/test_RATELIMITING_1",
+        "/%74est_ratelimiting_1", "/t%65st_ratelimiting_1", "/tes%74_ratelimiting_1", "/test_%72atelimiting_1",
+        "/test_ratelimitin%67_1", "/test_ratelimiting_%31", "/%2574est_ratelimiting_1", "/test_ratelimiting_%2531",
+        "/%2ftest_ratelimiting_1", "/test%2F_ratelimiting_1", "/test_ratelimiting_1%2F", "/test%2E_ratelimiting_1",
+        "/./test_ratelimiting_1", "/test_ratelimiting_1/./", "/alpha/../test_ratelimiting_1", "/alpha/../../test_ratelimiting_1",
+        "/test///ratelimiting_1", "///test_ratelimiting_1///",
+        "\\test_ratelimiting_1", "/test_ratelimiting_1\\", "\\test_ratelimiting_1\\",
+        "/test_ratelimiting_1?x=1", "/test_ratelimiting_1?a=1&b=2", "/test_ratelimiting_1?b=2&a=1",
+        "/test_ratelimiting_1?a=1&a=1", "/test_ratelimiting_1?", "/test_ratelimiting_1?#frag",
+        "/test_ratelimiting_1?x=%2F", "/test_ratelimiting_1?%78=1", "/test_ratelimiting_1?x=%2574",
+        "/test_ratelimiting_1;v=1", "/;v=1/test_ratelimiting_1", "/test_ratelimiting_1;foo=bar",
+        "/test_ratelimitiṅg_1", "/tést_ratelimiting_1", "/tést_ratelimiting_1", "/test_ratelimiting_1%C2%A0",
+        "https://example.com/test_ratelimiting_1", "http://example.com/test_ratelimiting_1",
+        "/test_ratelimiting_1%00", "/test_ratelimiting_1(%20)", "/test_ratelimiting_1..",
+        "/test_ratelimiting_1.;", "/test_ratelimiting_1.%2E", "/test_ratelimiting_1.json",
+        "/test_ratelimiting_1%2f..%2fsecret", "/test_ratelimiting_1%2f/", "/%2e%2e/test_ratelimiting_1"
     ]
 
     for test in tests:

@@ -171,7 +171,10 @@ def get_response_status_code(response):
     if isinstance(response, http.client.HTTPResponse):
         return response.status
     else:
-        return response.status_code
+        if isinstance(response, requests.Response):
+            return response.status_code
+        else:
+            return None
 
 
 def assert_response_code_is(response, status_code, message=None):

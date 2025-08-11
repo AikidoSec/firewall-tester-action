@@ -28,8 +28,8 @@ def run_test(s: TestServer, c: CoreApi):
         start_mock_servers(container_name)
         response = s.post("/api/request_different_port",
                           {"url": "http://127.0.0.1:4001", "port": "4000"})
-        assert_response_code_is_not(
-            response, 500, f"Aikido Zen should not block the request {response.text}")
+        assert_response_code_is(
+            response, 200, f"Aikido Zen should not block the request {response.text}")
     finally:
         subprocess.run(
             f"docker rm -f mock-4000-for-php", shell=True)

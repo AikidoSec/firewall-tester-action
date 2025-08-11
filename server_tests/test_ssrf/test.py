@@ -99,7 +99,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_ssrf_with_event(500, "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_ssrf_with_event(400, "expect_detection_not_blocked.json")
+    check_ssrf_with_event(200, "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
     check_ssrf_with_event(500, "expect_detection_blocked.json")

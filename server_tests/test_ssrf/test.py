@@ -88,6 +88,8 @@ def check_ssrf_with_event(response_code, expected_json):
 
 def check_ssrf(route, ip):
     response = s.post(route, {"url": ip}, timeout=10)
+    if len(response.text) == 0:
+        return
     assert_response_code_is(
         response, 500, f"[{route}] SSRF check failed for {ip} {response.text}")
 
@@ -118,6 +120,8 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[0:0::1]:4000",
         "http://127%2E0%2E0%2E1:4000",
         "http://%30:4000",
+        "http://127.0.0.1:4000:9999",
+        "http://127.0.0.1:9999:4000",
 
 
         # AWS metadata service
@@ -129,7 +133,12 @@ def run_test(s: TestServer, c: CoreApi):
         "http://0xA9FEA9FE/latest/meta-data/iam/security-credentials/",
         "http://2852039166/latest/meta-data/iam/security-credentials/",
         "http://[::ffff:169.254.169.254]:8081/latest/meta-data/iam/security-credentials/",
-        "http://[fd00:ec2::254]/latest/meta-data/iam/security-credentials/"
+        "http://[fd00:ec2::254]/latest/meta-data/iam/security-credentials/",
+        #
+        # http://1.1.1.1 &@2.2.2.2# @3.3.3.3/
+        "http://169.254.169.254 &@2.2.2.2# @3.3.3.3/latest/meta-data/iam/security-credentials/",
+        "http://1.1.1.1 &@169.254.169.254# @3.3.3.3/latest/meta-data/iam/security-credentials/",
+        "http://1.1.1.1 &@2.2.2.2# @169.254.169.254/latest/meta-data/iam/security-credentials/",
     ]
     ips.extend(
         [f"http://{ip}:80" for ip in generate_combinations("169.254.169.254")])

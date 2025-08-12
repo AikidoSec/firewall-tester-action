@@ -34,7 +34,7 @@ def check_sql_injection(response_code, response_body, event_id, expected_json):
 
 def check_sql_injection_payload(payload):
     response = s.post(
-        "/api/create", {"name": payload})
+        "/api/create", payload)
     if response.status_code == 200:
         pets = s.get("/api/pets/")
 
@@ -45,9 +45,10 @@ def check_sql_injection_payload(payload):
         # write pets_json to a file
         with open("pets.json", "w") as f:
             json.dump(pets_json, f)
-        assert in_aikido_security, "All pets must be in Aikido Security, payload: " + payload
+        assert in_aikido_security, "All pets must be in Aikido Security, payload: " + \
+            str(payload)
     else:
-        assert_response_code_is(response, 500, "Payload: " + payload)
+        assert_response_code_is(response, 500, "Payload: " + str(payload))
 
 
 def check_sql_injection_select(payload):
@@ -90,6 +91,81 @@ def run_test(s: TestServer, c: CoreApi):
 
     ]
     for payload in payloads:
+        payload = {
+            "name": payload
+        }
+        check_sql_injection_payload(payload)
+
+    # parameter pollution
+    json_payloads = [
+        # 1) Simple dup key (last-wins vs first-wins)
+        {"name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": "Malicious Pet', 'Gru from the Minions') --", "name": "hello"},
+
+        # 2) Duplicates separated by other keys
+        {"x": 1, "name": "hello", "y": 2,
+            "name": "Malicious Pet', 'Gru from the Minions') --", "z": 3},
+
+        # 3) Type changes across dups (string → bool/number/null/object/array)
+        {"name": True, "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": 123, "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": None, "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": {"nested": "obj"}, "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": ["a", "b"], "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 4) Case variants (common pollution source if backends normalize)
+        {"Name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"NAME": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"naMe": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 5) Key with trailing/leading spaces (some parsers trim)
+        {"name ": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {" name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 6) Hidden unicode spaces / zero-width chars in key
+        # \u200B zero-width space, \u00A0 non-breaking space
+        {"na\u200Bme": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"na\u00A0me": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 7) Homoglyphs (Latin 'a' vs Cyrillic 'а' U+0430)
+        {"n\u0430me": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 8) Dot/bracket notation keys (some frameworks flatten)
+        {"user.name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"user[name]": "hello",
+            "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 11) Mixed: one ‘name’ correct, another polluted
+        {"primary": {"name": "hello"},
+            "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 12) Empty & whitespace values vs polluted
+        {"name": "", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"name": "   ", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 13) Key normalization collisions (_name, -name)
+        {"_name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"-name": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 14) Encoded lookalike (name\u005B\u005D)
+        {"name[]": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 15) Multiple polluted keys to check multi-field logic
+        {"name": "Malicious Pet', 'Gru from the Minions') --",
+            "title": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 16) Very long benign preceding value (length tricks)
+        {"name": "x"*5000, "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 17) Surrogate pairs / emoji nearby (parser robustness)
+        {"name": "hello 😀", "name": "Malicious Pet', 'Gru from the Minions') --"},
+
+        # 18) Key with control chars (some servers strip)
+        {"na\rtme": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+        {"na\ntme": "hello", "name": "Malicious Pet', 'Gru from the Minions') --"},
+    ]
+
+    for payload in json_payloads:
         check_sql_injection_payload(payload)
 
 

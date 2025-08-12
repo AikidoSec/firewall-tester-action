@@ -122,7 +122,16 @@ def run_test(s: TestServer, c: CoreApi):
         "http://%30:4000",
         "http://127.0.0.1:4000:9999",
         "http://127.0.0.1:9999:4000",
-
+        "http://%31%32%37.%30.%30.%31:4000",
+        "http://ⓛocalhost:4000/",
+        "http://127.1.1.1:4000\@127.0.0.1:4000/",
+        "http://127.1.1.1:4000:\@@127.0.0.1:4000/",
+        "http://127.0.0.1:4000#\@127.2.2.2:80/ ",
+        "http://1.1.1.1 &@127.0.0.1:4000# @3.3.3.3/",
+        "http://localhost:4000 /",
+        "http://loc\097lhost:4000/",
+        "http://loc%5C097lhost:4000",
+        "https://localhost\r\naa:4000/",
 
         # AWS metadata service
         "http://169.254.169.254/latest/meta-data/iam/security-credentials/",

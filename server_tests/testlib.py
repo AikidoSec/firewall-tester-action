@@ -10,6 +10,7 @@ import string
 import inspect
 import os
 import http.client
+import re
 
 
 def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False):
@@ -214,3 +215,18 @@ def assert_event_contains_subset_file(event, event_subset_file):
         event_subset = json.load(file)
     assert event_subset
     assert_event_contains_subset(event, event_subset)
+
+
+def assert_line_contains_sensitive_data(line, line_number):
+    patterns = {
+        "SQL Query": r"select .* from|insert .* into",
+        "URL Query String with Sensitive Param": r"(?i)(\?|&)(email|password|token|apikey|credit|ssn)=([^&\s]+)",
+        "Basic Auth": r"(?i)basic\s+([a-zA-Z0-9]+:[a-zA-Z0-9]+)",
+        "Password Param": r"password=[^&\s]+",
+        "Bearer Token": r"(bearer\s+[A-Za-z0-9\-._~+/]+=*)",
+        "Authorization Header": r"authorization:\s.*",
+    }
+    for pattern_name, pattern in patterns.items():
+        if re.search(pattern, line):
+            raise AssertionError(
+                f"Line {line_number} contains '{pattern_name}': {line}")

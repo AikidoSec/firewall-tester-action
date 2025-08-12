@@ -4,44 +4,43 @@ import sys
 from testlib import *
 from core_api import CoreApi
 import os
+import re
 
 
 def run_test(s: TestServer, c: CoreApi):
-    # curl -H "Authorization: Basic dXNlcjpwYXNzd29yZA==" https://example.com/api/login
 
-    # Basic Auth Header
-    response = s.get(
+    _ = s.get(
         "/api/pets/", headers={"X-Forwarded-For": "1.3.3.7", "Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
 
-    # Bearer Token curl -H "Authorization: Bearer abcdef1234567890.token.value" https://example.com/api/data
-    response = s.get(
+    _ = s.get(
         "/api/pets/", headers={"X-Forwarded-For": "1.3.3.7", "Authorization": "Bearer abcdef1234567890.token.value"})
 
-    # API Key in Header curl -H "x-api-key: my_api_key_123456" https://example.com/api/secure
-    response = s.get(
+    _ = s.get(
         "/api/pets/", headers={"X-Forwarded-For": "1.3.3.7", "X-API-Key": "1234567890"})
 
-    # Credit Card in Payload curl -X POST https://example.com/api/pay -H "Content-Type: application/json" -d '{"credit_card":"4111111111111111","cvv":"123","expiry":"12/26"}'
-    response = s.post(
+    _ = s.post(
         "/api/pets/", {"credit_card": "4111111111111111", "cvv": "123", "expiry": "12/26"}, headers={"X-Forwarded-For": "1.3.3.7", "Content-Type": "application/json"})
 
-    # Name in Payload curl -X POST https://example.com/api/create -H "Content-Type: application/json" -d '{"name":"John Doe"}'
-    response = s.post(
+    _ = s.post(
         "/api/create/", {"name": "Malicious Pet', 'Gru from the Minions') --"}, headers={"X-Forwarded-For": "1.3.3.7", "Content-Type": "application/json"})
 
-    # Email and Password in Query curl "https://example.com/api/login?email=user@example.com&password=secret123"
-    response = s.get(
+    _ = s.post(
+        "/api/create/", {"name": "test", "email": "test@test.com", "password": "dXNlcjpwYXNzd29yZA"}, headers={"X-Forwarded-For": "1.3.3.7", "Content-Type": "application/json"})
+
+    _ = s.get(
         "/api/pets/?email=user@example.com&password=secret123", headers={"X-Forwarded-For": "1.3.3.7"})
 
-    # Shell Injection curl -X POST https://example.com/api/execute -d '{"userCommand":"`whoami`"}'
-    response = s.post("/api/execute", {"userCommand": "`whoami`"},  headers={
-                      "X-Forwarded-For": "1.3.3.7", "Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
+    _ = s.post("/api/execute", {"userCommand": "`whoami`"},  headers={
+        "X-Forwarded-For": "1.3.3.7", "Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
 
     logs = s.get_logs("test_logs_sensitive_data")
-    # save logs to file
+    logs = logs.split("\n")
 
-    with open("logs.txt", "w") as f:
-        f.write(logs)
+    for i, line in enumerate(logs, start=1):
+        line = line.lower().strip()
+        if "aikido" not in line and "zen" not in line:
+            continue
+        assert_line_contains_sensitive_data(line, i)
 
 
 if __name__ == "__main__":

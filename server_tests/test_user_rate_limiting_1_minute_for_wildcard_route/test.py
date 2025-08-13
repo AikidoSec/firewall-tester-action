@@ -7,7 +7,7 @@ import os
 
 '''
 1. Sets up the rate limiting config to 5 requests / minute for route '/'.
-2. Sends 5 requests to '/'. Checks that those requests are not blocked.
+2. Sends 5 requests to '/api/execute/<random_string>'. Checks that those requests are not blocked.
 3. Send another more 5 request to '/'. Checks that they all are rate limited.
 4. Sends 100 requests to another route '/tests'. Checks that those requests are not blocked.
 '''
@@ -17,7 +17,7 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(5):
         response = s.get(
             f"/api/execute/{generate_random_string(10)}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 200)
+        assert_response_code_is(response, 200, response.text)
 
     # sleep for 10 seconds
     time.sleep(5)
@@ -28,12 +28,15 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            assert_response_code_is(response, 429)
+            assert_response_code_is(response, 429, response.text)
 
     for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 200)
+        assert_response_code_is(response, 200, response.text)
+
+    response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
+    assert_response_code_is(response, 429, response.text)
 
 
 if __name__ == "__main__":

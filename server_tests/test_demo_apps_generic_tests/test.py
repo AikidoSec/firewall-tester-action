@@ -32,15 +32,15 @@ def run_test(s: TestServer, c: CoreApi):
 
     # ------ user blocking ------
 
-    response = s.get("/api/pets/", headers={
+    response = s.get_raw("/api/pets/", headers={
         "user": "123456"})
     assert_response_code_is(
-        response, 200, f"Expected 200 for user 123456 {response.text}")
+        response, 200, f"Expected 200 for user 123456 {response.read()}")
 
-    response = s.get("/api/pets/", headers={
+    response = s.get_raw("/api/pets/", headers={
         "user": "789"})
     assert_response_code_is(
-        response, 403, f"Expected 403 for user 789 {response.text}")
+        response, 403, f"Expected 403 for user 789 {response.read()}")
 
 
 if __name__ == "__main__":

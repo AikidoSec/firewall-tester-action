@@ -5,31 +5,14 @@ import os
 
 
 '''
-1. Send a very big request to the server.
-2. Send an sql injection payload to see if the server it's still working.
-3. Check for bot blocking.
-4. Check for user blocking.
+1. Check for user blocking.
+2. Check for bot blocking.
+3. Send a very big request to the server.
+4. Send an sql injection payload to see if the server it's still working.
 '''
 
 
 def run_test(s: TestServer, c: CoreApi):
-    file_path = os.path.join(os.path.dirname(__file__), "test.json")
-    response = s.post("/api/create", json.load(open(file_path, 'r')))
-    assert_response_code_is(
-        response, 200, f"Expected 200 for /api/create {response.text}")
-
-    response = s.post(
-        "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(
-        response, 500, f"Expected 500 for /api/create {response.text}")
-
-    # ------ Bot blocking ------
-
-    response = s.get("/api/pets/", headers={
-        "User-Agent": "1234googlebot1234"})
-    assert_response_code_is(
-        response, 403, f"Expected 403 for / {response.text}")
-
     # ------ user blocking ------
 
     response = s.get_raw("/api/pets/", headers={
@@ -41,6 +24,24 @@ def run_test(s: TestServer, c: CoreApi):
         "user": "789"})
     assert_response_code_is(
         response, 403, f"Expected 403 for user 789 {response.read()}")
+
+    # ------ Bot blocking ------
+
+    response = s.get("/api/pets/", headers={
+        "User-Agent": "1234googlebot1234"})
+    assert_response_code_is(
+        response, 403, f"Expected 403 for  {response.text}")
+
+    # ------ Big request ------
+    file_path = os.path.join(os.path.dirname(__file__), "test.json")
+    response = s.post("/api/create", json.load(open(file_path, 'r')))
+    assert_response_code_is(
+        response, 200, f"Expected 200 for /api/create {response.text}")
+
+    response = s.post(
+        "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
+    assert_response_code_is(
+        response, 500, f"Expected 500 for /api/create {response.text}")
 
 
 if __name__ == "__main__":

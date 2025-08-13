@@ -1,4 +1,5 @@
 {
+  "block": true,
   "success": true,
   "heartbeatIntervalInMS": 600000,
   "endpoints": [],

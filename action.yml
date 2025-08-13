@@ -51,13 +51,19 @@ inputs:
   test_timeout:
     description: The timeout in seconds for each test. Default is 60 seconds.
     required: false
-    default: '300'
+    default: '600'
   sleep_before_test:
     description:
       The number of seconds to sleep before starting the test. Default is 1
       second.
     required: false
     default: '1'
+  ignore_failures:
+    description:
+      If true, the action will exit with code 0 even if tests fail. Default is
+      false.
+    required: false
+    default: 'false'
 
 runs:
   using: node20

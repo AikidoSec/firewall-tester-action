@@ -8,6 +8,7 @@ import os
 1. Send a very big request to the server.
 2. Send an sql injection payload to see if the server it's still working.
 3. Check for bot blocking.
+4. Check for user blocking.
 '''
 
 
@@ -34,12 +35,12 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/", headers={
         "user": "123456"})
     assert_response_code_is(
-        response, 200, f"Expected 200 for user 123456/ {response.text}")
+        response, 200, f"Expected 200 for user 123456 {response.text}")
 
     response = s.get("/api/pets/", headers={
         "user": "789"})
     assert_response_code_is(
-        response, 403, f"Expected 403 for user 789/ {response.text}")
+        response, 403, f"Expected 403 for user 789 {response.text}")
 
 
 if __name__ == "__main__":

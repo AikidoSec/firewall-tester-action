@@ -1,4 +1,5 @@
 {
+  "block": true,
   "blockedIPAddresses": [],
   "allowedIPAddresses": [],
   "monitoredIPAddresses": [],

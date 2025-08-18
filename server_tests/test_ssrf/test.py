@@ -108,6 +108,11 @@ def run_test(s: TestServer, c: CoreApi):
         #     This is not a domain, but it will return 500
         "http://this.is.not.a.domain.com:8081",
         "http://localhost:4000",
+        "http:/localhost:4000/",
+        # "http.127.1.1.1:4000∖@127.0.0.1:4000/",
+        # "jdasndjknasjndajsn.@127.0.0.1:4000/",
+        # "dasndjknasjndajsn.localhost:4000/",
+        "http:////localhost:4000",
         "http://LOCALHOST:4000",
         "http://loopback:4000",
         "http://0:4000",
@@ -117,6 +122,7 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[::]:4000",
         "http://[0:0:0:0:0:0:0:1]:4000",
         "http://[::ffff:127.0.0.1]:4000",
+        "http://[0:0:0:0:0:ffff:127.0.0.1]:4000",
         "http://[0:0::1]:4000",
         "http://127%2E0%2E0%2E1:4000",
         "http://%30:4000",
@@ -127,6 +133,11 @@ def run_test(s: TestServer, c: CoreApi):
         "http://127.1.1.1:4000\@127.0.0.1:4000/",
         "http://127.1.1.1:4000:\@@127.0.0.1:4000/",
         "http://127.0.0.1:4000#\@127.2.2.2:80/ ",
+        "http://127.1.1.1:4000\\@127.0.0.1:4000/",
+        "http://127.1.1.1:4000\\\@127.0.0.1:4000/",
+        "http://127.1.1.1:4000\\\\@127.0.0.1:4000/",
+        "http://127.1.1.1:4000\\\\\\\\\@127.0.0.1:4000/",
+        "http://127.1.1.1:4000∖\\@127.0.0.1:4000/"
         "http://1.1.1.1 &@127.0.0.1:4000# @3.3.3.3/",
         "http://localhost:4000 /",
         "http://loc\097lhost:4000/",
@@ -159,11 +170,15 @@ def run_test(s: TestServer, c: CoreApi):
 
     # SSRF redirect tests
     ips.extend([
-        "http://ssrf-redirects.testssandbox.com/ssrf-test",
-        "http://ssrf-rédirects.testssandbox.com/ssrf-test",
-        "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test",
-        "http://ssrf-r%C3%A9directs.testssandbox.com/ssrf-test",
+        "http://ssrf-redirects.testssandbox.com/ssrf-test-4",
+        "http://ssrf-rédirects.testssandbox.com/ssrf-test-4",
+        "http://xn--ssrf-rdirects-ghb.testssandbox.com/ssrf-test-4",
+        "http://ssrf-r%C3%A9directs.testssandbox.com/ssrf-test-4",
     ])
+
+    for i in range(128):
+        ips.append(f"http://127.0.0.1:4000" + chr(i) + "/")
+
     for ip in ips:
         check_ssrf("/api/request", ip)
         check_ssrf("/api/request2", ip)

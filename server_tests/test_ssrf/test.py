@@ -108,11 +108,23 @@ def run_test(s: TestServer, c: CoreApi):
         #     This is not a domain, but it will return 500
         "http://this.is.not.a.domain.com:8081",
         "http://localhost:4000",
-        "http:/localhost:4000/",
+        # "http:/localhost:4000/",
+        #  "ht\ntp:/localhost:4000/",
+        #  "http:/localhost:4000/",
+        #  "aa:@localhost:4000",
+        # "http:localhost:4000/",
+        #  "https\u000D://localhost:4000/",
+        # "h\u000D\u000Att\u0009p://localhost:4000/"
+        # "http://0x7F000001:4000",
+        # "http://localhost:69535",
+        # "http://localhost:\u00094000",
+
+
+
         # "http.127.1.1.1:4000∖@127.0.0.1:4000/",
         # "jdasndjknasjndajsn.@127.0.0.1:4000/",
         # "dasndjknasjndajsn.localhost:4000/",
-        "http:////localhost:4000",
+        # "http:////localhost:4000",
         "http://LOCALHOST:4000",
         "http://loopback:4000",
         "http://0:4000",

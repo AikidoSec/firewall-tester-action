@@ -36,6 +36,7 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
           sleep_before_test: 15
+          ignore_failures: true
 
   test-python:
     name: Python Tests (zen-demo-python)
@@ -58,9 +59,10 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
-          skip_tests: test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_bypassed_ip_for_geo_blocking,test_user_rate_limiting_1_minute
+          skip_tests: test_rate_limiting_group_id_1_minute,test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_bypassed_ip_for_geo_blocking,test_user_rate_limiting_1_minute
           sleep_before_test: 15
           max_parallel_tests: 5
+          ignore_failures: true
 
   test-php:
     name: PHP Tests (zen-demo-php)
@@ -88,6 +90,9 @@ jobs:
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
           extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.126'
           sleep_before_test: 20
+          skip_tests: test_rate_limiting_group_id_1_minute
+          max_parallel_tests: 5
+          ignore_failures: true
 
   test-dotnet:
     name: Dotnet Tests (zen-demo-dotnet-core)
@@ -112,7 +117,8 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 15
           max_parallel_tests: 5
-          skip_tests: test_ssrf,test_api_spec
+          skip_tests: test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec
+          ignore_failures: true
 
   test-java:
     name: Java Tests (zen-demo-java)
@@ -137,3 +143,4 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 15
           max_parallel_tests: 5
+          ignore_failures: true

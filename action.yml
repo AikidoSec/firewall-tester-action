@@ -33,9 +33,9 @@ inputs:
   max_parallel_tests:
     description:
       The maximum number of tests to run in parallel (for each test, a new
-      container will be spawned). Default is 5.
+      container will be spawned). Default is 10.
     required: true
-    default: '5'
+    default: '10'
   config_update_delay:
     description:
       The delay in seconds to wait after updating the config to ensure the

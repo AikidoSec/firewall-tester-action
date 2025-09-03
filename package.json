@@ -44,7 +44,8 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@types/express": "^5.0.2",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "helmet": "8.1.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.9",

@@ -1,4 +1,5 @@
 import express, { Express } from 'express'
+import helmet from 'helmet'
 import * as core from '@actions/core'
 import { Server } from 'http'
 import createApp from './src/handlers/createApp.js'
@@ -12,6 +13,7 @@ import { listsHandler } from './src/handlers/listsHandler.js'
 import { updateListsHandler } from './src/handlers/updateListsHandler.js'
 
 const app: Express = express()
+app.use(helmet())
 const port = process.env.PORT || 3000
 let server: Server | undefined
 

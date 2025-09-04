@@ -37,6 +37,7 @@ import require$$7$2 from 'node:path';
 import require$$2$4 from 'node:fs';
 import require$$6$3 from 'querystring';
 import require$$13 from 'stream';
+import helmet from 'helmet';
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -72461,8 +72462,6 @@ function captureEvent(event, app) {
         events.set(app.id, []);
     }
     if (event.type === 'heartbeat') {
-        // save event to file
-        require$$1$1.writeFileSync('event.json', JSON.stringify(event, null, 2));
         event.routes.forEach((route) => {
             route.apispec = normalizeTypesInApiSpec(route.apispec);
         });
@@ -72597,6 +72596,7 @@ function updateListsHandler(req, res) {
 }
 
 const app = express();
+app.use(helmet());
 const port = process.env.PORT || 3000;
 let server;
 // Middleware
@@ -72638,7 +72638,7 @@ process.on('SIGTERM', () => {
 async function run() {
     try {
         // Start the Express server
-        startPostgres();
+        await startPostgres();
         startServer();
         const dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
@@ -72652,6 +72652,7 @@ async function run() {
         const ignore_failures = coreExports.getInput('ignore_failures') === 'true';
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
+        coreExports.debug(`Config update delay: ${config_update_delay}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
         coreExports.debug(`Test timeout: ${test_timeout}`);
         coreExports.debug(`Extra args: ${extra_args}`);
@@ -72709,7 +72710,7 @@ async function run() {
         stopPostgres();
     }
 }
-function startPostgres() {
+async function startPostgres() {
     const proc = spawn('docker', [
         'run',
         '--rm',
@@ -72728,10 +72729,26 @@ function startPostgres() {
     ], {
         stdio: 'inherit'
     });
+    console.log(`Started Postgres: ${proc.pid}`);
+    // wait for postgres to be ready
+    await new Promise((resolve) => {
+        setTimeout(resolve, 10000);
+    });
     proc.on('close', (code) => {
         if (code !== 0) {
             coreExports.setFailed(`Failed to start Postgres: ${code}`);
         }
+    });
+    proc.on('error', (err) => {
+        coreExports.setFailed(`Failed to start Postgres: ${err}`);
+    });
+    proc.on('exit', (code) => {
+        if (code !== 0) {
+            coreExports.setFailed(`Failed to start Postgres: ${code}`);
+        }
+    });
+    proc.on('message', (msg) => {
+        console.log(`Postgres: ${msg}`);
     });
 }
 function stopPostgres() {

@@ -21,7 +21,7 @@ process.on('SIGTERM', () => {
 export async function run(): Promise<void> {
   try {
     // Start the Express server
-    startPostgres()
+    await startPostgres()
     startServer()
     const dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
@@ -42,6 +42,7 @@ export async function run(): Promise<void> {
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
+    core.debug(`Config update delay: ${config_update_delay}`)
     core.debug(`Skip tests: ${skip_tests}`)
     core.debug(`Test timeout: ${test_timeout}`)
     core.debug(`Extra args: ${extra_args}`)
@@ -102,7 +103,7 @@ export async function run(): Promise<void> {
   }
 }
 
-function startPostgres() {
+async function startPostgres() {
   const proc = spawn(
     'docker',
     [
@@ -125,10 +126,26 @@ function startPostgres() {
       stdio: 'inherit'
     }
   )
+  console.log(`Started Postgres: ${proc.pid}`)
+  // wait for postgres to be ready
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10000)
+  })
   proc.on('close', (code) => {
     if (code !== 0) {
       core.setFailed(`Failed to start Postgres: ${code}`)
     }
+  })
+  proc.on('error', (err) => {
+    core.setFailed(`Failed to start Postgres: ${err}`)
+  })
+  proc.on('exit', (code) => {
+    if (code !== 0) {
+      core.setFailed(`Failed to start Postgres: ${code}`)
+    }
+  })
+  proc.on('message', (msg) => {
+    console.log(`Postgres: ${msg}`)
   })
 }
 

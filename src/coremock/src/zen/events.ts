@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AppData } from '../types.js'
-import fs from 'fs'
 
 const events = new Map()
 
@@ -41,8 +40,6 @@ export function captureEvent(event: any, app: AppData) {
   }
 
   if (event.type === 'heartbeat') {
-    // save event to file
-    fs.writeFileSync('event.json', JSON.stringify(event, null, 2))
     event.routes.forEach((route: any) => {
       route.apispec = normalizeTypesInApiSpec(route.apispec)
     })

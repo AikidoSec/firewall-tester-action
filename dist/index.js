@@ -37,7 +37,6 @@ import require$$7$2 from 'node:path';
 import require$$2$4 from 'node:fs';
 import require$$6$3 from 'querystring';
 import require$$13 from 'stream';
-import helmet from 'helmet';
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -12059,20 +12058,6 @@ function requirePool () {
 	      ? { ...options.interceptors }
 	      : undefined;
 	    this[kFactory] = factory;
-
-	    this.on('connectionError', (origin, targets, error) => {
-	      // If a connection error occurs, we remove the client from the pool,
-	      // and emit a connectionError event. They will not be re-used.
-	      // Fixes https://github.com/nodejs/undici/issues/3895
-	      for (const target of targets) {
-	        // Do not use kRemoveClient here, as it will close the client,
-	        // but the client cannot be closed in this state.
-	        const idx = this[kClients].indexOf(target);
-	        if (idx !== -1) {
-	          this[kClients].splice(idx, 1);
-	        }
-	      }
-	    });
 	  }
 
 	  [kGetDispatcher] () {
@@ -72596,7 +72581,6 @@ function updateListsHandler(req, res) {
 }
 
 const app = express();
-app.use(helmet());
 const port = process.env.PORT || 3000;
 let server;
 // Middleware

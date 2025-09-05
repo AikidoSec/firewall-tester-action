@@ -15,7 +15,8 @@
     "coverage",
     "dist",
     "node_modules",
-    "zen-demo"
+    "zen-demo",
+    "server_tests"
   ],
   "include": ["src/**/*"]
 }

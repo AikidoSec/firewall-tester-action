@@ -1,0 +1,18 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "route": "/api/request"
+  },
+  "attack": {
+    "kind": "ssrf",
+    "blocked": true,
+    "source": "body",
+    "path": ".url",
+    "metadata": {
+      "hostname": "127.0.0.1",
+      "port": "4000"
+    }
+  }
+}

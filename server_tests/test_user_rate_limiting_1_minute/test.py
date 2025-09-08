@@ -94,15 +94,16 @@ def run_test(s: TestServer, c: CoreApi):
         assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
 
-    # Headers: X-Http-Method-Override, X-HTTP-Method-Override, X-Http-Method, X-HTTP-Method, X-Method-Override;
+    # Headers: X-Http-Method-Override, X-HTTP-Method-Override, X-Http-Method, X-HTTP-Method, X-Method-Override
     for header in ["X-Http-Method-Override", "X-HTTP-Method-Override", "X-Http-Method", "X-HTTP-Method", "X-Method-Override"]:
-        response = s.post("/api/pets/", headers={header: "GET"}, data="")
+        response = s.post("/test_ratelimiting_1",
+                          headers={header: "GET", "X-Forwarded-For": "2.16.53.5"}, data="")
         assert_response_code_is_not(
             response, 200, f" Rate limiting bypass for {header}")
 
     # Parameters in the URL: _method, method, httpMethod, _HttpMethod
     for param in ["_method", "method", "httpMethod", "_HttpMethod"]:
-        response = s.post(f"/api/pets/?{param}=GET",
+        response = s.post(f"/test_ratelimiting_1?{param}=GET",
                           headers={"X-Forwarded-For": "2.16.53.5"})
         assert_response_code_is_not(
             response, 200, f" Rate limiting bypass for {param}")

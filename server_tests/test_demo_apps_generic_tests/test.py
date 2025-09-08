@@ -77,6 +77,18 @@ def run_test(s: TestServer, c: CoreApi):
     pets = s.get("/api/pets/")
     assert 'Gru' not in pets.text, f"Bypass for big nested json in token, pets: {pets.text}"
 
+    # ------ Token in token ------
+    token = create_token({"a": "b"})
+    for _ in range(10):
+        token = create_token({"a": token})
+    body = {
+        "a": token,
+        "name": "Malicious Pet', 'Gru from the Minions') --"
+    }
+    response = s.post("/api/create", data=body)
+    pets = s.get("/api/pets/")
+    assert 'Gru' not in pets.text, f"Bypass for token in token, pets: {pets.text}"
+
 
 if __name__ == "__main__":
     args, s, c = init_server_and_core()

@@ -20,6 +20,13 @@ DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
     "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
+ENV_FILE_CONTENT = """
+AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000
+AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000
+AIKIDO_URL=http://{DOCKER_HOST_IP}:3000
+AIKIDO_REALTIME_URL=http://{DOCKER_HOST_IP}:3000
+"""
+
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -151,24 +158,27 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 2. run the Docker container
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
-        if not os.path.exists(env_file_path):
+        if os.path.exists(env_file_path):
+            # write at the beginning of the file
+            with open(env_file_path, "r") as f:
+                content = f.read()
+            with open(env_file_path, "w") as f:
+                f.write(ENV_FILE_CONTENT.format(DOCKER_HOST_IP=DOCKER_HOST_IP))
+                f.write(content)
+        else:
             raise Exception(
                 f"Env file not found: {env_file_path} for test: {test_dir}")
+
         create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
         subprocess.run(create_database_command, shell=True, check=True)
         time.sleep(1)
+
         command = (
             f"docker run -d "
             f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT={app_port} "
-            f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            # temp for dotnet
-            f"--env AIKIDO_URL=http://{DOCKER_HOST_IP}:3000 "
-            # temp for dotnet
-            f"--env AIKIDO_REALTIME_URL=http://{DOCKER_HOST_IP}:3000 "
             f"--env DATABASE_URL=postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
@@ -243,7 +253,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                             "Segmentation fault or core dumped")
             return result
 
-        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
+        # redirect logs of the Docker container to > $GITHUB_STEP_SUMMARY
         # subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
         #               shell=True, check=False, capture_output=True)
         # stop the container

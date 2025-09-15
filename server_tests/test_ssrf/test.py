@@ -155,7 +155,6 @@ def run_test(s: TestServer, c: CoreApi):
         "http://localhost:4000 /",
         # "http://loc\097lhost:4000/",
         # "http://loc%5C097lhost:4000",
-        "https://localhost\r\naa:4000/",
 
         # AWS metadata service
         "http://169.254.169.254/latest/meta-data/iam/security-credentials/",

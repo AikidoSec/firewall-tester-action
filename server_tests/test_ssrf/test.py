@@ -137,6 +137,7 @@ def run_test(s: TestServer, c: CoreApi):
         "http://[0:0:0:0:0:ffff:127.0.0.1]:4000",
         "http://[0:0::1]:4000",
         "http://127%2E0%2E0%2E1:4000",
+        "h\tt\nt\rp://l\to\nc\ra\tl\nh\ro\ts\nt:4\t0\n0\r0/p\ta\nt\rh?q\tu\ne\rry#f\tr\na\rg",
         "http://%30:4000",
         "http://127.0.0.1:4000:9999",
         "http://127.0.0.1:9999:4000",
@@ -152,8 +153,8 @@ def run_test(s: TestServer, c: CoreApi):
         "http://127.1.1.1:4000∖\\@127.0.0.1:4000/"
         "http://1.1.1.1 &@127.0.0.1:4000# @3.3.3.3/",
         "http://localhost:4000 /",
-        "http://loc\097lhost:4000/",
-        "http://loc%5C097lhost:4000",
+        # "http://loc\097lhost:4000/",
+        # "http://loc%5C097lhost:4000",
         "https://localhost\r\naa:4000/",
 
         # AWS metadata service

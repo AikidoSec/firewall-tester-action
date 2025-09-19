@@ -76,9 +76,6 @@ def run_api_spec_tests(fns, expected_json, s: TestServer, c: CoreApi):
     start_events = c.get_events()
     for fn in fns:
         response = s.post(*fn())
-        # save response to file
-        with open("response.json", "w") as f:
-            f.write(response.text)
         assert_response_code_is(response, 200)
 
     c.wait_for_new_events(70, old_events_length=len(start_events))

@@ -16,19 +16,18 @@ import os
 
 
 def check_sql_injection(response_code, response_body, event_id, expected_json):
-    start_events = c.get_events()
+    start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
     # assert_response_code_is(response, response_code) # TODO: normalize all apps to return 500
     assert_response_body_contains(response, response_body)
 
-    c.wait_for_new_events(20, old_events_length=len(start_events))
+    c.wait_for_new_events(20, old_events_length=len(
+        start_events), filter_type="detected_attack")
 
-    all_events = c.get_events()
+    all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    # assert_events_length_is(new_events, 1)
-    assert_started_event_is_valid(all_events[0])
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 

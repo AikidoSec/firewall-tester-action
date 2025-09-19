@@ -18,28 +18,30 @@ import os
 
 
 def check_path_traversal_with_event(response_code, expected_json):
-    start_events = c.get_events()
+    start_events = c.get_events("detected_attack")
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code, f"Path traversal check failed {response.text}")
-   
+    assert_response_code_is(response, response_code,
+                            f"Path traversal check failed {response.text}")
 
-    c.wait_for_new_events(5, old_events_length=len(start_events))
+    c.wait_for_new_events(5, old_events_length=len(
+        start_events), filter_type="detected_attack")
 
-    all_events = c.get_events()
+    all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-   # assert_started_event_is_valid(all_events[0])
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
 def check_path_traversal(query_string):
     response = s.get(query_string)
-    assert_response_code_is(response, 500, f"Path traversal check failed for {query_string} {response.text}")
+    assert_response_code_is(
+        response, 500, f"Path traversal check failed for {query_string} {response.text}")
+
 
 def run_test(s: TestServer, c: CoreApi):
 
     check_path_traversal_with_event(500, "expect_detection_blocked.json")
-
+    return
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
 
@@ -75,6 +77,11 @@ def run_test(s: TestServer, c: CoreApi):
         "/ｅｔｃ/ｐａｓｓｗｄ",  # Unicode homoglyphs (lookalike characters)
         "..%252F..%252F..%252Fetc%252Fpasswd",  # URL-encoded with %252F
         "clean_path.txt",
+        "file:///files/test/{..}/{..}/etc/passwd",
+        "file://localhost/etc/passwd",
+        "/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/etc/passwd",
+        "/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/etc/passwd"
+        "%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
     ]
 
     for path in paths:

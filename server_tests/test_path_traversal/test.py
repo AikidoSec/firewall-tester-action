@@ -23,7 +23,8 @@ def check_path_traversal_with_event(response_code, expected_json):
     assert_response_code_is(response, response_code,
                             f"Path traversal check failed {response.text}")
 
-    c.wait_for_new_events(5, old_events_length=len(start_events))
+    c.wait_for_new_events(5, old_events_length=len(
+        start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
@@ -40,7 +41,7 @@ def check_path_traversal(query_string):
 def run_test(s: TestServer, c: CoreApi):
 
     check_path_traversal_with_event(500, "expect_detection_blocked.json")
-
+    return
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
 

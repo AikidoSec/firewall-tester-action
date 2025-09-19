@@ -115,7 +115,8 @@ def check_wave_attack(get_method_path, ip):
         method, path = get_method_path()
         r = s.request(method, path,
                       headers={"X-Forwarded-For": ip})
-    c.wait_for_new_events(20, old_events_length=len(start_events))
+    c.wait_for_new_events(20, old_events_length=len(
+        start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
 

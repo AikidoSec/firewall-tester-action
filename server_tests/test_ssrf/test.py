@@ -76,7 +76,8 @@ def check_ssrf_with_event(response_code, expected_json):
         "/api/request", {"url": "http://127.0.0.1:4000"}, timeout=10)
     assert_response_code_is(response, response_code)
 
-    c.wait_for_new_events(5, old_events_length=len(start_events))
+    c.wait_for_new_events(5, old_events_length=len(
+        start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]

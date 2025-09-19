@@ -54,9 +54,9 @@ class CoreApi:
             events = [event for event in events if event['type'] == filter_type]
         return events
 
-    def wait_for_new_events(self, max_wait_time: int, old_events_length: int):
+    def wait_for_new_events(self, max_wait_time: int, old_events_length: int, filter_type: str = None):
         while max_wait_time > 0:
-            if len(self.get_events()) > old_events_length:
+            if len(self.get_events(filter_type)) > old_events_length:
                 return True
             time.sleep(1)
             max_wait_time -= 1

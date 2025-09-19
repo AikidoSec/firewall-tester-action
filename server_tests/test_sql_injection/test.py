@@ -22,7 +22,8 @@ def check_sql_injection(response_code, response_body, event_id, expected_json):
     # assert_response_code_is(response, response_code) # TODO: normalize all apps to return 500
     assert_response_body_contains(response, response_body)
 
-    c.wait_for_new_events(20, old_events_length=len(start_events))
+    c.wait_for_new_events(20, old_events_length=len(
+        start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]

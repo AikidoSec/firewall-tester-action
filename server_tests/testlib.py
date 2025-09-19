@@ -188,7 +188,7 @@ def assert_response_code_is(response, status_code, message=None):
 
 def assert_response_code_is_not(response, status_code, message=None):
     assert get_response_status_code(
-        response) != status_code, f"Status codes should not be the same: {get_response_status_code(response)} vs {status_code} {message}"
+        response) != status_code, f"Status code should be different from {status_code}. Message: {message}"
 
 
 def assert_response_header_contains(response, header, value):

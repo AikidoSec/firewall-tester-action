@@ -20,6 +20,13 @@ DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
     "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
+ENV_FILE_CONTENT = """
+AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000
+AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000
+AIKIDO_URL=http://{DOCKER_HOST_IP}:3000
+AIKIDO_REALTIME_URL=http://{DOCKER_HOST_IP}:3000
+"""
+
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -124,7 +131,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
-        core_api = CoreApi(token=token, core_url=CORE_URL,
+        core_api = CoreApi(token=token, core_url=CORE_URL, test_name=test_dir,
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
@@ -151,21 +158,28 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 2. run the Docker container
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
-        if not os.path.exists(env_file_path):
+        if os.path.exists(env_file_path):
+            # write at the beginning of the file
+            with open(env_file_path, "r") as f:
+                content = f.read()
+            with open(env_file_path, "w") as f:
+                f.write(ENV_FILE_CONTENT.format(DOCKER_HOST_IP=DOCKER_HOST_IP))
+                f.write(content)
+        else:
             raise Exception(
                 f"Env file not found: {env_file_path} for test: {test_dir}")
+
         create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
         subprocess.run(create_database_command, shell=True, check=True)
         time.sleep(1)
+
         command = (
             f"docker run -d "
             f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
             f"--env AIKIDO_TOKEN={token} "
             f"--env PORT={app_port} "
-            f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
+            f"--env DATABASE_URL=postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
             f"{DOCKER_IMAGE_NAME}"
@@ -176,7 +190,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         time.sleep(sleep_before_test)
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 4. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
@@ -239,7 +253,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                             "Segmentation fault or core dumped")
             return result
 
-        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
+        # redirect logs of the Docker container to > $GITHUB_STEP_SUMMARY
         # subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
         #               shell=True, check=False, capture_output=True)
         # stop the container
@@ -271,7 +285,7 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
             return
 
     command.append(dockerfile_dir)
-    logger.debug(f"Building Docker image: {command}")
+    logger.debug(f"Building Docker image: {' '.join(command)}")
     subprocess.run(" ".join(command), shell=True, check=True)
 
 
@@ -326,7 +340,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -422,7 +436,11 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
     # Exit with error if any tests failed or timed out
     if failed_tests > 0 or timeout_tests > 0:
-        sys.exit(1)
+        if ignore_failures == "true":
+            logger.warning("Tests failed but ignoring failures as requested")
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -436,6 +454,9 @@ if __name__ == "__main__":
     parser.add_argument("--extra_build_args", type=str, required=False)
     parser.add_argument("--app_port", type=int, required=False)
     parser.add_argument("--sleep_before_test", type=int, required=False)
+    parser.add_argument("--ignore_failures", type=str,
+                        required=False, default="false")
+
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures)

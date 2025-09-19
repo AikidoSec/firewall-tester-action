@@ -110,13 +110,13 @@ def get_random_path_query():
 
 
 def check_wave_attack(get_method_path, ip):
-    start_events = c.get_events()
+    start_events = c.get_events("detected_attack_wave")
     for i in range(16):
         method, path = get_method_path()
         r = s.request(method, path,
                       headers={"X-Forwarded-For": ip})
     c.wait_for_new_events(20, old_events_length=len(start_events))
-    all_events = c.get_events()
+    all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
 
     assert len(

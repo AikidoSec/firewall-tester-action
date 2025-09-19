@@ -71,14 +71,14 @@ def generate_combinations(ip_str):
 
 
 def check_ssrf_with_event(response_code, expected_json):
-    start_events = c.get_events()
+    start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/request", {"url": "http://127.0.0.1:4000"}, timeout=10)
     assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(start_events))
 
-    all_events = c.get_events()
+    all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
     assert_events_length_is(new_events, 1)

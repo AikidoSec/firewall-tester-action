@@ -46,10 +46,13 @@ class CoreApi:
             firewall = json.load(f)
         return self.update_runtime_firewall_json(firewall)
 
-    def get_events(self) -> list:
+    def get_events(self, filter_type: str = None) -> list:
         response = requests.get(
             f"{self.core_url}/api/runtime/events", headers={"Authorization": f"{self.token}"})
-        return response.json()
+        events = response.json()
+        if filter_type:
+            events = [event for event in events if event['type'] == filter_type]
+        return events
 
     def wait_for_new_events(self, max_wait_time: int, old_events_length: int):
         while max_wait_time > 0:

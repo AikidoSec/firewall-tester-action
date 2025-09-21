@@ -73,7 +73,6 @@ def run_test(s: TestServer, c: CoreApi):
 
         "Malicious Pet\0', 'Gru from the Minions') --",
         "Malicious Pet%00', 'Gru from the Minions') --",
-        "Malicious Pet\x00', 'Gru from the Minions') --",
 
         "Malicious Pet‘, ‘Gru from the Minions‘) --",
         "Malicious Pet‘， ‘Gru from the Minions‘) --",

@@ -13,16 +13,16 @@ from core_api import CoreApi
 def check_shell_injection(response_code):
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code)
+    assert_response_code_is(response, response_code, "shell injection")
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(response, response_code)
+    assert_response_code_is(response, response_code, "sql injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code)
+    assert_response_code_is(response, response_code, "path traversal")
 
 
 def run_test(s: TestServer, c: CoreApi):

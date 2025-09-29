@@ -10,7 +10,7 @@ from core_api import CoreApi
 '''
 
 
-def check_shell_injection(response_code):
+def check_force_protection_off(response_code):
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
     assert_response_code_is(response, response_code, "shell injection")
@@ -26,14 +26,13 @@ def check_shell_injection(response_code):
 
 
 def run_test(s: TestServer, c: CoreApi):
-    pass
-    # check_shell_injection(500)
+    check_force_protection_off(500)
 
-    # c.update_runtime_config_file("change_config_force_protection_off.json")
-    # check_shell_injection(200)
+    c.update_runtime_config_file("change_config_force_protection_off.json")
+    check_force_protection_off(200)
 
-    # c.update_runtime_config_file("start_config.json")
-    # check_shell_injection(500)
+    c.update_runtime_config_file("start_config.json")
+    check_force_protection_off(500)
 
 
 if __name__ == "__main__":

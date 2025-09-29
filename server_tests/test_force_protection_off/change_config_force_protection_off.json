@@ -1,9 +1,9 @@
 {
-  "block": false,
+  "block": true,
   "endpoints": [
     {
       "method": "POST",
-      "route": "/api/execute3",
+      "route": "/api/execute",
       "forceProtectionOff": true,
       "graphql": null,
       "allowedIPAddresses": [],

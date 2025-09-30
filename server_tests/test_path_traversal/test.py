@@ -45,6 +45,8 @@ def run_test(s: TestServer, c: CoreApi):
     check_path_traversal_with_event(500, "expect_detection_blocked.json")
 
     paths = [
+        ".%252E/etc/passwd",
+        ".%252E/secrets/key.txt",
         "////etc/passwd",
         "../secrets/key.txt",
         "../../../etc/passwd",

@@ -1,9 +1,5 @@
-import requests
-import time
-import sys
 from testlib import *
 from core_api import CoreApi
-import os
 
 
 '''
@@ -41,7 +37,7 @@ def check_path_traversal(query_string):
 def run_test(s: TestServer, c: CoreApi):
 
     check_path_traversal_with_event(500, "expect_detection_blocked.json")
-    return
+
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
 

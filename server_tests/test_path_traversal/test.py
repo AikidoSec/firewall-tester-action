@@ -25,6 +25,8 @@ def check_path_traversal_with_event(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
     # assert_events_length_is(new_events, 1)
+    assert len(
+        new_events) >= 1, f"Expected at least 1 event, got {len(new_events)}"
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 

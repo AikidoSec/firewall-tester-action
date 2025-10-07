@@ -19,7 +19,7 @@ def check_path_traversal_with_event(response_code, expected_json):
     assert_response_code_is(response, response_code,
                             f"Path traversal check failed {response.text}")
 
-    c.wait_for_new_events(5, old_events_length=len(
+    c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")

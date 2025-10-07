@@ -51,7 +51,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
-          ref: add-read-file2-route
+          ref: main
           submodules: recursive
 
       - name: Test Local Action

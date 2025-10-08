@@ -308,8 +308,6 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
             1 for r in test_results if r.status == TestStatus.TIMEOUT)
         failed_tests = sum(
             1 for r in test_results if r.status == TestStatus.FAILED)
-        total_duration = sum(
-            r.duration for r in test_results if r.duration is not None)
 
         f.write("### Overview\n\n")
         f.write(f"- **Total Tests:** {total_tests}\n")
@@ -317,7 +315,6 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write(f"- **Skipped:** {skipped_tests}\n")
         f.write(f"- **Timed Out:** {timeout_tests}\n")
         f.write(f"- **Failed:** {failed_tests}\n")
-        f.write(f"- **Total Duration:** {total_duration:.2f} seconds\n\n")
 
         # Write detailed results table
         f.write("### Detailed Results\n\n")

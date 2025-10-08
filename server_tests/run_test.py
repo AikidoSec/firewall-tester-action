@@ -188,8 +188,13 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
         time.sleep(sleep_before_test)
+
+        # 4. Cold turkey :
+        requests.get(f"http://localhost:{start_port}/") # Cold turkey for python
+        time.sleep(1)
+
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
-        # 4. run the test
+        # 5. run the test
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
         logger.debug(f"Running test: {command}")
 

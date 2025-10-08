@@ -16,7 +16,7 @@ Same as test_user_rate_limiting_1_minute but without X-Forwarded-For header.
 
 
 def run_test(s: TestServer, c: CoreApi):
-    for _ in range(5):
+    for _ in range(4):  # one it's made in run_test.py (Cold turkey)
         response = s.get(
             "/")
         assert_response_code_is(response, 200)

@@ -51,7 +51,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
-          ref: main
+          ref: gunicorn-threads-1w-4t
           submodules: recursive
 
       - name: Test Local Action

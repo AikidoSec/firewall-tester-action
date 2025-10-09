@@ -27,7 +27,6 @@ jobs:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
           ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
       - name: Test Local Action
@@ -52,7 +51,6 @@ jobs:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
           ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
       - name: Test Local Action
@@ -76,7 +74,6 @@ jobs:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
           ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
           submodules: recursive
 
       - name: Test Local Action

@@ -64,6 +64,10 @@ inputs:
       false.
     required: false
     default: 'false'
+  test_type:
+    description: The type of test to run. Default is 'server'.
+    required: false
+    default: 'server'
 
 runs:
   using: node20

@@ -31,6 +31,7 @@
     "lint": "npx eslint .",
     "local-action": "npx @github/local-action . src/main.ts .env",
     "local-action-php": "npx @github/local-action . src/main.ts .env.example.php",
+    "local-action-php-control": "npx @github/local-action . src/main.ts .env.example.php.control",
     "local-action-python": "npx @github/local-action . src/main.ts .env.example.python",
     "local-action-nodejs": "npx @github/local-action . src/main.ts .env.example.nodejs",
     "local-action-java": "npx @github/local-action . src/main.ts .env.example.java",

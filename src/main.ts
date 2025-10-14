@@ -39,6 +39,13 @@ export async function run(): Promise<void> {
       core.getInput('sleep_before_test')
     )
     const ignore_failures: boolean = core.getInput('ignore_failures') === 'true'
+    const test_type: string = core.getInput('test_type')
+    if (!['server', 'control'].includes(test_type)) {
+      core.setFailed(
+        `Invalid test type: ${test_type} Must be one of: server, control`
+      )
+      return
+    }
 
     core.debug(`Dockerfile path: ${dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
@@ -50,6 +57,7 @@ export async function run(): Promise<void> {
     core.debug(`App port: ${app_port}`)
     core.debug(`Sleep before test: ${sleep_before_test}`)
     core.debug(`Ignore failures: ${ignore_failures}`)
+    core.debug(`Test type: ${test_type}`)
     // Spawn the Python process
     const this_file_dir = path.dirname(new URL(import.meta.url).pathname)
     await new Promise<void>((resolve, reject) => {
@@ -76,7 +84,9 @@ export async function run(): Promise<void> {
           '--sleep_before_test',
           sleep_before_test.toString(),
           '--ignore_failures',
-          ignore_failures.toString()
+          ignore_failures.toString(),
+          '--test_type',
+          test_type
         ],
         {
           stdio: 'inherit'

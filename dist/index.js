@@ -12058,6 +12058,20 @@ function requirePool () {
 	      ? { ...options.interceptors }
 	      : undefined;
 	    this[kFactory] = factory;
+
+	    this.on('connectionError', (origin, targets, error) => {
+	      // If a connection error occurs, we remove the client from the pool,
+	      // and emit a connectionError event. They will not be re-used.
+	      // Fixes https://github.com/nodejs/undici/issues/3895
+	      for (const target of targets) {
+	        // Do not use kRemoveClient here, as it will close the client,
+	        // but the client cannot be closed in this state.
+	        const idx = this[kClients].indexOf(target);
+	        if (idx !== -1) {
+	          this[kClients].splice(idx, 1);
+	        }
+	      }
+	    });
 	  }
 
 	  [kGetDispatcher] () {
@@ -72634,6 +72648,11 @@ async function run() {
         const app_port = parseInt(coreExports.getInput('app_port'));
         const sleep_before_test = parseInt(coreExports.getInput('sleep_before_test'));
         const ignore_failures = coreExports.getInput('ignore_failures') === 'true';
+        const test_type = coreExports.getInput('test_type');
+        if (!['server', 'control'].includes(test_type)) {
+            coreExports.setFailed(`Invalid test type: ${test_type} Must be one of: server, control`);
+            return;
+        }
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Config update delay: ${config_update_delay}`);
@@ -72644,6 +72663,7 @@ async function run() {
         coreExports.debug(`App port: ${app_port}`);
         coreExports.debug(`Sleep before test: ${sleep_before_test}`);
         coreExports.debug(`Ignore failures: ${ignore_failures}`);
+        coreExports.debug(`Test type: ${test_type}`);
         // Spawn the Python process
         const this_file_dir = require$$1$8.dirname(new URL(import.meta.url).pathname);
         await new Promise((resolve, reject) => {
@@ -72668,7 +72688,9 @@ async function run() {
                 '--sleep_before_test',
                 sleep_before_test.toString(),
                 '--ignore_failures',
-                ignore_failures.toString()
+                ignore_failures.toString(),
+                '--test_type',
+                test_type
             ], {
                 stdio: 'inherit'
             });

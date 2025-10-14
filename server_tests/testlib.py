@@ -76,6 +76,7 @@ def init_server_and_core():
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_name", type=str, required=True)
     parser.add_argument("--server_port", type=int, required=True)
+    parser.add_argument("--control_server_port", type=int, required=False)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
     parser.add_argument("--config_update_delay", type=int, default=60)
@@ -84,8 +85,54 @@ def init_server_and_core():
     server = TestServer(port=args.server_port, token=args.token)
     core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
                    config_update_delay=args.config_update_delay)
+    if args.control_server_port:
+        control_server = TestControlServer(port=args.control_server_port)
+        return args, server, core, control_server
+    else:
+        return args, server, core
 
-    return args, server, core
+
+"""
+- `GET /health` - Health check
+- `GET /status` - Get Apache status
+- `POST /start_server` - Start Apache
+- `POST /stop_server` - Stop Apache
+- `POST /restart` - Hard restart Apache
+- `POST /graceful-restart` - Graceful restart Apache
+- `GET /get-server-logs` - Get Apache logs
+- `GET /config-test` - Test Apache configuration
+"""
+
+
+class TestControlServer:
+    def __init__(self, port: int):
+        self.port = port
+
+    def health(self):
+        return localhost_get_request(self.port, "/health")
+
+    def status(self):
+        return localhost_get_request(self.port, "/status")
+
+    def start_server(self):
+        return localhost_post_request(self.port, "/start_server", {})
+
+    def stop_server(self):
+        return localhost_post_request(self.port, "/stop_server", {})
+
+    def restart(self):
+        return localhost_post_request(self.port, "/restart", {})
+
+    def graceful_restart(self):
+        return localhost_post_request(self.port, "/graceful-restart", {})
+
+    def get_server_logs(self, type="all", lines=50):
+        response = localhost_get_request(
+            self.port, f"/get-server-logs?type={type}&lines={lines}")
+        return response.text if response else None
+
+    def config_test(self):
+        return localhost_get_request(self.port, "/config-test")
 
 
 class TestServer:
@@ -196,8 +243,8 @@ def assert_response_header_contains(response, header, value):
     assert value in response.headers[header], f"Header '{header}' does not contain '{value}' but '{response.headers[header]}'"
 
 
-def assert_response_body_contains(response, text):
-    assert text in response.text, f"Test '{text}' is not part of response body: {response.text}"
+def assert_response_body_contains(response, text, message=None):
+    assert text in response.text, f"Test '{text}' is not part of response body: {response.text}. Message: {message}"
 
 
 def assert_events_length_is(events, length):

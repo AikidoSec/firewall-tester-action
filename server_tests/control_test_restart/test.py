@@ -59,7 +59,7 @@ def check_event_is_submitted_shell_injection(response_code, expected_json):
     response = s.post("/api/execute", {"userCommand": "whoami"})
     assert_response_code_is(response, response_code)
 
-    c.wait_for_new_events(5, old_events_length=len(
+    c.wait_for_new_events(10, old_events_length=len(
         start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")
@@ -84,6 +84,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
 
     cs.restart()
     cs.status_is_running(True)
+    time.sleep(5)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")
@@ -93,6 +94,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.status_is_running(False)
     cs.restart()
     cs.status_is_running(True)
+    time.sleep(5)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

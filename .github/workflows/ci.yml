@@ -94,7 +94,7 @@ jobs:
           ignore_failures: true
 
   test-php-control:
-    name: PHP Control Tests (zen-demo-php)
+    name: PHP Control Tests (apache2 - mod_php)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout action

@@ -2,11 +2,12 @@
 from testlib import *
 from core_api import CoreApi
 
+
 """
 1. Check control server is running, start the server and send 100 requests and 100 attacks
-2. Restart the server using graceful restart and send 100 attacks and 100 requests
-3. Restart the server using graceful restart, send one attack, and check event is submitted to core
-4. Stop server and start it again using graceful restart and check it's working fine
+2. Restart the server using restart and send 100 attacks and 100 requests
+3. Restart the server using restart, send one attack, and check event is submitted to core
+4. Stop server and start it again using restart and check it's working fine
 """
 
 
@@ -75,13 +76,13 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     send_100_requests()
     send_100_attacks()
 
-    cs.graceful_restart()
+    cs.restart()
     cs.status_is_running(True)
 
     send_100_attacks()
     send_100_requests()
 
-    cs.graceful_restart()
+    cs.restart()
     cs.status_is_running(True)
 
     check_event_is_submitted_shell_injection(
@@ -90,7 +91,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     # stop server and start it again usng graceful restart
     cs.stop_server()
     cs.status_is_running(False)
-    cs.graceful_restart()
+    cs.restart()
     cs.status_is_running(True)
 
     check_event_is_submitted_shell_injection(

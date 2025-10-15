@@ -99,6 +99,7 @@ def init_server_and_core():
 - `POST /stop_server` - Stop Apache
 - `POST /restart` - Hard restart Apache
 - `POST /graceful-restart` - Graceful restart Apache
+- `POST /graceful-stop` - Graceful stop Apache
 - `GET /get-server-logs` - Get Apache logs
 - `GET /config-test` - Test Apache configuration
 """
@@ -108,25 +109,54 @@ class TestControlServer:
     def __init__(self, port: int):
         self.port = port
 
-    def health(self):
-        return localhost_get_request(self.port, "/health")
+    def check_health(self):
+        r = localhost_get_request(self.port, "/health")
+        assert_response_code_is(r, 200, f"Health check failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
 
-    def status(self):
-        return localhost_get_request(self.port, "/status")
+    def status_is_running(self, running: bool):
+        r = localhost_get_request(self.port, "/status")
+        assert_response_code_is(r, 200, f"Status check failed: {r.text}")
+        if running:
+            assert_response_body_contains(
+                r, "running", f"Server is not running {r.text}")
+        else:
+            assert_response_body_contains(
+                r, "stopped", f"Server is not stopped {r.text}")
 
     def start_server(self):
-        return localhost_post_request(self.port, "/start_server", {})
+        r = localhost_post_request(self.port, "/start_server", {})
+        assert_response_code_is(r, 200, f"Start server failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
+        time.sleep(3)
 
     def stop_server(self):
-        return localhost_post_request(self.port, "/stop_server", {})
+        r = localhost_post_request(self.port, "/stop_server", {})
+        assert_response_code_is(r, 200, f"Stop server failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":false", f"Server is not stopped {r.text}")
 
     def restart(self):
-        return localhost_post_request(self.port, "/restart", {})
+        r = localhost_post_request(self.port, "/restart", {})
+        assert_response_code_is(r, 200, f"Restart failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
 
     def graceful_restart(self):
-        return localhost_post_request(self.port, "/graceful-restart", {})
+        r = localhost_post_request(self.port, "/graceful-restart", {})
+        assert_response_code_is(r, 200, f"Graceful restart failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
+        time.sleep(3)
 
-    def get_server_logs(self, type="all", lines=50):
+    def graceful_stop_server(self):
+        r = localhost_post_request(self.port, "/graceful-stop", {})
+        assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
+        time.sleep(3)
+
+    def get_server_logs(self, type="error", lines=50):
         response = localhost_get_request(
             self.port, f"/get-server-logs?type={type}&lines={lines}")
         return response.text if response else None

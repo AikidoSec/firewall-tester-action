@@ -39,7 +39,7 @@ start server
 
 def send_100_requests():
     for _ in range(5):
-        response = s.get("/api/pets/", retries=1)
+        response = s.get("/api/pets/")
         assert_response_code_is(response, 200,
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
 

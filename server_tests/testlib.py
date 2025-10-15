@@ -13,12 +13,12 @@ import http.client
 import re
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, retries=3):
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
-    for attempt in range(retries):
+    for attempt in range(3):
         try:
             if raw:
                 conn = http.client.HTTPConnection("localhost", port)
@@ -29,7 +29,7 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
                     f"http://localhost:{port}{route}", headers=headers)
             break  # Success, exit retry loop
         except Exception as e:
-            print(f"Error (attempt {attempt + 1}/{retries}): {e}")
+            print(f"Error (attempt {attempt + 1}/3): {e}")
             if attempt == 2:  # Last attempt
                 return None
             time.sleep(0.1)  # Brief delay before retry
@@ -190,8 +190,8 @@ class TestServer:
         self.port = port
         self.token = token
 
-    def get(self, route="", headers={}, benchmark=False, retries=3):
-        return localhost_get_request(self.port, route, headers, benchmark, retries=retries)
+    def get(self, route="", headers={}, benchmark=False):
+        return localhost_get_request(self.port, route, headers, benchmark)
 
     def get_raw(self, route="", headers={}, benchmark=False):
         return localhost_get_request(self.port, route, headers, benchmark, raw=True)

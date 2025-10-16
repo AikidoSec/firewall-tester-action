@@ -111,7 +111,8 @@ class TestControlServer:
 
     def check_health(self):
         r = localhost_get_request(self.port, "/health")
-        assert_response_code_is(r, 200, f"Health check failed: {r.text}")
+        assert_response_code_is(
+            r, 200, f"Health check failed: {r.text if r else 'No response'}")
         assert_response_body_contains(
             r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
 

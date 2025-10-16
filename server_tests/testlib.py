@@ -142,7 +142,7 @@ class TestControlServer:
         assert_response_code_is(
             r, 200, f"Stop server failed: {r.text} {self.get_server_logs()}")
         assert_response_body_contains(
-            r, "\"is_running\":false", f"Server is not stopped {r.text} {self.get_server_logs()}")
+            r, "\"is_running\":false", message=f"Server is not stopped {self.get_server_logs()}")
 
     def restart(self):
         r = localhost_post_request(self.port, "/restart", {})
@@ -300,7 +300,10 @@ def assert_response_header_contains(response, header, value):
 
 
 def assert_response_body_contains(response, text, message=None):
-    assert text in response.text, f"Test '{text}' is not part of response body: {response.text}. Message: {message}"
+    if message is None:
+        assert text in response.text, f"Test '{text}' is not part of response body: {response.text}"
+    else:
+        assert text in response.text, f"Test '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
 
 
 def assert_events_length_is(events, length):

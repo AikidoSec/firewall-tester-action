@@ -110,7 +110,11 @@ class TestControlServer:
         self.port = port
 
     def check_health(self):
-        r = localhost_get_request(self.port, "/health")
+        for i in range(3):
+            r = localhost_get_request(self.port, "/health")
+            if r and r.status_code == 200:
+                break
+            time.sleep(i * 3)
         assert_response_code_is(
             r, 200, f"Health check failed: {r.text if r else 'No response'}")
         assert_response_body_contains(

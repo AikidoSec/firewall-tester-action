@@ -142,7 +142,7 @@ class TestControlServer:
         assert_response_code_is(
             r, 200, f"Stop server failed: {r.text} {self.get_server_logs()}")
         assert_response_body_contains(
-            r, "\"is_running\":false", f"Server is not stopped {r.text}")
+            r, "\"is_running\":false", f"Server is not stopped {r.text} {self.get_server_logs()}")
 
     def restart(self):
         r = localhost_post_request(self.port, "/restart", {})

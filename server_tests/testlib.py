@@ -162,7 +162,7 @@ class TestControlServer:
         assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
         time.sleep(3)
 
-    def get_server_logs(self, type="error", lines=200):
+    def get_server_logs(self, type="error", lines=1000):
         response = localhost_get_request(
             self.port, f"/get-server-logs?type={type}&lines={lines}")
         return response.text if response else None

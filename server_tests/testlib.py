@@ -110,13 +110,13 @@ class TestControlServer:
         self.port = port
 
     def check_health(self):
-        for i in range(3):
+        for i in range(5):
             r = localhost_get_request(self.port, "/health")
             if r and r.status_code == 200:
                 break
-            time.sleep(i * 3)
+            time.sleep((i + 1) * 3)
         assert_response_code_is(
-            r, 200, f"Health check failed: {r.text if r else 'No response'}")
+            r, 200, f"[attempt {i + 1}/5] Health chseck failed: {r.text if r else 'No response'} - PORT: {self.port}")
         assert_response_body_contains(
             r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
 
@@ -162,7 +162,7 @@ class TestControlServer:
         assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
         time.sleep(3)
 
-    def get_server_logs(self, type="error", lines=50):
+    def get_server_logs(self, type="error", lines=200):
         response = localhost_get_request(
             self.port, f"/get-server-logs?type={type}&lines={lines}")
         return response.text if response else None

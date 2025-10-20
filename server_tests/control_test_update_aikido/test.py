@@ -85,6 +85,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.uninstall_aikido()
     cs.install_aikido_version("1.3.5")
     cs.start_server()
+    s.get("api/pets/")
     old_start_events = c.get_events("started")
     assert_events_length_is(old_start_events, 1)
     send_100_requests()
@@ -93,6 +94,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.stop_server()
     cs.install_aikido()
     cs.start_server()
+    s.get("api/pets/")
     current_start_events = c.get_events("started")
     assert_events_length_is(current_start_events, 1)
 

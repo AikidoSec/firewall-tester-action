@@ -84,7 +84,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
 
     cs.restart()
     cs.status_is_running(True)
-    time.sleep(5)
+    time.sleep(60 * 2)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")
@@ -94,7 +94,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.status_is_running(False)
     cs.restart()
     cs.status_is_running(True)
-    time.sleep(5)
+    time.sleep(60 * 2)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

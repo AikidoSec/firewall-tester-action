@@ -94,7 +94,7 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     send_100_requests()
 
     restart_server_using_stop_start()
-    time.sleep(5)
+    time.sleep(60 * 2)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

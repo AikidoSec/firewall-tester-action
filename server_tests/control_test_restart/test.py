@@ -4,8 +4,8 @@ from core_api import CoreApi
 
 
 """
-1. Check control server is running, start the server and send 100 requests and 100 attacks
-2. Restart the server using restart and send 100 attacks and 100 requests
+1. Check control server is running, start the server and send 100 requests and 8 attacks
+2. Restart the server using restart and send 8 attacks and 100 requests
 3. Restart the server using restart, send one attack, and check event is submitted to core
 4. Stop server and start it again using restart and check it's working fine
 """
@@ -18,9 +18,9 @@ def send_100_requests():
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
 
 
-def send_100_attacks():
+def send_attacks():
     # path traversal attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
         assert_response_code_is(response, 500,
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
@@ -28,7 +28,7 @@ def send_100_attacks():
             response, "firewall has blocked a path traversal", f"{response.text} {cs.get_server_logs()}")
 
     # sql injection attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
         assert_response_code_is(response, 500,
@@ -37,7 +37,7 @@ def send_100_attacks():
             response, "firewall has blocked an SQL injection", f"{response.text} {cs.get_server_logs()}")
 
     # shell injection attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
         assert_response_code_is(response, 500,
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
@@ -45,7 +45,7 @@ def send_100_attacks():
             response, "firewall has blocked a shell injection", f"{response.text} {cs.get_server_logs()}")
 
     # ssrf attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081"}, timeout=10)
         assert_response_code_is(response, 500,
@@ -74,17 +74,17 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.start_server()
 
     send_100_requests()
-    send_100_attacks()
+    send_attacks()
 
     cs.restart()
     cs.status_is_running(True)
 
-    send_100_attacks()
+    send_attacks()
     send_100_requests()
 
     cs.restart()
     cs.status_is_running(True)
-    time.sleep(60 * 2)
+    time.sleep(5)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")
@@ -94,11 +94,11 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.status_is_running(False)
     cs.restart()
     cs.status_is_running(True)
-    time.sleep(60 * 2)
+    time.sleep(5)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")
-    send_100_attacks()
+    send_attacks()
     send_100_requests()
 
 

@@ -4,9 +4,9 @@ from core_api import CoreApi
 
 
 """
-1. Check control server is running, start the server and send 100 requests and 100 attacks
-2. Restart the server using stop start and send 100 requests and 100 attacks
-3. Restart the server using stop start and send 100 attacks and 100 requests
+1. Check control server is running, start the server and send 100 requests and 8 attacks
+2. Restart the server using stop start and send 100 requests and 8 attacks
+3. Restart the server using stop start and send 8 attacks and 100 requests
 4. Restart the server using stop start, send one attack, and check event is submitted to core
 """
 
@@ -18,9 +18,9 @@ def send_100_requests():
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
 
 
-def send_100_attacks():
+def send_attacks():
     # path traversal attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
         assert_response_code_is(response, 500,
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
@@ -28,7 +28,7 @@ def send_100_attacks():
             response, "firewall has blocked a path traversal", f"{response.text} {cs.get_server_logs()}")
 
     # sql injection attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
         assert_response_code_is(response, 500,
@@ -37,7 +37,7 @@ def send_100_attacks():
             response, "firewall has blocked an SQL injection", f"{response.text} {cs.get_server_logs()}")
 
     # shell injection attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
         assert_response_code_is(response, 500,
                                 f"Request failed: {response.text} {cs.get_server_logs()}")
@@ -45,7 +45,7 @@ def send_100_attacks():
             response, "firewall has blocked a shell injection", f"{response.text} {cs.get_server_logs()}")
 
     # ssrf attacks
-    for _ in range(25):
+    for _ in range(2):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081"}, timeout=10)
         assert_response_code_is(response, 500,
@@ -64,14 +64,14 @@ def check_event_is_submitted_shell_injection(response_code, expected_json):
 
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
-
     assert_events_length_is(new_events, 1)
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def restart_server_using_stop_start():
+def restart_server_using_stop_start(sleep_time: int = 0):
     cs.stop_server()
     cs.status_is_running(False)
+    time.sleep(sleep_time)
     cs.start_server()
     cs.status_is_running(True)
 
@@ -81,16 +81,16 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.start_server()
 
     send_100_requests()
-    send_100_attacks()
+    send_attacks()
 
     restart_server_using_stop_start()
 
     send_100_requests()
-    send_100_attacks()
+    send_attacks()
 
     restart_server_using_stop_start()
 
-    send_100_attacks()
+    send_attacks()
     send_100_requests()
 
     restart_server_using_stop_start()

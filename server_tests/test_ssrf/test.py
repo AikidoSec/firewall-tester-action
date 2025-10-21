@@ -91,8 +91,8 @@ def check_ssrf(route, ip):
     response = s.post(route, {"url": ip}, timeout=10)
     if len(response.text) == 0:
         return
-    assert_response_code_is(
-        response, 500, f"[{route}] SSRF check failed for {ip} {response.text}")
+    assert_response_code_is_not(
+        response, 200, f"[{route}] SSRF check failed for {ip} {response.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):

@@ -190,6 +190,12 @@ class TestControlServer:
     def config_test(self):
         return localhost_get_request(self.port, "/config-test")
 
+    def kill_agent(self):
+        r = localhost_post_request(self.port, "/kill-aikido-agent", {})
+        assert_response_code_is(r, 200, f"Kill aikido agent failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"success\"", f"Kill aikido agent failed: {r.text}")
+
 
 class TestServer:
     def __init__(self, port: int, token: str):

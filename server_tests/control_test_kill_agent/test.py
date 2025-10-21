@@ -2,12 +2,12 @@
 from testlib import *
 from core_api import CoreApi
 
-
 """
 1. Check control server is running, start the server and send 100 requests and 8 attacks
-2. Restart the server using stop start and send 100 requests and 8 attacks
-3. Restart the server using stop start and send 8 attacks and 100 requests
-4. Restart the server using stop start, send one attack, and check event is submitted to core
+2. Kill the agent and send 100 requests and 8 attacks (attacks should be blocked)
+3. Restart the server using stop start send an attack and check event is submitted to core
+4. Kill the agent and send 100 requests and 8 attacks (attacks should be blocked)
+5. Graceful restart the server, send an attack and check event is submitted to core
 """
 
 
@@ -59,7 +59,7 @@ def check_event_is_submitted_shell_injection(response_code, expected_json):
     response = s.post("/api/execute", {"userCommand": "whoami"})
     assert_response_code_is(response, response_code)
 
-    c.wait_for_new_events(5, old_events_length=len(
+    c.wait_for_new_events(10, old_events_length=len(
         start_events), filter_type="detected_attack")
 
     all_events = c.get_events("detected_attack")
@@ -83,18 +83,24 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     send_100_requests()
     send_attacks()
 
-    restart_server_using_stop_start()
+    cs.kill_agent()
 
     send_100_requests()
     send_attacks()
 
     restart_server_using_stop_start()
+    s.get("/api/pets/")
 
-    send_attacks()
+    check_event_is_submitted_shell_injection(
+        500, "expect_detection_blocked.json")
+
+    cs.kill_agent()
     send_100_requests()
+    send_attacks()
 
-    restart_server_using_stop_start()
-    time.sleep(5)
+    cs.graceful_restart()
+    cs.status_is_running(True)
+    s.get("/api/pets/")
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

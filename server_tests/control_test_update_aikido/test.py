@@ -4,27 +4,6 @@ from core_api import CoreApi
 
 
 """
-uninstall aikido
-install old version
-start server
-8 attacks - blocked
-100 requests
-
-stop server
-install current version
-start server
-8 attacks - blocked
-100 requests
-check events for new versions
-
-stop server
-uninstall aikido
-start server
-8 attacks - not blocked
-"""
-
-
-"""
 1. Install an old Aikido version + start server
 2. Save started event
 3. Send 100 requests and 8 attacks - blocked

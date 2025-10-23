@@ -62,7 +62,7 @@ def send_attacks(expected_code: int, expected_message: str):
 def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.check_health()
     cs.uninstall_aikido()
-    cs.install_aikido_version("1.3.5")
+    cs.install_aikido_version("1.4.0")
     cs.start_server()
     s.get("/api/pets/")
     old_start_events = c.get_events("started")

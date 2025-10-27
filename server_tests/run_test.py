@@ -20,13 +20,6 @@ DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
     "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
-ENV_FILE_CONTENT = """
-AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000
-AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000
-AIKIDO_URL=http://{DOCKER_HOST_IP}:3000
-AIKIDO_REALTIME_URL=http://{DOCKER_HOST_IP}:3000
-"""
-
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -156,41 +149,49 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        env_file_path = os.path.join(os.path.dirname(
-            os.path.abspath(__file__)), test_dir, 'test.env')
-        if os.path.exists(env_file_path):
-            # write at the beginning of the file
-            with open(env_file_path, "r") as f:
-                content = f.read()
-            with open(env_file_path, "w") as f:
-                f.write(ENV_FILE_CONTENT.format(DOCKER_HOST_IP=DOCKER_HOST_IP))
-                f.write(content)
-        else:
-            raise Exception(
-                f"Env file not found: {env_file_path} for test: {test_dir}")
-
         create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
         subprocess.run(create_database_command, shell=True, check=True)
         time.sleep(1)
+
+        extra_envs = {
+            "AIKIDO_TOKEN": token,
+            "PORT": app_port,
+            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
+        }
+        env_file_path = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), test_dir, 'test.env')
+        if os.path.exists(env_file_path):
+            # remove from extra_envs env that are already in the file
+            with open(env_file_path, "r") as f:
+                content = f.read()
+            keys_to_remove = [
+                env for env in extra_envs if f"{env}=" in content]
+            for env in keys_to_remove:
+                del extra_envs[env]
 
         command = (
             f"docker run -d "
             f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
-            f"--env AIKIDO_TOKEN={token} "
-            f"--env PORT={app_port} "
-            f"--env DATABASE_URL=postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
-            f"{DOCKER_IMAGE_NAME}"
         )
+        for env, value in extra_envs.items():
+            command += f" --env {env}={value}"
+        command += f" {DOCKER_IMAGE_NAME}"
+
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
         time.sleep(sleep_before_test)
 
         # 4. Cold turkey :
-        requests.get(f"http://localhost:{start_port}/") # Cold turkey for python
+        # Cold turkey for python
+        requests.get(f"http://localhost:{start_port}/")
         time.sleep(1)
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))

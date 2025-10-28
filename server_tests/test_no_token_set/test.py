@@ -9,14 +9,15 @@ from core_api import CoreApi
 
 
 def check_attacks_blocked(response_code):
-    # shell injection
-    response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code, "shell injection")
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
     assert_response_code_is(response, response_code, "sql injection")
+
+    # shell injection
+    response = s.post("/api/execute", {"userCommand": "whoami"})
+    assert_response_code_is(response, response_code, "shell injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")

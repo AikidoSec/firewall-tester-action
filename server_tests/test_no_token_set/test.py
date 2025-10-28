@@ -3,7 +3,7 @@ from core_api import CoreApi
 
 
 '''
-1. Sets up a simple config and env AIKIDO_BLOCK=1 and AIKIDO_TOKEN= (empty token)
+1. Sets up a simple config and env AIKIDO_BLOCK=1 and AIKIDO_TOKEN is not set
 2. Send some attacks and check that they are blocked (response code 500).
 '''
 

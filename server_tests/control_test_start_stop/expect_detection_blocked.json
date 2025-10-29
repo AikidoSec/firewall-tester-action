@@ -1,0 +1,17 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "route": "/api/execute"
+  },
+  "attack": {
+    "kind": "shell_injection",
+    "blocked": true,
+    "source": "body",
+    "metadata": {}
+  },
+  "agent": {
+    "dryMode": false
+  }
+}

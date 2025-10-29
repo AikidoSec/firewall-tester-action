@@ -17,6 +17,7 @@ import shlex
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+# ip addr show docker0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
     "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
@@ -120,7 +121,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
@@ -180,6 +181,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
         )
+
+        if control_port:
+            command += f" -p {control_port}:8081 "
+
         for env, value in extra_envs.items():
             command += f" --env {env}={value}"
         command += f" {DOCKER_IMAGE_NAME}"
@@ -191,12 +196,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         # 4. Cold turkey :
         # Cold turkey for python
-        requests.get(f"http://localhost:{start_port}/")
-        time.sleep(1)
+        if not control_port:
+            requests.get(f"http://localhost:{start_port}/")
+            time.sleep(1)
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 5. run the test
         command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        if control_port:
+            command += f" --control_server_port {control_port}"
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
@@ -343,13 +351,17 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
+    if test_type == "control":
+        dir_start = "control_"
+    else:
+        dir_start = "test_"
 
     test_dirs = [d for d in os.listdir(os.path.dirname(
-        os.path.abspath(__file__))) if d.startswith("test_")]
+        os.path.abspath(__file__))) if d.startswith(dir_start)]
     test_results: List[TestResult] = []
 
     # Parse skip_tests into a set for O(1) lookup
@@ -358,6 +370,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_tests) as executor:
         future_to_test = {}
         start_port = 3001
+        control_start_port = 9001
 
         for test_dir in test_dirs:
             # Skip tests that are in the skip list
@@ -380,10 +393,13 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 test_timeout,
                 extra_args,
                 app_port,
-                sleep_before_test
+                sleep_before_test,
+                None if test_type == "server" else control_start_port
+
             )
             future_to_test[future] = test_dir
             start_port += 1
+            control_start_port += 1
 
         for future in concurrent.futures.as_completed(future_to_test):
             test_dir = future_to_test[future]
@@ -459,7 +475,9 @@ if __name__ == "__main__":
     parser.add_argument("--sleep_before_test", type=int, required=False)
     parser.add_argument("--ignore_failures", type=str,
                         required=False, default="false")
+    parser.add_argument("--test_type", type=str,
+                        required=False, default="server")
 
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)

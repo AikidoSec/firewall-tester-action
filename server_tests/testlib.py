@@ -76,6 +76,7 @@ def init_server_and_core():
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_name", type=str, required=True)
     parser.add_argument("--server_port", type=int, required=True)
+    parser.add_argument("--control_server_port", type=int, required=False)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
     parser.add_argument("--config_update_delay", type=int, default=60)
@@ -84,8 +85,116 @@ def init_server_and_core():
     server = TestServer(port=args.server_port, token=args.token)
     core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
                    config_update_delay=args.config_update_delay)
+    if args.control_server_port:
+        control_server = TestControlServer(port=args.control_server_port)
+        return args, server, core, control_server
+    else:
+        return args, server, core
 
-    return args, server, core
+
+"""
+- `GET /health` - Health check
+- `GET /status` - Get Apache status
+- `POST /start_server` - Start Apache
+- `POST /stop_server` - Stop Apache
+- `POST /restart` - Hard restart Apache
+- `POST /graceful-restart` - Graceful restart Apache
+- `POST /graceful-stop` - Graceful stop Apache
+- `GET /get-server-logs` - Get Apache logs
+- `GET /config-test` - Test Apache configuration
+"""
+
+
+class TestControlServer:
+    def __init__(self, port: int):
+        self.port = port
+
+    def check_health(self):
+        for i in range(5):
+            r = localhost_get_request(self.port, "/health")
+            if r and r.status_code == 200:
+                break
+            time.sleep((i + 1) * 3)
+        assert_response_code_is(
+            r, 200, f"[attempt {i + 1}/5] Health chseck failed: {r.text if r else 'No response'} - PORT: {self.port}")
+        assert_response_body_contains(
+            r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
+
+    def status_is_running(self, running: bool):
+        r = localhost_get_request(self.port, "/status")
+        assert_response_code_is(r, 200, f"Status check failed: {r.text}")
+        if running:
+            assert_response_body_contains(
+                r, "running", f"Server is not running {r.text}")
+        else:
+            assert_response_body_contains(
+                r, "stopped", f"Server is not stopped {r.text}")
+
+    def start_server(self):
+        r = localhost_post_request(self.port, "/start_server", {})
+        assert_response_code_is(r, 200, f"Start server failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
+        time.sleep(3)
+
+    def stop_server(self):
+        r = localhost_post_request(self.port, "/stop_server", {})
+        assert_response_code_is(
+            r, 200, f"Stop server failed: {r.text} {self.get_server_logs()}")
+        assert_response_body_contains(
+            r, "\"is_running\":false", message=f"Server is not stopped {self.get_server_logs()}")
+
+    def restart(self):
+        r = localhost_post_request(self.port, "/restart", {})
+        assert_response_code_is(r, 200, f"Restart failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
+
+    def graceful_restart(self):
+        r = localhost_post_request(self.port, "/graceful-restart", {})
+        assert_response_code_is(r, 200, f"Graceful restart failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"is_running\":true", f"Server is not running {r.text}")
+        time.sleep(3)
+
+    def graceful_stop_server(self):
+        r = localhost_post_request(self.port, "/graceful-stop", {})
+        assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
+        time.sleep(3)
+
+    def get_server_logs(self, type="error", lines=1000):
+        response = localhost_get_request(
+            self.port, f"/get-server-logs?type={type}&lines={lines}")
+        return response.text if response else None
+
+    def uninstall_aikido(self):
+        r = localhost_post_request(self.port, "/uninstall-aikido", {})
+        assert_response_code_is(r, 200, f"Uninstall aikido failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"success\"", f"Uninstall aikido failed: {r.text}")
+
+    def install_aikido(self):
+        r = localhost_post_request(self.port, "/install-aikido", {})
+        assert_response_code_is(r, 200, f"Install aikido failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"success\"", f"Install aikido failed: {r.text}")
+
+    def install_aikido_version(self, version: str):
+        r = localhost_post_request(
+            self.port, "/install-aikido-version", {"version": version})
+        assert_response_code_is(
+            r, 200, f"Install aikido version failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"success\"", f"Install aikido version failed: {r.text}")
+
+    def config_test(self):
+        return localhost_get_request(self.port, "/config-test")
+
+    def kill_agent(self):
+        r = localhost_post_request(self.port, "/kill-aikido-agent", {})
+        assert_response_code_is(r, 200, f"Kill aikido agent failed: {r.text}")
+        assert_response_body_contains(
+            r, "\"status\":\"success\"", f"Kill aikido agent failed: {r.text}")
 
 
 class TestServer:
@@ -196,8 +305,11 @@ def assert_response_header_contains(response, header, value):
     assert value in response.headers[header], f"Header '{header}' does not contain '{value}' but '{response.headers[header]}'"
 
 
-def assert_response_body_contains(response, text):
-    assert text in response.text, f"Test '{text}' is not part of response body: {response.text}"
+def assert_response_body_contains(response, text, message=None):
+    if message is None:
+        assert text in response.text, f"Test '{text}' is not part of response body: {response.text}"
+    else:
+        assert text in response.text, f"Test '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
 
 
 def assert_events_length_is(events, length):

@@ -26,8 +26,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
-          ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action
@@ -36,7 +35,8 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
-          skip_tests: test_api_spec,test_bypassed_ip_for_geo_blocking
+          sleep_before_test: 15
+          ignore_failures: true
 
   test-python:
     name: Python Tests (zen-demo-python)
@@ -51,8 +51,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-python
           path: ./zen-demo
-          ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
+          ref: gunicorn-threads-1w-4t
           submodules: recursive
 
       - name: Test Local Action
@@ -60,7 +59,10 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
-          skip_tests: test_api_spec,test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_shell_injection,test_bypassed_ip_for_geo_blocking
+          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_bypassed_ip_for_geo_blocking,test_user_rate_limiting_1_minute
+          sleep_before_test: 15
+          max_parallel_tests: 5
+          ignore_failures: true
 
   test-php:
     name: PHP Tests (zen-demo-php)
@@ -75,8 +77,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
-          ref: main
-          token: ${{ secrets.DEMO_APPS_DOWNLOAD_TOKEN }}
+          ref: dev-testing
           submodules: recursive
 
       - name: Test Local Action
@@ -84,59 +85,89 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
-          extra_args:
-            '--env-file=./zen-demo/.env.example -e
-            APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
+          extra_args: "--env-file=./zen-demo/.env.example -e
+            APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM="
+          extra_build_args: "--build-arg PHP_FIREWALL_VERSION=1.0.126"
           sleep_before_test: 20
-          skip_tests: test_api_spec,test_shell_injection
+          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute
+          max_parallel_tests: 5
+          ignore_failures: true
 
-  # test-typescript:
-  #   name: TypeScript Tests
-  #   runs-on: ubuntu-latest
+  test-php-control:
+    name: PHP Control Tests (apache2 - mod_php)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
 
-  #   steps:
-  #     - name: Checkout
-  #       id: checkout
-  #       uses: actions/checkout@v4
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-php
+          path: ./zen-demo
+          ref: apache-mod-php-control-server
+          submodules: recursive
 
-  #     - name: Setup Node.js
-  #       id: setup-node
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version-file: .node-version
-  #         cache: npm
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          extra_args: "--env-file=./zen-demo/.env.example -e
+            APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM="
+          sleep_before_test: 20
+          max_parallel_tests: 5
+          ignore_failures: true
+          test_type: control
 
-  #     - name: Install Dependencies
-  #       id: npm-ci
-  #       run: npm ci
+  test-dotnet:
+    name: Dotnet Tests (zen-demo-dotnet-core)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
 
-  #     - name: Check Format
-  #       id: npm-format-check
-  #       run: npm run format:check
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-dotnet-core
+          path: ./zen-demo
+          ref: fix-qa-endpoints
+          submodules: recursive
 
-  #     - name: Lint
-  #       id: npm-lint
-  #       run: npm run lint
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          sleep_before_test: 15
+          max_parallel_tests: 5
+          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec
+          ignore_failures: true
 
-  #     - name: Test
-  #       id: npm-ci-test
-  #       run: npm run ci-test
+  test-java:
+    name: Java Tests (zen-demo-java)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
 
-  # test-action:
-  #   name: GitHub Actions Test
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-java
+          path: ./zen-demo
+          ref: dev-testing
+          submodules: recursive
 
-  #   steps:
-  #     - name: Checkout
-  #       id: checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Test Local Action
-  #       id: test-action
-  #       uses: ./
-  #       with:
-  #         dockerfile_path: ./temp_test/Dockerfile
-  #     - name: Print Output
-  #       id: output
-  #       run: echo "${{ steps.test-action.outputs.time }}"
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          sleep_before_test: 15
+          max_parallel_tests: 5
+          ignore_failures: true

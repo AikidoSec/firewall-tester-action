@@ -17,6 +17,7 @@ import shlex
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+# ip addr show docker0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
 DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
     "GITHUB_ACTIONS") == "true" else "172.18.0.1"
 
@@ -120,11 +121,11 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
-        core_api = CoreApi(token=token, core_url=CORE_URL,
+        core_api = CoreApi(token=token, core_url=CORE_URL, test_name=test_dir,
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
@@ -149,34 +150,61 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        env_file_path = os.path.join(os.path.dirname(
-            os.path.abspath(__file__)), test_dir, 'test.env')
-        if not os.path.exists(env_file_path):
-            raise Exception(
-                f"Env file not found: {env_file_path} for test: {test_dir}")
         create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
         subprocess.run(create_database_command, shell=True, check=True)
         time.sleep(1)
+
+        extra_envs = {
+            "AIKIDO_TOKEN": token,
+            "PORT": app_port,
+            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
+        }
+        env_file_path = os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), test_dir, 'test.env')
+        if os.path.exists(env_file_path):
+            # remove from extra_envs env that are already in the file
+            with open(env_file_path, "r") as f:
+                content = f.read()
+            keys_to_remove = [
+                env for env in extra_envs if f"{env}=" in content]
+            for env in keys_to_remove:
+                del extra_envs[env]
+
         command = (
             f"docker run -d "
             f"{sanitize_extra_run_args(extra_args)} "
             f"--env-file {env_file_path} "
-            f"--env AIKIDO_TOKEN={token} "
-            f"--env PORT={app_port} "
-            f"--env AIKIDO_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env AIKIDO_REALTIME_ENDPOINT=http://{DOCKER_HOST_IP}:3000 "
-            f"--env DATABASE_URL=postgresql://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
-            f"{DOCKER_IMAGE_NAME}"
         )
+
+        if control_port:
+            command += f" -p {control_port}:8081 "
+
+        for env, value in extra_envs.items():
+            command += f" --env {env}={value}"
+        command += f" {DOCKER_IMAGE_NAME}"
+
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
         # 3. wait for the container to be ready
         time.sleep(sleep_before_test)
+
+        # 4. Cold turkey :
+        # Cold turkey for python
+        if not control_port:
+            requests.get(f"http://localhost:{start_port}/")
+            time.sleep(1)
+
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
-        # 4. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        # 5. run the test
+        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        if control_port:
+            command += f" --control_server_port {control_port}"
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
@@ -239,7 +267,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                             "Segmentation fault or core dumped")
             return result
 
-        # redirect logs of the docker container to > $GITHUB_STEP_SUMMARY
+        # redirect logs of the Docker container to > $GITHUB_STEP_SUMMARY
         # subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
         #               shell=True, check=False, capture_output=True)
         # stop the container
@@ -271,7 +299,7 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
             return
 
     command.append(dockerfile_dir)
-    logger.debug(f"Building Docker image: {command}")
+    logger.debug(f"Building Docker image: {' '.join(command)}")
     subprocess.run(" ".join(command), shell=True, check=True)
 
 
@@ -294,8 +322,6 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
             1 for r in test_results if r.status == TestStatus.TIMEOUT)
         failed_tests = sum(
             1 for r in test_results if r.status == TestStatus.FAILED)
-        total_duration = sum(
-            r.duration for r in test_results if r.duration is not None)
 
         f.write("### Overview\n\n")
         f.write(f"- **Total Tests:** {total_tests}\n")
@@ -303,7 +329,6 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write(f"- **Skipped:** {skipped_tests}\n")
         f.write(f"- **Timed Out:** {timeout_tests}\n")
         f.write(f"- **Failed:** {failed_tests}\n")
-        f.write(f"- **Total Duration:** {total_duration:.2f} seconds\n\n")
 
         # Write detailed results table
         f.write("### Detailed Results\n\n")
@@ -326,13 +351,17 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
+    if test_type == "control":
+        dir_start = "control_"
+    else:
+        dir_start = "test_"
 
     test_dirs = [d for d in os.listdir(os.path.dirname(
-        os.path.abspath(__file__))) if d.startswith("test_")]
+        os.path.abspath(__file__))) if d.startswith(dir_start)]
     test_results: List[TestResult] = []
 
     # Parse skip_tests into a set for O(1) lookup
@@ -341,6 +370,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_tests) as executor:
         future_to_test = {}
         start_port = 3001
+        control_start_port = 9001
 
         for test_dir in test_dirs:
             # Skip tests that are in the skip list
@@ -363,10 +393,13 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 test_timeout,
                 extra_args,
                 app_port,
-                sleep_before_test
+                sleep_before_test,
+                None if test_type == "server" else control_start_port
+
             )
             future_to_test[future] = test_dir
             start_port += 1
+            control_start_port += 1
 
         for future in concurrent.futures.as_completed(future_to_test):
             test_dir = future_to_test[future]
@@ -422,7 +455,11 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
     # Exit with error if any tests failed or timed out
     if failed_tests > 0 or timeout_tests > 0:
-        sys.exit(1)
+        if ignore_failures == "true":
+            logger.warning("Tests failed but ignoring failures as requested")
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -436,6 +473,11 @@ if __name__ == "__main__":
     parser.add_argument("--extra_build_args", type=str, required=False)
     parser.add_argument("--app_port", type=int, required=False)
     parser.add_argument("--sleep_before_test", type=int, required=False)
+    parser.add_argument("--ignore_failures", type=str,
+                        required=False, default="false")
+    parser.add_argument("--test_type", type=str,
+                        required=False, default="server")
+
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test)
+              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)

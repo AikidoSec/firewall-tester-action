@@ -2,29 +2,70 @@
   "type": "heartbeat",
   "routes": [
     {
-      "path": "/api/v1/orders",
       "method": "POST",
-      "hits": 3,
+      "path": "/api/create",
+      "hits": 2,
+
       "apispec": {
         "body": {
-          "type": "json"
-        },
-
-        "auth": [
-          {
-            "type": "http",
-            "scheme": "bearer"
-          },
-          {
-            "type": "apiKey",
-            "in": "header",
-            "name": "x-api-key"
+          "type": "json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "age": { "type": "number", "optional": true },
+              "orderId": { "type": "string", "optional": true },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemId": { "type": "string" },
+                    "quantity": { "type": "number" },
+                    "price": { "type": "number" },
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "color": { "type": "string" },
+                        "size": { "type": "string" }
+                      }
+                    }
+                  }
+                },
+                "optional": true
+              },
+              "shippingAddress": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "street": { "type": "string" },
+                  "city": { "type": "string" },
+                  "state": { "type": "string" },
+                  "zip": { "type": "string" },
+                  "country": { "type": "string" }
+                },
+                "optional": true
+              },
+              "paymentMethod": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string" },
+                  "cardNumber": { "type": "string" },
+                  "expiryDate": { "type": "string" }
+                },
+                "optional": true
+              },
+              "total": { "type": "number", "optional": true }
+            }
           }
-        ]
+        },
+        "query": {
+          "type": "object",
+          "properties": {}
+        },
+        "auth": [{ "type": "http", "scheme": "bearer" }]
       }
     }
   ],
-  "agent": {
-    "dryMode": false
-  }
+  "agent": {}
 }

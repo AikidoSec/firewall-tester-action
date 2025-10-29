@@ -31,8 +31,12 @@
     "lint": "npx eslint .",
     "local-action": "npx @github/local-action . src/main.ts .env",
     "local-action-php": "npx @github/local-action . src/main.ts .env.example.php",
+    "local-action-php-control": "npx @github/local-action . src/main.ts .env.example.php.control",
     "local-action-python": "npx @github/local-action . src/main.ts .env.example.python",
     "local-action-nodejs": "npx @github/local-action . src/main.ts .env.example.nodejs",
+    "local-action-java": "npx @github/local-action . src/main.ts .env.example.java",
+    "local-action-dotnet": "npx @github/local-action . src/main.ts .env.example.dotnet",
+    "local-action-ruby": "npx @github/local-action . src/main.ts .env.example.ruby",
     "package": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",
     "package:watch": "npm run package -- --watch",
     "test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
@@ -44,8 +48,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@types/express": "^5.0.2",
-    "express": "^5.1.0",
-    "helmet": "8.1.0"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.9",
@@ -55,7 +58,6 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-typescript": "^12.1.1",
-    "@types/helmet": "^0.0.48",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.17.48",
     "@typescript-eslint/eslint-plugin": "^8.32.1",

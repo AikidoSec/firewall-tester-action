@@ -72431,27 +72431,33 @@ function realtimeConfigHandler(req, res) {
 
 const events = new Map();
 function normalizeTypesInApiSpec(schema) {
-    const clone = { ...schema };
-    // Convert single-element array type to string
-    if (Array.isArray(clone.type) && clone.type.length === 1) {
-        clone.type = clone.type[0];
+    if (Array.isArray(schema)) {
+        return schema.map(normalizeTypesInApiSpec);
     }
-    // Recurse into properties
-    if (clone.properties) {
-        const newProps = {};
-        for (const [key, value] of Object.entries(clone.properties)) {
-            newProps[key] = normalizeTypesInApiSpec(value);
+    if (typeof schema === 'object' && schema !== null) {
+        const clone = {};
+        for (const key in schema) {
+            if (key === 'type') {
+                let value = schema[key];
+                if (Array.isArray(value) && value.length === 1) {
+                    value = value[0];
+                }
+                clone[key] = value;
+            }
+            else {
+                clone[key] = normalizeTypesInApiSpec(schema[key]);
+            }
         }
-        clone.properties = newProps;
+        return clone;
     }
-    if (clone.items) {
-        clone.items = normalizeTypesInApiSpec(clone.items);
-    }
-    return clone;
+    return schema;
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function captureEvent(event, app) {
     if (!events.has(app.id)) {
+        events.set(app.id, []);
+    }
+    if (event.type === 'started') {
         events.set(app.id, []);
     }
     if (event.type === 'heartbeat') {
@@ -72630,7 +72636,7 @@ process.on('SIGTERM', () => {
 async function run() {
     try {
         // Start the Express server
-        startPostgres();
+        await startPostgres();
         startServer();
         const dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
@@ -72641,18 +72647,28 @@ async function run() {
         const extra_build_args = coreExports.getInput('extra_build_args');
         const app_port = parseInt(coreExports.getInput('app_port'));
         const sleep_before_test = parseInt(coreExports.getInput('sleep_before_test'));
+        const ignore_failures = coreExports.getInput('ignore_failures') === 'true';
+        const test_type = coreExports.getInput('test_type');
+        if (!['server', 'control'].includes(test_type)) {
+            coreExports.setFailed(`Invalid test type: ${test_type} Must be one of: server, control`);
+            return;
+        }
         coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
+        coreExports.debug(`Config update delay: ${config_update_delay}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
         coreExports.debug(`Test timeout: ${test_timeout}`);
         coreExports.debug(`Extra args: ${extra_args}`);
         coreExports.debug(`Extra build args: ${extra_build_args}`);
         coreExports.debug(`App port: ${app_port}`);
         coreExports.debug(`Sleep before test: ${sleep_before_test}`);
+        coreExports.debug(`Ignore failures: ${ignore_failures}`);
+        coreExports.debug(`Test type: ${test_type}`);
         // Spawn the Python process
+        const this_file_dir = require$$1$8.dirname(new URL(import.meta.url).pathname);
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
-                './server_tests/run_test.py',
+                `${this_file_dir}/../server_tests/run_test.py`,
                 '--dockerfile_path',
                 dockerfile_path,
                 '--max_parallel_tests',
@@ -72670,7 +72686,11 @@ async function run() {
                 '--app_port',
                 app_port.toString(),
                 '--sleep_before_test',
-                sleep_before_test.toString()
+                sleep_before_test.toString(),
+                '--ignore_failures',
+                ignore_failures.toString(),
+                '--test_type',
+                test_type
             ], {
                 stdio: 'inherit'
             });
@@ -72696,7 +72716,7 @@ async function run() {
         stopPostgres();
     }
 }
-function startPostgres() {
+async function startPostgres() {
     const proc = spawn('docker', [
         'run',
         '--rm',
@@ -72715,10 +72735,26 @@ function startPostgres() {
     ], {
         stdio: 'inherit'
     });
+    console.log(`Started Postgres: ${proc.pid}`);
+    // wait for postgres to be ready
+    await new Promise((resolve) => {
+        setTimeout(resolve, 10000);
+    });
     proc.on('close', (code) => {
         if (code !== 0) {
             coreExports.setFailed(`Failed to start Postgres: ${code}`);
         }
+    });
+    proc.on('error', (err) => {
+        coreExports.setFailed(`Failed to start Postgres: ${err}`);
+    });
+    proc.on('exit', (code) => {
+        if (code !== 0) {
+            coreExports.setFailed(`Failed to start Postgres: ${code}`);
+        }
+    });
+    proc.on('message', (msg) => {
+        console.log(`Postgres: ${msg}`);
     });
 }
 function stopPostgres() {

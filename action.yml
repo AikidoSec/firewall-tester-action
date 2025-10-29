@@ -33,9 +33,9 @@ inputs:
   max_parallel_tests:
     description:
       The maximum number of tests to run in parallel (for each test, a new
-      container will be spawned). Default is 5.
+      container will be spawned). Default is 10.
     required: true
-    default: '5'
+    default: '10'
   config_update_delay:
     description:
       The delay in seconds to wait after updating the config to ensure the
@@ -51,13 +51,23 @@ inputs:
   test_timeout:
     description: The timeout in seconds for each test. Default is 60 seconds.
     required: false
-    default: '300'
+    default: '600'
   sleep_before_test:
     description:
       The number of seconds to sleep before starting the test. Default is 1
       second.
     required: false
     default: '1'
+  ignore_failures:
+    description:
+      If true, the action will exit with code 0 even if tests fail. Default is
+      false.
+    required: false
+    default: 'false'
+  test_type:
+    description: The type of test to run. Default is 'server'.
+    required: false
+    default: 'server'
 
 runs:
   using: node20

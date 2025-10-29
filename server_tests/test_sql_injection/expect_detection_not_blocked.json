@@ -1,0 +1,17 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "headers": {},
+    "method": "POST",
+    "route": "/api/create"
+  },
+  "attack": {
+    "kind": "sql_injection",
+    "blocked": false,
+    "source": "body",
+    "metadata": {}
+  },
+  "agent": {
+    "dryMode": true
+  }
+}

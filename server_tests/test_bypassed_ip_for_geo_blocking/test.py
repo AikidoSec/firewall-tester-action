@@ -13,24 +13,20 @@ import os
 '''
 
 
-def f(config_file: str):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), config_file)
-
-
 def run_test(s: TestServer, c: CoreApi):
-    response = s.get("/api/pets/")
+    response = s.get("/api/pets/",  headers={"X-Forwarded-For": "2.16.53.5"})
     assert_response_code_is(response, 200)
     assert_response_body_contains(response, "[]")
 
-    c.update_runtime_config_file(f("change_config_remove_bypassed_ip.json"))
+    c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
 
-    response = s.get("/api/pets/")
-    assert_response_code_is(response, 403)
+    response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
     assert_response_body_contains(response, "is blocked")
+    assert_response_code_is(response, 403)
 
-    c.update_runtime_config_file(f("start_config.json"))
+    c.update_runtime_config_file("start_config.json")
 
-    response = s.get("/api/pets/")
+    response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
     assert_response_code_is(response, 200)
     assert_response_body_contains(response, "[]")
 

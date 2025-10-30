@@ -72731,7 +72731,9 @@ async function startPostgres() {
         '-p',
         '5432:5432',
         '-d',
-        'postgres'
+        'postgres',
+        '-c',
+        'max_connections=200'
     ], {
         stdio: 'inherit'
     });

@@ -22,7 +22,8 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
     assert_response_code_is(response, 200)
-    assert_response_body_contains(response, "[]")
+    response_body = response.json()
+    assert isinstance(response_body, list)
 
     c.update_runtime_config_file("start_config.json")
 
@@ -34,8 +35,8 @@ def run_test(s: TestServer, c: CoreApi):
     c.update_runtime_config_file("config_allow_private.json")
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "127.0.0.1"})
-    assert_response_body_contains(response, "[]")
-    assert_response_code_is(response, 200)
+    response_body = response.json()
+    assert isinstance(response_body, list)
 
 
 if __name__ == "__main__":

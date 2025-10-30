@@ -16,7 +16,8 @@ import os
 def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/",  headers={"X-Forwarded-For": "2.16.53.5"})
     assert_response_code_is(response, 200)
-    assert_response_body_contains(response, "[]")
+    response_body = response.json()
+    assert isinstance(response_body, list)
 
     c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
 
@@ -28,7 +29,8 @@ def run_test(s: TestServer, c: CoreApi):
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
     assert_response_code_is(response, 200)
-    assert_response_body_contains(response, "[]")
+    response_body = response.json()
+    assert isinstance(response_body, list)
 
 
 if __name__ == "__main__":

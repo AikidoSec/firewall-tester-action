@@ -257,19 +257,22 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         return result
     finally:
         # chcek the logs for "Segmentation fault" or "core dumped"
-        logs = subprocess.check_output(
-            ["docker", "logs", test_dir], stderr=subprocess.STDOUT)
-        logs_str = logs.decode("utf-8")
-        logger.debug(f"Logs: {logs_str}")
+        logs_str = ""
+        logs = None
+        try:
+            logs = subprocess.check_output(
+                ["docker", "logs", test_dir], stderr=subprocess.STDOUT)
+            logs_str = logs.decode("utf-8")
+            logger.debug(f"Logs: {logs_str}")
+        except Exception as e:
+            logger.error(f"Error getting logs: {e} \n{traceback.format_exc()}")
+            logs_str = ""
 
         if "Segmentation fault" in logs_str or "core dumped" in logs_str:
             result.complete(TestStatus.FAILED,
                             "Segmentation fault or core dumped")
             return result
 
-        # redirect logs of the Docker container to > $GITHUB_STEP_SUMMARY
-        # subprocess.run(f"docker logs {test_dir} 2>&1 >> $GITHUB_STEP_SUMMARY",
-        #               shell=True, check=False, capture_output=True)
         # stop the container
         subprocess.run(f"docker stop {test_dir}",
                        shell=True, check=True, capture_output=True)

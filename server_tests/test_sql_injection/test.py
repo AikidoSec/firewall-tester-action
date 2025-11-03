@@ -19,7 +19,6 @@ def check_sql_injection(response_code, response_body, event_id, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    # assert_response_code_is(response, response_code) # TODO: normalize all apps to return 500
     assert_response_body_contains(response, response_body)
 
     c.wait_for_new_events(20, old_events_length=len(
@@ -28,6 +27,7 @@ def check_sql_injection(response_code, response_body, event_id, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
+    assert_events_length_at_least(new_events, 1)
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
@@ -41,9 +41,6 @@ def check_sql_injection_payload(payload):
         # all the pets must be in Aikido Security
         in_aikido_security = all(
             pet["owner"] == "Aikido Security" for pet in pets_json)
-        # write pets_json to a file
-        with open("pets.json", "w") as f:
-            json.dump(pets_json, f)
         assert in_aikido_security, "All pets must be in Aikido Security, payload: " + \
             str(payload)
     else:

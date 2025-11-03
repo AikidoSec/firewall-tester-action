@@ -318,6 +318,12 @@ def assert_events_length_is(events, length):
         events) == length, f"Error: Events list contains {len(events)} elements and not {length} elements, {events}"
 
 
+def assert_events_length_at_least(events, length):
+    assert isinstance(events, list), "Error: Events is not a list."
+    assert len(
+        events) >= length, f"Error: Events list contains {len(events)} elements and not at least {length} elements, {events}"
+
+
 def assert_started_event_is_valid(event):
     assert_event_contains_subset(event, {"type": "started", "agent": {}})
 

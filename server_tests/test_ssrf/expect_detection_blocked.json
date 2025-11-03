@@ -1,7 +1,6 @@
 {
   "type": "detected_attack",
   "request": {
-    "headers": {},
     "method": "POST",
     "route": "/api/request"
   },

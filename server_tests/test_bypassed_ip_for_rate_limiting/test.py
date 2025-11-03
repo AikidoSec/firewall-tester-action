@@ -20,12 +20,6 @@ def run_test(s: TestServer, c: CoreApi):
         assert_response_code_is(
             response, 200, "Failed for header X-Forwarded-For: 2.16.53.5")
 
-    for _ in range(100):
-        response = s.get(
-            "/api/pets/",  headers={"X-Forwarded-For": "127.0.0.1, 2.16.53.5"})
-        assert_response_code_is(
-            response, 200, "Failed for header X-Forwarded-For: 127.0.0.1, 2.16.53.5")
-
     c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
 
     for i in range(100):

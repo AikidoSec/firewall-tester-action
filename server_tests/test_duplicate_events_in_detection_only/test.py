@@ -2,11 +2,9 @@ from testlib import *
 from core_api import CoreApi
 
 
-
-
-def check_path_traversal():
+def check_path_traversal(path):
     start_events = c.get_events("detected_attack")
-    response = s.get("/api/read?path=../secrets/key.txt")
+    response = s.get(f"{path}?path=../secrets/key.txt")
     assert_response_code_is(response, 200,
                             f"Path traversal check failed {response.text}")
 
@@ -17,7 +15,7 @@ def check_path_traversal():
     new_events = all_events[len(start_events):]
 
     assert_events_length_is(new_events, 1)
-   
+
 
 def check_shell_injection():
     start_events = c.get_events("detected_attack")
@@ -33,10 +31,10 @@ def check_shell_injection():
     assert_events_length_is(new_events, 1)
 
 
-def check_ssrf():
+def check_ssrf(path):
     start_events = c.get_events("detected_attack")
     response = s.post(
-        "/api/request", {"url": "http://127.0.0.1:4000"}, timeout=10)
+        f"{path}", {"url": "http://127.0.0.1:4000"}, timeout=10)
     assert_response_code_is(response, 200)
 
     c.wait_for_new_events(5, old_events_length=len(
@@ -49,9 +47,11 @@ def check_ssrf():
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_path_traversal()
+    check_path_traversal("api/read")
+    check_path_traversal("api/read2")
     check_shell_injection()
-    check_ssrf()
+    check_ssrf("api/request")
+    check_ssrf("api/request2")
 
 
 if __name__ == "__main__":

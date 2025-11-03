@@ -25,7 +25,7 @@ def check_path_traversal_with_event(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    # assert_events_length_is(new_events, 1)
+    assert_events_length_at_least(new_events, 1)
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
@@ -39,13 +39,13 @@ def check_path_traversal(query_string):
 
 def run_test(s: TestServer, c: CoreApi):
 
-    # check_path_traversal_with_event(500, "expect_detection_blocked.json")
+    check_path_traversal_with_event(500, "expect_detection_blocked.json")
 
-    # c.update_runtime_config_file("change_config_disable_blocking.json")
-    # check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
+    c.update_runtime_config_file("change_config_disable_blocking.json")
+    check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
 
-    # c.update_runtime_config_file("start_config.json")
-    # check_path_traversal_with_event(500, "expect_detection_blocked.json")
+    c.update_runtime_config_file("start_config.json")
+    check_path_traversal_with_event(500, "expect_detection_blocked.json")
 
     paths = [
         "../secrets/key.txt",

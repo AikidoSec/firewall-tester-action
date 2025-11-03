@@ -1,7 +1,6 @@
 {
   "type": "detected_attack",
   "request": {
-    "headers": {},
     "method": "GET",
     "route": "/api/read"
   },
@@ -9,7 +8,6 @@
     "kind": "path_traversal",
     "blocked": true,
     "source": "query",
-
     "metadata": {}
   },
   "agent": {

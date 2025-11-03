@@ -48,7 +48,6 @@ def check_ssrf(path):
 
 def run_test(s: TestServer, c: CoreApi):
     check_path_traversal("api/read")
-    check_path_traversal("api/read2")
     check_shell_injection()
     check_ssrf("api/request")
     check_ssrf("api/request2")

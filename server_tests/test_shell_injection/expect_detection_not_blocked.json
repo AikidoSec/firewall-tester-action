@@ -3,7 +3,8 @@
   "request": {
     "headers": {},
     "method": "POST",
-    "route": "/api/execute"
+    "route": "/api/execute",
+    "url": "REGEX:^https?://localhost:\\d+/api/execute$"
   },
   "attack": {
     "kind": "shell_injection",

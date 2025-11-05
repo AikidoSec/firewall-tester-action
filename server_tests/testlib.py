@@ -270,6 +270,14 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
                 return True
         except:
             pass
+
+        if isinstance(event_subset, str) and event_subset.startswith("REGEX:"):
+            regex = event_subset.split("REGEX:")[1]
+            if re.match(regex, event):
+                return True
+            else:
+                return result(AssertionError(f"Value mismatch: {event} does not match regex: {regex}"))
+
         if event_subset != event:
             return result(AssertionError(f"Value mismatch: {event_subset} != {event}"))
 

@@ -2,7 +2,8 @@
   "type": "detected_attack",
   "request": {
     "method": "POST",
-    "route": "/api/request"
+    "route": "/api/request",
+    "url": "REGEX:^https?://localhost:\\d+/api/request$"
   },
   "attack": {
     "kind": "ssrf",

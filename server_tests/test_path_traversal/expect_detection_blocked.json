@@ -2,7 +2,8 @@
   "type": "detected_attack",
   "request": {
     "method": "GET",
-    "route": "/api/read"
+    "route": "/api/read",
+    "url": "REGEX:^https?://localhost:\\d+/api/read\\?path=\\.\\./secrets/key\\.txt$"
   },
   "attack": {
     "kind": "path_traversal",

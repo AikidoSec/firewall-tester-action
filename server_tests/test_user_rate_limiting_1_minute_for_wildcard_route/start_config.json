@@ -2,7 +2,7 @@
   "endpoints": [
     {
       "method": "GET",
-      "route": "/api/e*/*",
+      "route": "/test_ratelimiting_*",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],

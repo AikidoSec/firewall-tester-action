@@ -72222,9 +72222,18 @@ function createApp(req, res) {
     });
 }
 
+// list of those tokens that are down
+const downTokens = new Set();
+function setTokenDown(token) {
+    downTokens.add(token);
+}
 function checkToken(req, res, next) {
     const token = req.headers['authorization'];
-    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method}`);
+    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${downTokens.has(token ?? '') ? 'DOWN' : 'UP'}`);
+    if (downTokens.has(token ?? '')) {
+        res.status(503).json({ message: 'Service is down' });
+        return;
+    }
     if (!token) {
         res.status(401).json({
             message: 'Token is required'
@@ -72609,6 +72618,11 @@ app.post('/api/runtime/events', checkToken, captureEventHandler);
 app.get('/api/runtime/firewall/lists', checkToken, listsHandler);
 app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler);
 app.post('/api/runtime/apps', createApp);
+// when this endpoint is called, the server should go down (will respind with 503 at any request for that token)
+app.post('/api/runtime/apps/down', checkToken, (req, res) => {
+    setTokenDown(req.headers['authorization'] ?? '');
+    res.status(200).json({ message: 'Service is down' });
+});
 // Function to start the server
 const startServer = () => {
     server = app.listen(port, () => {

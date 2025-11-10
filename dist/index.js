@@ -72642,6 +72642,7 @@ async function run() {
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
         const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
         const skip_tests = coreExports.getInput('skip_tests');
+        const run_tests = coreExports.getInput('run_tests') || process.env.RUN_TESTS || '';
         const test_timeout = parseInt(coreExports.getInput('test_timeout'));
         const extra_args = coreExports.getInput('extra_args');
         const extra_build_args = coreExports.getInput('extra_build_args');
@@ -72657,6 +72658,7 @@ async function run() {
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Config update delay: ${config_update_delay}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
+        coreExports.debug(`Run tests: ${run_tests}`);
         coreExports.debug(`Test timeout: ${test_timeout}`);
         coreExports.debug(`Extra args: ${extra_args}`);
         coreExports.debug(`Extra build args: ${extra_build_args}`);
@@ -72677,6 +72679,8 @@ async function run() {
                 config_update_delay.toString(),
                 '--skip_tests',
                 skip_tests,
+                '--run_tests',
+                run_tests,
                 '--test_timeout',
                 test_timeout.toString(),
                 '--extra_args',

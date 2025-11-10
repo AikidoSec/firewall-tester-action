@@ -31,6 +31,8 @@ export async function run(): Promise<void> {
       core.getInput('config_update_delay')
     )
     const skip_tests: string = core.getInput('skip_tests')
+    const run_tests: string =
+      core.getInput('run_tests') || process.env.RUN_TESTS || ''
     const test_timeout: number = parseInt(core.getInput('test_timeout'))
     const extra_args: string = core.getInput('extra_args')
     const extra_build_args: string = core.getInput('extra_build_args')
@@ -51,6 +53,7 @@ export async function run(): Promise<void> {
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
     core.debug(`Config update delay: ${config_update_delay}`)
     core.debug(`Skip tests: ${skip_tests}`)
+    core.debug(`Run tests: ${run_tests}`)
     core.debug(`Test timeout: ${test_timeout}`)
     core.debug(`Extra args: ${extra_args}`)
     core.debug(`Extra build args: ${extra_build_args}`)
@@ -73,6 +76,8 @@ export async function run(): Promise<void> {
           config_update_delay.toString(),
           '--skip_tests',
           skip_tests,
+          '--run_tests',
+          run_tests,
           '--test_timeout',
           test_timeout.toString(),
           '--extra_args',

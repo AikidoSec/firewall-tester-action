@@ -10,7 +10,7 @@ import { listEventsHandler } from './src/handlers/listEvents.js'
 import { captureEventHandler } from './src/handlers/captureEvent.js'
 import { listsHandler } from './src/handlers/listsHandler.js'
 import { updateListsHandler } from './src/handlers/updateListsHandler.js'
-import { setTokenDown } from './src/middleware/checkToken.js'
+import { setTokenDown, setTokenUp } from './src/middleware/checkToken.js'
 
 const app: Express = express()
 const port = process.env.PORT || 3000
@@ -38,7 +38,12 @@ app.post('/api/runtime/apps/down', checkToken, (req, res) => {
   setTokenDown(req.headers['authorization'] ?? '')
   res.status(200).json({ message: 'Service is down' })
 })
-// Function to start the server
+
+app.post('/api/runtime/apps/up', (req, res) => {
+  setTokenUp(req.headers['authorization'] ?? '')
+  res.status(200).json({ message: 'Service is up' })
+})
+// Function to start the server4
 export const startServer = () => {
   server = app.listen(port, () => {
     core.info(`Server is running on port ${port}`)

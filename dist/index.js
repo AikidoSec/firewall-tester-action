@@ -72227,6 +72227,9 @@ const downTokens = new Set();
 function setTokenDown(token) {
     downTokens.add(token);
 }
+function setTokenUp(token) {
+    downTokens.delete(token);
+}
 function checkToken(req, res, next) {
     const token = req.headers['authorization'];
     coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${downTokens.has(token ?? '') ? 'DOWN' : 'UP'}`);
@@ -72623,7 +72626,11 @@ app.post('/api/runtime/apps/down', checkToken, (req, res) => {
     setTokenDown(req.headers['authorization'] ?? '');
     res.status(200).json({ message: 'Service is down' });
 });
-// Function to start the server
+app.post('/api/runtime/apps/up', (req, res) => {
+    setTokenUp(req.headers['authorization'] ?? '');
+    res.status(200).json({ message: 'Service is up' });
+});
+// Function to start the server4
 const startServer = () => {
     server = app.listen(port, () => {
         coreExports.info(`Server is running on port ${port}`);

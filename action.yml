@@ -48,6 +48,13 @@ inputs:
       "test_allowed_ip,test2,test3")
     required: false
     default: ''
+  run_tests:
+    description:
+      Comma-separated list of test names to run (e.g.
+      "test_allowed_ip,test2,test3"). If specified, only these tests will be
+      run. If not specified, all tests (except those in skip_tests) will be run.
+    required: false
+    default: ''
   test_timeout:
     description: The timeout in seconds for each test. Default is 60 seconds.
     required: false

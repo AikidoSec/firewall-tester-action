@@ -61,3 +61,13 @@ class CoreApi:
             time.sleep(1)
             max_wait_time -= 1
         return False
+
+    def set_mock_server_down(self):
+        response = requests.post(
+            f"{self.core_url}/api/runtime/apps/down", headers={"Authorization": f"{self.token}"})
+        return response.json()
+
+    def set_mock_server_up(self):
+        response = requests.post(
+            f"{self.core_url}/api/runtime/apps/up", headers={"Authorization": f"{self.token}"})
+        return response.json()

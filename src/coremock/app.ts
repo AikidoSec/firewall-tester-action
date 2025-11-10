@@ -10,6 +10,7 @@ import { listEventsHandler } from './src/handlers/listEvents.js'
 import { captureEventHandler } from './src/handlers/captureEvent.js'
 import { listsHandler } from './src/handlers/listsHandler.js'
 import { updateListsHandler } from './src/handlers/updateListsHandler.js'
+import { setTokenDown } from './src/middleware/checkToken.js'
 
 const app: Express = express()
 const port = process.env.PORT || 3000
@@ -32,7 +33,11 @@ app.get('/api/runtime/firewall/lists', checkToken, listsHandler)
 app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler)
 
 app.post('/api/runtime/apps', createApp)
-
+// when this endpoint is called, the server should go down (will respind with 503 at any request for that token)
+app.post('/api/runtime/apps/down', checkToken, (req, res) => {
+  setTokenDown(req.headers['authorization'] ?? '')
+  res.status(200).json({ message: 'Service is down' })
+})
 // Function to start the server
 export const startServer = () => {
   server = app.listen(port, () => {

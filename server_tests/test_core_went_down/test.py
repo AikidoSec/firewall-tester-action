@@ -37,7 +37,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_attacks_blocked(500)
 
     c.set_mock_server_down()
-    time.sleep(120)
+    time.sleep(70)
 
     check_attacks_blocked(500)
 
@@ -53,6 +53,17 @@ def run_test(s: TestServer, c: CoreApi):
             pass
         else:
             assert_response_code_is(response, 429, response.text)
+
+    c.set_mock_server_up()
+
+    check_event_is_submitted_shell_injection(
+        500, "expect_detection_blocked.json")
+
+    c.set_mock_server_timeout()
+
+    time.sleep(70)
+
+    check_attacks_blocked(500)
 
     c.set_mock_server_up()
 

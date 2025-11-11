@@ -72222,19 +72222,55 @@ function createApp(req, res) {
     });
 }
 
-// list of those tokens that are down
 const downTokens = new Set();
+const timeoutTokens = new Set();
+const timeoutTimeouts = new Map();
 function setTokenDown(token) {
     downTokens.add(token);
 }
 function setTokenUp(token) {
     downTokens.delete(token);
+    timeoutTokens.delete(token);
+    clearTimeout(timeoutTimeouts.get(token) ?? undefined);
+    timeoutTimeouts.delete(token);
 }
+function setTokenTimeout(token) {
+    timeoutTokens.add(token);
+}
+function addTokenTimeout(token, timeout) {
+    timeoutTimeouts.set(token, timeout);
+}
+function isTokenDown(token) {
+    return downTokens.has(token);
+}
+function isTokenTimeout(token) {
+    return timeoutTokens.has(token);
+}
+function setTokenDownHandler(req, res) {
+    setTokenDown(req.headers['authorization'] ?? '');
+    res.status(200).json({ message: 'Service is down' });
+}
+function clearTokenDownHandler(req, res) {
+    setTokenUp(req.headers['authorization'] ?? '');
+    res.status(200).json({ message: 'Service is up' });
+}
+function setTokenTimeoutHandler(req, res) {
+    setTokenTimeout(req.headers['authorization'] ?? '');
+    res.status(200).json({ message: 'Service is timeout' });
+}
+
 function checkToken(req, res, next) {
     const token = req.headers['authorization'];
-    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${downTokens.has(token ?? '') ? 'DOWN' : 'UP'}`);
-    if (downTokens.has(token ?? '')) {
+    coreExports.info(`Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${isTokenDown(token ?? '') ? 'DOWN' : 'UP'}`);
+    if (isTokenDown(token ?? '')) {
         res.status(503).json({ message: 'Service is down' });
+        return;
+    }
+    if (isTokenTimeout(token ?? '')) {
+        const t = setTimeout(() => {
+            res.status(500).json({ message: 'Service is timeout' });
+        }, 3 * 60 * 1000);
+        addTokenTimeout(token ?? '', t);
         return;
     }
     if (!token) {
@@ -72622,14 +72658,9 @@ app.get('/api/runtime/firewall/lists', checkToken, listsHandler);
 app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler);
 app.post('/api/runtime/apps', createApp);
 // when this endpoint is called, the server should go down (will respind with 503 at any request for that token)
-app.post('/api/runtime/apps/down', checkToken, (req, res) => {
-    setTokenDown(req.headers['authorization'] ?? '');
-    res.status(200).json({ message: 'Service is down' });
-});
-app.post('/api/runtime/apps/up', (req, res) => {
-    setTokenUp(req.headers['authorization'] ?? '');
-    res.status(200).json({ message: 'Service is up' });
-});
+app.post('/api/runtime/apps/down', checkToken, setTokenDownHandler);
+app.post('/api/runtime/apps/timeout', checkToken, setTokenTimeoutHandler);
+app.post('/api/runtime/apps/up', clearTokenDownHandler);
 // Function to start the server4
 const startServer = () => {
     server = app.listen(port, () => {

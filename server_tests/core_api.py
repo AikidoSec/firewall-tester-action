@@ -71,3 +71,8 @@ class CoreApi:
         response = requests.post(
             f"{self.core_url}/api/runtime/apps/up", headers={"Authorization": f"{self.token}"})
         return response.json()
+
+    def set_mock_server_timeout(self):
+        response = requests.post(
+            f"{self.core_url}/api/runtime/apps/timeout", headers={"Authorization": f"{self.token}"})
+        return response.json()

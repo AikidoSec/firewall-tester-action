@@ -1,19 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
 import { getByToken } from '../zen/apps.js'
 import * as core from '@actions/core'
+import {
+  isTokenDown,
+  isTokenTimeout,
+  addTokenTimeout
+} from '../handlers/coreDown.js'
 // Augment Express Request type
 interface RequestWithAppData extends Request {
   appData?: { id: number; token: string; configUpdatedAt: number }
-}
-
-// list of those tokens that are down
-const downTokens = new Set<string>()
-export function setTokenDown(token: string) {
-  downTokens.add(token)
-}
-
-export function setTokenUp(token: string) {
-  downTokens.delete(token)
 }
 
 export function checkToken(
@@ -23,10 +18,20 @@ export function checkToken(
 ): void {
   const token = req.headers['authorization']
   core.info(
-    `Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${downTokens.has(token ?? '') ? 'DOWN' : 'UP'}`
+    `Token: ${token?.substring(0, 15)}... for ${req.url} method ${req.method} ${isTokenDown(token ?? '') ? 'DOWN' : 'UP'}`
   )
-  if (downTokens.has(token ?? '')) {
+  if (isTokenDown(token ?? '')) {
     res.status(503).json({ message: 'Service is down' })
+    return
+  }
+  if (isTokenTimeout(token ?? '')) {
+    const t = setTimeout(
+      () => {
+        res.status(500).json({ message: 'Service is timeout' })
+      },
+      3 * 60 * 1000
+    )
+    addTokenTimeout(token ?? '', t)
     return
   }
 

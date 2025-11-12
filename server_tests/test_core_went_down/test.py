@@ -45,7 +45,7 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get("/test_ratelimiting_1")
         assert_response_code_is(response, 200, response.text)
 
-    time.sleep(10)
+    time.sleep(5)
 
     for i in range(10):
         response = s.get("/test_ratelimiting_1")
@@ -66,6 +66,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_attacks_blocked(500)
 
     c.set_mock_server_up()
+    time.sleep(5)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

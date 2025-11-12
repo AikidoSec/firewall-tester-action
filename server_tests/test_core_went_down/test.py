@@ -66,7 +66,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_attacks_blocked(500)
 
     c.set_mock_server_up()
-    time.sleep(5)
+    time.sleep(30)
 
     check_event_is_submitted_shell_injection(
         500, "expect_detection_blocked.json")

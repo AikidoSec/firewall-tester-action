@@ -1,0 +1,11 @@
+{
+  "type": "detected_attack",
+  "attack": {
+    "kind": "stored_ssrf",
+    "blocked": true,
+    "metadata": {
+      "hostname": "evil-stored-ssrf-hostname",
+      "privateIP": "169.254.169.254"
+    }
+  }
+}

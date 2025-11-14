@@ -29,7 +29,7 @@ def set_etc_hosts(target_container_name: str, ip: str, hostname: str):
 def start_mock_servers(target_container_name: str):
     path = os.path.join(os.path.dirname(__file__), "mock-imds.py")
     subprocess.run(
-        f"docker run -d --name {target_container_name}-mock-imds -v {path}:/mock-imds.py:ro --network container:{target_container_name} --cap-add NET_ADMIN python:3.12-alpine sh -c 'apk add --no-cache iproute2 && python /mock-imds.py 169.254.169.254 100.100.100.200 fd00:ec2::254'", shell=True)
+        f"docker run -d --name {target_container_name}-mock-imds -v {path}:/mock-imds.py:ro --network container:{target_container_name} --cap-add NET_ADMIN python:3.12-alpine sh -c 'apk add --no-cache iproute2 && python /mock-imds.py 169.254.169.254'", shell=True)
     i = 0
     while True:
         time.sleep(1)
@@ -45,7 +45,6 @@ def start_mock_servers(target_container_name: str):
 
 def check_ssrf_with_event(response_code, expected_json):
     start_events = c.get_events("detected_attack")
-    # this will start on server a thread that will make a request to the stored_ssrf endpoint after 10 seconds
     response = s.post("/api/stored_ssrf_2", timeout=10)
     assert_response_code_is(response, response_code, f"[{response.text}]")
 

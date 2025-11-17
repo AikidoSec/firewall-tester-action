@@ -172,3 +172,30 @@ jobs:
           sleep_before_test: 15
           max_parallel_tests: 5
           ignore_failures: true
+
+  test-ruby:
+    name: Ruby Tests (zen-demo-ruby)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-ruby
+          path: ./zen-demo
+          ref: dev-testing
+          submodules: recursive
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          sleep_before_test: 30
+          max_parallel_tests: 5
+          ignore_failures: true
+          extra_args: "-e RAILS_ENV=test"
+          app_port: 3000

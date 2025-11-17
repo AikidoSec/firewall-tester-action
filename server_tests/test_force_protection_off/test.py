@@ -31,6 +31,18 @@ def run_test(s: TestServer, c: CoreApi):
     c.update_runtime_config_file("change_config_force_protection_off.json")
     check_force_protection_off(200)
 
+    # chechk that rate limiting it's not impacted by force protection off
+    for i in range(5):
+        response = s.get("/test_ratelimiting_1")
+        assert_response_code_is(response, 200, response.text)
+
+    for i in range(10):
+        response = s.get("/test_ratelimiting_1")
+        if i < 5:
+            pass
+        else:
+            assert_response_code_is(response, 429, response.text)
+
     c.update_runtime_config_file("start_config.json")
     check_force_protection_off(500)
 

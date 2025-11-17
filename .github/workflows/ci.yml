@@ -89,9 +89,10 @@ jobs:
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM="
           extra_build_args: "--build-arg PHP_FIREWALL_VERSION=1.0.126"
           sleep_before_test: 20
-          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute
           max_parallel_tests: 5
           ignore_failures: true
+          test_timeout: 900 # 15 minutes
+          config_update_delay: 120 # 2 minutes
 
   test-php-control:
     name: PHP Control Tests (apache2 - mod_php)

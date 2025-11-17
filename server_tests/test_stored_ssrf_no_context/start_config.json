@@ -1,0 +1,17 @@
+{
+  "block": true,
+  "endpoints": [
+    {
+      "method": "POST",
+      "route": "/api/stored_ssrf_2",
+      "forceProtectionOff": true,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": true,
+        "maxRequests": 1000,
+        "windowSizeInMS": 60000
+      }
+    }
+  ]
+}

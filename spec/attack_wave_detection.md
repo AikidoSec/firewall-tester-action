@@ -31,4 +31,4 @@ type DetectedAttackWave = {
 - `metadata` is an empty object for now
 
 Later added:
-- `samples` contains a list of suspicious requests that were sent from the same IP address within the attack wave time window. Each sample includes the HTTP method and URL of the request. The URL can be the full URL or just the path with query parameters (depending on the agent).
+- `samples` contains a **unique** list of suspicious requests that were sent from the same IP address within the attack wave time window. Each sample includes the HTTP method and URL of the request. The URL can be the full URL or just the path with query parameters (depending on the agent).

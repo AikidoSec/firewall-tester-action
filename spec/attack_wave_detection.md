@@ -27,7 +27,7 @@ type DetectedAttackWave = {
 
 - `ipAddress` is the IP address from which the attack wave originated
 - `userAgent` is the User-Agent header of the last request in the attack wave
-- `source` is the name of the source where the request was detected (e.g. `"http.createServer"` in Node.js)
+- `source` is the name of the source where the request was detected (e.g. `http.createServer` in Node.js)
 - `metadata` is an empty object for now
 
 Later added:

@@ -10,6 +10,11 @@ import { listEventsHandler } from './src/handlers/listEvents.js'
 import { captureEventHandler } from './src/handlers/captureEvent.js'
 import { listsHandler } from './src/handlers/listsHandler.js'
 import { updateListsHandler } from './src/handlers/updateListsHandler.js'
+import {
+  setTokenDownHandler,
+  clearTokenDownHandler,
+  setTokenTimeoutHandler
+} from './src/handlers/coreDown.js'
 
 const app: Express = express()
 const port = process.env.PORT || 3000
@@ -32,8 +37,13 @@ app.get('/api/runtime/firewall/lists', checkToken, listsHandler)
 app.post('/api/runtime/firewall/lists', checkToken, updateListsHandler)
 
 app.post('/api/runtime/apps', createApp)
+// when this endpoint is called, the server should go down (will respind with 503 at any request for that token)
+app.post('/api/runtime/apps/down', checkToken, setTokenDownHandler)
 
-// Function to start the server
+app.post('/api/runtime/apps/timeout', checkToken, setTokenTimeoutHandler)
+
+app.post('/api/runtime/apps/up', clearTokenDownHandler)
+// Function to start the server4
 export const startServer = () => {
   server = app.listen(port, () => {
     core.info(`Server is running on port ${port}`)

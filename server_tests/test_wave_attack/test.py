@@ -94,7 +94,7 @@ def get_random_query():
 
 
 def get_random_path_filename():
-    return "GET", f"/api/pets/{get_random_filename()}"
+    return "GET", f"/api/execute/{get_random_filename()}"
 
 
 def get_random_path_directory():

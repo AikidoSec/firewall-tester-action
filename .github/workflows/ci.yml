@@ -89,9 +89,10 @@ jobs:
             APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM="
           extra_build_args: "--build-arg PHP_FIREWALL_VERSION=1.0.126"
           sleep_before_test: 20
-          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute
           max_parallel_tests: 5
           ignore_failures: true
+          test_timeout: 900 # 15 minutes
+          config_update_delay: 120 # 2 minutes
 
   test-php-control:
     name: PHP Control Tests (apache2 - mod_php)
@@ -171,3 +172,30 @@ jobs:
           sleep_before_test: 15
           max_parallel_tests: 5
           ignore_failures: true
+
+  test-ruby:
+    name: Ruby Tests (zen-demo-ruby)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with:
+          repository: Aikido-demo-apps/zen-demo-ruby
+          path: ./zen-demo
+          ref: dev-testing
+          submodules: recursive
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          sleep_before_test: 30
+          max_parallel_tests: 5
+          ignore_failures: true
+          extra_args: "-e RAILS_ENV=test"
+          app_port: 3000

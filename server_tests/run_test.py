@@ -354,7 +354,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
+def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -369,6 +369,13 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
     # Parse skip_tests into a set for O(1) lookup
     tests_to_skip = set(skip_tests.split(',')) if skip_tests else set()
+
+    # Parse run_tests into a set for O(1) lookup
+    tests_to_run = set(run_tests.split(',')) if run_tests else set()
+
+    # If run_tests is specified, filter test_dirs to only include those tests
+    if tests_to_run:
+        test_dirs = [d for d in test_dirs if d in tests_to_run]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel_tests) as executor:
         future_to_test = {}
@@ -471,6 +478,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
     parser.add_argument("--skip_tests", type=str, required=False)
+    parser.add_argument("--run_tests", type=str, required=False)
     parser.add_argument("--test_timeout", type=int, required=False)
     parser.add_argument("--extra_args", type=str, required=False)
     parser.add_argument("--extra_build_args", type=str, required=False)
@@ -483,4 +491,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+              args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)

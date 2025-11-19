@@ -1,0 +1,17 @@
+{
+  "block": true,
+  "endpoints": [
+    {
+      "method": "GET",
+      "route": "/test_ratelimiting_1",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": true,
+        "maxRequests": 5,
+        "windowSizeInMS": 60000
+      }
+    }
+  ]
+}

@@ -109,12 +109,12 @@ def get_random_path_query():
     return "GET", f"/api/pets/?path={get_random_query()}"
 
 
-def check_wave_attack(get_method_path, ip):
+def check_wave_attack(get_method_path, ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for i in range(16):
         method, path = get_method_path()
         r = s.request(method, path,
-                      headers={"X-Forwarded-For": ip})
+                      headers={"X-Forwarded-For": ip, "user": user_id})
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
@@ -127,12 +127,42 @@ def check_wave_attack(get_method_path, ip):
     assert new_events[0]["request"][
         "ipAddress"] == ip, f"Expected ipAddress {ip}, got {new_events[0]['request']['ipAddress']}"
 
+    assert "user" in new_events[0][
+        "attack"], f"Expected user in attack, got {new_events[0]['attack']}"
+    assert "id" in new_events[0]["attack"][
+        "user"], f"Expected id in user, got {new_events[0]['attack']['user']}"
+    assert new_events[0]["attack"]["user"][
+        "id"] == user_id, f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}"
+
+
+def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
+    start_events = c.get_events("detected_attack_wave")
+    for i in range(16):
+        method, path = get_method_path()
+        r = s.request(method, path,
+                      headers={"X-Forwarded-For": ip, "user": user_id})
+    c.wait_for_new_events(20, old_events_length=len(
+        start_events), filter_type="detected_attack_wave")
+    all_events = c.get_events("detected_attack_wave")
+    new_events = all_events[len(start_events):]
+
+    assert len(
+        new_events) == 0, f"Expected 0 events, got {len(new_events)} (ip: {ip})"
+
 
 def run_test(s: TestServer, c: CoreApi):
-    check_wave_attack(get_random_path_filename, "2.16.53.5")
-    check_wave_attack(get_random_path_directory, "2.16.53.6")
-    check_wave_attack(get_random_path_extension, "2.16.53.7")
-    check_wave_attack(get_random_path_query, "2.16.53.8")
+    check_wave_attack(get_random_path_filename, "2.16.53.5", "1234")
+    check_wave_attack(get_random_path_directory, "2.16.53.6", "1235")
+    check_wave_attack(get_random_path_extension, "2.16.53.7", "1236")
+    check_wave_attack(get_random_path_query, "2.16.53.8", "1237")
+
+    check_wave_attack_with_same_ip(
+        get_random_path_filename, "2.16.53.5", "1234")
+    check_wave_attack_with_same_ip(
+        get_random_path_directory, "2.16.53.6", "1235")
+    check_wave_attack_with_same_ip(
+        get_random_path_extension, "2.16.53.7", "1236")
+    check_wave_attack_with_same_ip(get_random_path_query, "2.16.53.8", "1237")
 
 
 if __name__ == "__main__":

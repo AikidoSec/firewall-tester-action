@@ -111,7 +111,7 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
         "0:0:0000:0000:0000:ffff:6464:64c8",
         "0:0:0::ffff:6464:64c8"
         #  "fd00:ec2:0:0000:0000:0:0000:254",
-        "fd00:ec2:0:0:0:0::254"
+        #  "fd00:ec2:0:0:0:0::254"
     ]
 
     for ip in IDMS_IPS_V4 + IDMS_IPS_V6:

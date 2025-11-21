@@ -34,7 +34,6 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 30
-          max_parallel_tests: 5
           ignore_failures: true
           extra_args: "-e RAILS_ENV=test"
           app_port: 3000

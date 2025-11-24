@@ -300,7 +300,7 @@ def get_response_status_code(response):
 
 def assert_response_code_is(response, status_code, message=None):
     assert get_response_status_code(
-        response) == status_code, f"Status codes are not the same: {get_response_status_code(response)} vs {status_code} {message}"
+        response) == status_code, f"Status codes are not the same, expected {status_code}, got {get_response_status_code(response)} - {message}"
 
 
 def assert_response_code_is_not(response, status_code, message=None):

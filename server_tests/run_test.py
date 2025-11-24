@@ -275,10 +275,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         # stop the container
         subprocess.run(f"docker stop {test_dir}",
-                       shell=True, check=True, capture_output=True)
+                       shell=True, check=False, capture_output=False)
         # remove the container
         subprocess.run(f"docker rm -f {test_dir}",
-                       shell=True, check=True, capture_output=True)
+                       shell=True, check=False, capture_output=False)
 
 
 def build_docker_image(dockerfile_path: str, extra_build_args: str):

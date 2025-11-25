@@ -1,16 +1,25 @@
 from testlib import *
 
 """
-This test checks that the wave attack detection works for the following cases:
-- Filename
-- Directory
-- File Extension
-- Query
+This test suite validates wave attack detection functionality across multiple scenarios:
 
-The test sends 16 requests to the server with a different IP address for each attack.
-The test then waits for 20 seconds and checks that the event was sent to cloud.
+Positive Tests (expect detection):
+- Filename patterns: Tests detection of suspicious filenames (e.g., .bashrc, .gitconfig)
+- Directory patterns: Tests detection of suspicious directory names (e.g., .git, .vscode)
+- File Extension patterns: Tests detection of suspicious file extensions (e.g., .env, .sql)
+- Query patterns: Tests detection of suspicious query parameters (e.g., SQL injection attempts)
+Each positive test sends 16 requests with the same IP address, waits 20 seconds, and verifies
+that exactly 1 attack wave event is detected and contains the correct IP and user information.
 
-NODE: I didn't add the tests for methods (BDMTHD, ...), because they don't reach the aikido middleware.)
+Negative Tests (expect no detection):
+- Same IP retry: Tests that subsequent attacks from an already-detected IP don't trigger
+  additional events (sends 16 requests, waits 5 seconds, expects 0 events)
+- Sliding window: Tests that 15 requests spaced 10 seconds apart (15 * 10 seconds = 150 seconds > 60 seconds) don't trigger wave detection
+  due to sliding window behavior 
+- Bypass IP: Tests that requests from allowed/bypass IP addresses don't trigger detection
+  (sends 15 requests, expects 0 events)
+
+NOTE: Tests for HTTP methods (BDMTHD, etc.) are not included because they don't reach the aikido middleware.
 """
 
 
@@ -141,13 +150,42 @@ def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
         method, path = get_method_path()
         r = s.request(method, path,
                       headers={"X-Forwarded-For": ip, "user": user_id})
-    c.wait_for_new_events(20, old_events_length=len(
+    c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
 
     assert len(
         new_events) == 0, f"Expected 0 events, got {len(new_events)} (ip: {ip})"
+
+
+def check_wave_attack_with_same_ip_sliding_window(ip, user_id):
+    start_events = c.get_events("detected_attack_wave")
+    for _ in range(15):
+        time.sleep(10)
+        method, path = get_random_path_filename()
+        _ = s.request(method, path,
+                      headers={"X-Forwarded-For": ip, "user": user_id})
+    c.wait_for_new_events(10, old_events_length=len(
+        start_events), filter_type="detected_attack_wave")
+    all_events = c.get_events("detected_attack_wave")
+    new_events = all_events[len(start_events):]
+    assert len(
+        new_events) == 0, f"Test sent 15 suspicious requests with 10 seconds sleep between each request (same IP). Expected 0 attack wave events, but got {len(new_events)} event(s)"
+
+
+def check_wave_attack_with_bypass_ip(ip, user_id):
+    start_events = c.get_events("detected_attack_wave")
+    for _ in range(15):
+        method, path = get_random_path_filename()
+        _ = s.request(method, path,
+                      headers={"X-Forwarded-For": ip, "user": user_id})
+    c.wait_for_new_events(10, old_events_length=len(
+        start_events), filter_type="detected_attack_wave")
+    all_events = c.get_events("detected_attack_wave")
+    new_events = all_events[len(start_events):]
+    assert len(
+        new_events) == 0, f"Test sent 15 suspicious requests with bypass IP {ip} (allowedIPAddresses). Expected 0 attack wave events, but got {len(new_events)} event(s)"
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -163,6 +201,9 @@ def run_test(s: TestServer, c: CoreApi):
     check_wave_attack_with_same_ip(
         get_random_path_extension, "2.16.53.7", "1236")
     check_wave_attack_with_same_ip(get_random_path_query, "2.16.53.8", "1237")
+
+    check_wave_attack_with_same_ip_sliding_window("2.16.53.9", "1238")
+    check_wave_attack_with_bypass_ip("2.16.53.10", "1239")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "name": "GitHub Actions (TypeScript)",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
-  "postCreateCommand": "npm install && pip install -r requirements.txt --break-system-packages",
+  "postCreateCommand": "npm install -g @aikidosec/safe-chain && safe-chain setup --include-python && npm install  && pip install -r requirements.txt --break-system-packages",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
     "ghcr.io/devcontainers/features/python:1": {}

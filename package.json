@@ -1,7 +1,7 @@
 {
   "name": "firewall-tester-action",
   "description": "GitHub Actions TypeScript template",
-  "version": "v1.0.0",
+  "version": "v1.0.2",
   "author": "",
   "type": "module",
   "private": true,

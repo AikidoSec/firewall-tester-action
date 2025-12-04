@@ -1,0 +1,28 @@
+{
+  "block": true,
+  "success": true,
+  "heartbeatIntervalInMS": 600000,
+  "endpoints": [
+    {
+      "method": "POST",
+      "route": "/api/create",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": true,
+        "maxRequests": 1,
+        "windowSizeInMS": 60000
+      }
+    }
+  ],
+  "blockedUserIds": [],
+  "allowedIPAddresses": [
+    "93.184.216.34",
+    "203.0.113.0/24",
+    "2606:2800:220:1:248:1893:25c8:1946",
+    "2001:db8:abcd:0012::/64"
+  ],
+  "receivedAnyStats": false,
+  "blockedIPAddresses": []
+}

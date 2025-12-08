@@ -51,7 +51,8 @@ def test_explicitly_blocked_domain(s: TestServer, c: CoreApi):
     """Test that explicitly blocked domains are always blocked"""
     response = s.post("/api/request",
                       {"url": "http://evil.example.com/test"})
-    assert_response_code_is(response, 500)
+    assert_response_code_is(
+        response, 500, f"{response.text} - explicitly blocked domain evil.example.com should be blocked")
     assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -89,13 +90,15 @@ def test_explicitly_blocked_domain(s: TestServer, c: CoreApi):
     """Test that hostname matching is case-insensitive"""
     # Test with uppercase hostname
     response = s.post("/api/request", {"url": "http://EVIL.EXAMPLE.COM"})
-    assert_response_code_is(response, 500)
+    assert_response_code_is(
+        response, 500, f"{response.text} - uppercase hostname EVIL.EXAMPLE.COM should be blocked (case-insensitive matching)")
     assert_response_body_contains(
         response, "blocked an outbound connection")
 
     # Test with mixed case
     response = s.post("/api/request", {"url": "http://Evil.Example.Com"})
-    assert_response_code_is(response, 500)
+    assert_response_code_is(
+        response, 500, f"{response.text} - mixed case hostname Evil.Example.Com should be blocked (case-insensitive matching)")
     assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -131,7 +134,8 @@ def test_new_domain_allowed_when_flag_disabled(s: TestServer, c: CoreApi):
 
     """Test that explicitly blocked domains are still blocked when blockNewOutgoingRequests is false"""
     response = s.post("/api/request", {"url": "http://evil.example.com"})
-    assert_response_code_is(response, 500)
+    assert_response_code_is(
+        response, 500, f"{response.text} - explicitly blocked domain evil.example.com should still be blocked even when blockNewOutgoingRequests is false")
     assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -141,7 +145,8 @@ def test_detection_mode(s: TestServer, c: CoreApi):
     c.update_runtime_config_file("config_no_blocking.json")
 
     response = s.post("/api/request", {"url": "http://evil.example.com"})
-    assert_response_code_is(response, 200)
+    assert_response_code_is(
+        response, 200, f"{response.text} - detection mode (block: false) should not block requests to evil.example.com")
 
 
 def run_test(s: TestServer, c: CoreApi):

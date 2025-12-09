@@ -34,7 +34,7 @@ def run_test(s: TestServer, c: CoreApi):
         {"ip": "::ffff:23.45.67.89",
             "type": "IPv4-mapped IPv6 address (in 23.45.67.89/24 range)"},
         {"ip": "2606:2800:220:1:248:1893:25c8:1946",      "type": "single IPv6"},
-        {"ip": "2001:db8:abcd:12:abcd::1", "type": "CIDR 2001:db8:abcd:0012::/64"},
+        {"ip": "2001:0db9:abcd:1234::5678", "type": "CIDR 2001:0db9:abcd:1234::/64"},
     ]
 
     # Baseline events before sending any traffic for this test

@@ -89,30 +89,30 @@ def run_test(s: TestServer, c: CoreApi):
         assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking and endpoint-level allowedIPAddresses restriction: {response.text}")
 
-        # # Wait a bit to give the agent time to potentially send heartbeat / stats
+    # Wait a bit to give the agent time to potentially send heartbeat / stats
     c.wait_for_new_events(
         70, old_events_length=len(start_heartbeat_events), filter_type="heartbeat"
     )
 
-    # # Ensure no new heartbeat events were created because bypassed IPs should not generate stats or API spec data
     all_heartbeat_events = c.get_events("heartbeat")
     new_heartbeat_events = all_heartbeat_events[len(start_heartbeat_events):]
-
+    assert_events_length_is(new_heartbeat_events, 1)
+    heartbeat = new_heartbeat_events[0]
     # routes should not contain  "method": "POST", "path": "/api/create",
-    for route in new_heartbeat_events[0]["routes"]:
+    for route in heartbeat["routes"]:
         assert "POST" not in route["method"] and "/api/create" not in route[
             "path"], f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data"
 
-    assert new_heartbeat_events[0]["stats"]["requests"][
-        "total"] == 1, f"Requests total should be 1, found {new_heartbeat_events[0]['stats']['requests']['total']}"
+    assert heartbeat["stats"]["requests"][
+        "total"] == 1, f"Requests total should be 1, found {heartbeat['stats']['requests']['total']}"
     # attacksDetected
-    assert new_heartbeat_events[0]["stats"]["requests"]["attacksDetected"][
-        "total"] == 0, f"Attacks detected should be 0, found {new_heartbeat_events[0]['stats']['requests']['attacksDetected']['total']}"
+    assert heartbeat["stats"]["requests"]["attacksDetected"][
+        "total"] == 0, f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}"
     # rateLimited
-    assert new_heartbeat_events[0]["stats"]["requests"][
-        "rateLimited"] == 0, f"Rate limited should be 0, found {new_heartbeat_events[0]['stats']['requests']['rateLimited']}"
+    assert heartbeat["stats"]["requests"][
+        "rateLimited"] == 0, f"Rate limited should be 0, found {heartbeat['stats']['requests']['rateLimited']}"
 
-    for stat in new_heartbeat_events[0]["stats"]["operations"].values():
+    for stat in heartbeat["stats"]["operations"].values():
         assert stat["attacksDetected"][
             "total"] == 0, f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}"
 

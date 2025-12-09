@@ -8,10 +8,22 @@
       "route": "/api/create",
       "forceProtectionOff": false,
       "graphql": null,
-      "allowedIPAddresses": [],
+      "allowedIPAddresses": ["185.245.255.212"],
       "rateLimiting": {
         "enabled": true,
         "maxRequests": 1,
+        "windowSizeInMS": 60000
+      }
+    },
+    {
+      "method": "GET",
+      "route": "/api/pets",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": ["185.245.255.212"],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
         "windowSizeInMS": 60000
       }
     }

@@ -8,9 +8,12 @@ Bypassed IPs allow certain IP addresses to completely bypass all Zen security fe
 This test verifies that:
 1. Requests from bypassed IPs bypass rate limiting (multiple requests from same IP are not rate limited).
 2. Requests from bypassed IPs bypass attack detection (path traversal, SQL injection, shell injection attacks are not blocked).
-3. Requests from bypassed IPs do not generate API spec discovery data (routes are not included in heartbeat events).
-4. Requests from bypassed IPs do not count towards attack statistics (attacksDetected and rateLimited remain 0).
-5. Bypassed IPs work for single IPv4 addresses, IPv4 CIDR ranges, single IPv6 addresses, and IPv6 CIDR ranges.
+3. Requests from bypassed IPs bypass bot blocking (requests with blocked user agents are not blocked).
+4. Requests from bypassed IPs bypass geo blocking (requests from blocked IP ranges are not blocked).
+5. Requests from bypassed IPs bypass endpoint-level allowedIPAddresses restrictions (can access endpoints even if not in endpoint's allowedIPAddresses).
+6. Requests from bypassed IPs do not generate API spec discovery data (routes are not included in heartbeat events).
+7. Requests from bypassed IPs do not count towards attack statistics (attacksDetected and rateLimited remain 0).
+8. Bypassed IPs work for single IPv4 addresses, IPv4 CIDR ranges, single IPv6 addresses, and IPv6 CIDR ranges.
 '''
 
 
@@ -70,6 +73,21 @@ def run_test(s: TestServer, c: CoreApi):
             "/api/execute", {"userCommand": "whoami"}, headers={"X-Forwarded-For": ip["ip"]})
         assert_response_code_is(
             response, 200, f"Request should not be blocked: {response.text}")
+
+        # 4. bot blocking should be bypassed (send request with blocked user agent)
+        # Using pattern like "1234googlebot1234" which matches the blockedUserAgents pattern "Googlebot"
+        response = s.get(
+            "/test_ratelimiting_2", headers={"X-Forwarded-For": ip["ip"], "User-Agent": "1234googlebot1234"})
+        assert_response_code_is(
+            response, 200, f"Request with blocked user agent should not be blocked from bypass IP {ip['ip']} ({ip['type']}): {response.text}")
+
+        # 5. geo blocking should be bypassed (send request from IP that would normally be geo-blocked)
+        # Note: Some bypass IPs (93.184.216.34 and 23.45.67.89) are in blockedIPAddresses ranges in start_firewall.json, so they should still work
+        # Also tests endpoint-level allowedIPAddresses bypass: /api/pets has allowedIPAddresses: ["185.245.255.212"], but bypassed IPs should still access it
+        response = s.get(
+            "/api/pets/", headers={"X-Forwarded-For": ip["ip"]})
+        assert_response_code_is(
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking and endpoint-level allowedIPAddresses restriction: {response.text}")
 
         # # Wait a bit to give the agent time to potentially send heartbeat / stats
     c.wait_for_new_events(

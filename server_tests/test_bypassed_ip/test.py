@@ -30,7 +30,9 @@ def run_test(s: TestServer, c: CoreApi):
     # IPs that should be bypassed according to start_config.json
     bypass_ips = [
         {"ip": "93.184.216.34",    "type": "public IPv4"},
-        {"ip": "203.0.113.42",      "type": "CIDR 203.0.113.0/24"},
+        {"ip": "23.45.67.89",      "type": "CIDR 23.45.67.89/24"},
+        {"ip": "::ffff:23.45.67.89",
+            "type": "IPv4-mapped IPv6 address (in 23.45.67.89/24 range)"},
         {"ip": "2606:2800:220:1:248:1893:25c8:1946",      "type": "single IPv6"},
         {"ip": "2001:db8:abcd:12:abcd::1", "type": "CIDR 2001:db8:abcd:0012::/64"},
     ]

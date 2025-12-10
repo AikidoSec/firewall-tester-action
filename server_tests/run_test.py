@@ -231,10 +231,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
                 # Find the last stack trace line from test.py
                 test_stack_line = None
-                for line in reversed(error_lines):
-                    if 'test.py' in line and 'in run_test' in line:
+                for i in range(len(error_lines)):
+                    line = error_lines[i]
+                    if f'{test_dir}/test.py' in line:
                         test_stack_line = line.strip()
-                        break
 
                 if assertion_error and test_stack_line:
                     error_message = f"{test_stack_line}<br>`{assertion_error}`"

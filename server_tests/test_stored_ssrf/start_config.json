@@ -1,4 +1,5 @@
 {
   "block": true,
-  "endpoints": []
+  "endpoints": [],
+  "allowedIPAddresses": ["93.184.216.34"]
 }

@@ -13,7 +13,7 @@ import http.client
 import re
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False):
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET"):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
@@ -22,7 +22,7 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
         try:
             if raw:
                 conn = http.client.HTTPConnection("localhost", port)
-                conn.request("GET", route, headers=headers)
+                conn.request(method, route, headers=headers)
                 r = conn.getresponse()
             else:
                 r = requests.get(
@@ -205,8 +205,8 @@ class TestServer:
     def get(self, route="", headers={}, benchmark=False):
         return localhost_get_request(self.port, route, headers, benchmark)
 
-    def get_raw(self, route="", headers={}, benchmark=False):
-        return localhost_get_request(self.port, route, headers, benchmark, raw=True)
+    def get_raw(self, route="", headers={}, benchmark=False, method="GET"):
+        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method)
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)

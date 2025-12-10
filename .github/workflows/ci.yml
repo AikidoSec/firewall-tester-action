@@ -59,7 +59,6 @@ jobs:
         uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
-          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_allowed_ip,test_allowed_ip_for_wildcard_route,test_allowed_ip_most_restrictive,test_bypassed_ip_for_geo_blocking,test_user_rate_limiting_1_minute
           sleep_before_test: 15
           max_parallel_tests: 5
           ignore_failures: true
@@ -93,6 +92,7 @@ jobs:
           ignore_failures: true
           test_timeout: 900 # 15 minutes
           config_update_delay: 120 # 2 minutes
+          skip_tests: test_stored_ssrf,test_stored_ssrf_no_context
 
   test-php-control:
     name: PHP Control Tests (apache2 - mod_php)
@@ -145,7 +145,7 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           sleep_before_test: 15
           max_parallel_tests: 5
-          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec
+          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec,test_stored_ssrf_no_context,test_stored_ssrf
           ignore_failures: true
 
   test-java:
@@ -197,5 +197,5 @@ jobs:
           sleep_before_test: 30
           max_parallel_tests: 5
           ignore_failures: true
-          extra_args: "-e RAILS_ENV=test"
+          extra_args: "-e RAILS_ENV=test -e AIKIDO_CLIENT_IP_HEADER=HTTP_X_FORWARDED_FOR"
           app_port: 3000

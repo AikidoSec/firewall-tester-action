@@ -10,13 +10,18 @@ Tests the outbound domain blocking feature:
 4. Tests that allowed domains can be accessed when blockNewOutgoingRequests is true
 5. Tests that new/unknown domains are blocked when blockNewOutgoingRequests is true
 6. Tests case-insensitive hostname matching (uppercase and mixed case)
-7. Tests heartbeat events:
+7. Tests Punycode/IDN normalization:
+   - Punycode requests blocked when Unicode domain is in blocklist
+   - Unicode requests blocked when Punycode domain is in blocklist
+   - Allowed IDN domains work with both Unicode and Punycode forms
+   - URL percent-encoding bypass attempts are blocked
+8. Tests heartbeat events:
    - Blocked domains are reported in heartbeat events
    - Bypassed IPs do not report domains in heartbeat events
    - Allowed domains are reported in heartbeat events
-8. Tests that new domains are allowed when blockNewOutgoingRequests is false
-9. Tests that explicitly blocked domains are still blocked when blockNewOutgoingRequests is false
-10. Tests that detection mode (block: false) doesn't block
+9. Tests that new domains are allowed when blockNewOutgoingRequests is false
+10. Tests that explicitly blocked domains are still blocked when blockNewOutgoingRequests is false
+11. Tests that detection mode (block: false) doesn't block
 '''
 
 
@@ -102,6 +107,48 @@ def test_explicitly_blocked_domain(s: TestServer, c: CoreApi):
     assert_response_body_contains(
         response, "blocked an outbound connection")
 
+    """Test Punycode bypass attempts - Unicode domain blocked, Punycode request"""
+    # böse.example.com is blocked in config as Unicode
+    # xn--bse-sna.example.com is the Punycode encoding of "böse.example.com"
+    response = s.post(
+        "/api/request", {"url": "http://xn--bse-sna.example.com"})
+    assert_response_code_is(
+        response, 500, f"{response.text} - Punycode request xn--bse-sna.example.com should be blocked when Unicode domain böse.example.com is in blocklist")
+    assert_response_body_contains(
+        response, "blocked an outbound connection")
+
+    """Test Punycode bypass attempts - Punycode domain blocked, Unicode request"""
+    # xn--mnchen-3ya.example.com is blocked in config as Punycode
+    # münchen.example.com is the Unicode form
+    response = s.post("/api/request", {"url": "http://münchen.example.com"})
+    assert_response_code_is(
+        response, 500, f"{response.text} - Unicode request münchen.example.com should be blocked when Punycode domain xn--mnchen-3ya.example.com is in blocklist")
+    assert_response_body_contains(
+        response, "blocked an outbound connection")
+
+    """Test allowed IDN domains work with both Unicode and Punycode forms"""
+    # münchen-allowed.example.com is allowed in config as Unicode
+    # Should work with Unicode form
+    response = s.post(
+        "/api/request", {"url": "http://münchen-allowed.example.com"})
+    assert_response_code_is(
+        response, 200, f"{response.text} - allowed Unicode domain münchen-allowed.example.com should be accessible")
+
+    # Should also work with Punycode form (xn--mnchen-allowed-gsb.example.com)
+    response = s.post(
+        "/api/request", {"url": "http://xn--mnchen-allowed-gsb.example.com"})
+    assert_response_code_is(
+        response, 200, f"{response.text} - allowed Punycode domain xn--mnchen-allowed-gsb.example.com should be accessible")
+
+    """Test URL percent-encoding bypass attempts"""
+    # böse.example.com is blocked - try with percent-encoded ö (%C3%B6)
+    # b%C3%B6se.example.com should be normalized to böse.example.com
+    response = s.post("/api/request", {"url": "http://b%C3%B6se.example.com"})
+    assert_response_code_is(
+        response, 500, f"{response.text} - percent-encoded hostname b%C3%B6se.example.com should be blocked (normalized to böse.example.com)")
+    assert_response_body_contains(
+        response, "blocked an outbound connection")
+
     c.wait_for_new_events(70, old_events_length=len(
         start_events), filter_type="heartbeat")
 
@@ -164,7 +211,10 @@ if __name__ == "__main__":
         "domain2.example.com",
         "safe.example.com",
         "another-unknown.example.com",
-        "unknown.example.com"
+        "unknown.example.com",
+        "xn--bse-sna.example.com",
+        "xn--mnchen-3ya.example.com",
+        "xn--mnchen-allowed-gsb.example.com"
     ]
     ip = "11.22.33.44"
     try:

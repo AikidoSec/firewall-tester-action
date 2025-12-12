@@ -3,20 +3,18 @@ from testlib import *
 from core_api import CoreApi
 
 '''
-Bypassed IPs allow certain IP addresses to bypass most Zen security features and protections.
+Bypassed IPs allow certain IP addresses to bypass all Zen security features and protections.
 
 This test verifies that:
 1. Requests from bypassed IPs bypass rate limiting (multiple requests from same IP are not rate limited).
 2. Requests from bypassed IPs bypass attack detection (path traversal, SQL injection, shell injection attacks are not blocked).
 3. Requests from bypassed IPs bypass bot blocking (requests with blocked user agents are not blocked).
 4. Requests from bypassed IPs bypass geo blocking (requests from blocked IP ranges are not blocked).
-5. Requests from bypassed IPs do not generate API spec discovery data (routes are not included in heartbeat events).
-6. Requests from bypassed IPs do not count towards attack statistics (attacksDetected and rateLimited remain 0).
-7. Bypassed IPs work for single IPv4 addresses, IPv4 CIDR ranges, single IPv6 addresses, and IPv6 CIDR ranges.
-
-This test also verifies that bypassed IPs do NOT bypass:
-- Route-level Admin IP restrictions (endpoint-level `allowedIPAddresses` when a specific allowlist is configured).
-- Blocked user IDs (blockedUserIds).
+5. Requests from bypassed IPs bypass route-level Admin IP restrictions (endpoint-level `allowedIPAddresses` when a specific allowlist is configured).
+6. Requests from bypassed IPs bypass blocked user IDs (blockedUserIds).
+7. Requests from bypassed IPs do not generate API spec discovery data (routes are not included in heartbeat events).
+8. Requests from bypassed IPs do not count towards attack statistics (attacksDetected and rateLimited remain 0).
+9. Bypassed IPs work for single IPv4 addresses, IPv4 CIDR ranges, single IPv6 addresses, and IPv6 CIDR ranges.
 '''
 
 
@@ -45,18 +43,6 @@ def run_test(s: TestServer, c: CoreApi):
 
     # Baseline events before sending any traffic for this test
     start_heartbeat_events = c.get_events("heartbeat")
-
-    # Bypassed IPs should not bypass route-level Admin IP restrictions (endpoint-level `allowedIPAddresses`).
-    response = s.get("/test_ratelimiting_1",
-                     headers={"X-Forwarded-For": "93.184.216.34"})
-    assert_response_code_is(
-        response, 403, f"Bypassed IPs should not bypass route-level Admin IP restrictions (endpoint-level `allowedIPAddresses`).")
-
-    # Bypassed IPs should not bypass blocked user ids
-    response = s.get(
-        "/api/pets/", headers={"X-Forwarded-For": "93.184.216.34", "user": "789"})
-    assert_response_code_is(
-        response, 403, f"Bypassed IPs should not bypass blocked user ids (blockedUserIds)")
 
     # Send multiple requests from each bypass IP and ensure they are never blocked
     for ip in bypass_ips:
@@ -102,6 +88,20 @@ def run_test(s: TestServer, c: CoreApi):
             "/api/pets/", headers={"X-Forwarded-For": ip["ip"]})
         assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking: {response.text}")
+
+        # 6. route-level Admin IP restrictions should be bypassed (endpoint-level `allowedIPAddresses`)
+        # The /test_ratelimiting_1 endpoint has allowedIPAddresses: ["185.245.255.212"], but bypassed IPs should still access it
+        response = s.get(
+            "/test_ratelimiting_1", headers={"X-Forwarded-For": ip["ip"]})
+        assert_response_code_is(
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass route-level Admin IP restrictions: {response.text}")
+
+        # # 7. blocked user IDs should be bypassed (blockedUserIds)
+        # User "789" is in blockedUserIds, but requests from bypassed IPs should still work
+        response = s.get(
+            "/api/pets/", headers={"X-Forwarded-For": ip["ip"], "user": "789"})
+        assert_response_code_is(
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs: {response.text}")
 
     # Wait a bit to give the agent time to potentially send heartbeat / stats
     c.wait_for_new_events(

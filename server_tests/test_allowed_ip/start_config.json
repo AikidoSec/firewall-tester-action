@@ -5,7 +5,13 @@
       "route": "/api/pets",
       "forceProtectionOff": false,
       "graphql": null,
-      "allowedIPAddresses": ["185.245.255.212"],
+      "allowedIPAddresses": [
+        "185.245.255.212",
+        "185.245.255.0/24",
+        "::ffff:185.245.255.212",
+        "2606:2800:220:1:248:1893:25c8:1946",
+        "2001:0db9:abcd:1234::/64"
+      ],
       "rateLimiting": {
         "enabled": false,
         "maxRequests": 100,

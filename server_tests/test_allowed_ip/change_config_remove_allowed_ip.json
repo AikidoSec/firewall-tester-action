@@ -2,7 +2,7 @@
   "endpoints": [
     {
       "method": "GET",
-      "route": "/test",
+      "route": "/api/pets",
       "forceProtectionOff": false,
       "graphql": null,
       "allowedIPAddresses": [],

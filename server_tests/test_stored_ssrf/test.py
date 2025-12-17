@@ -74,6 +74,13 @@ def check_ssrf_with_event(response_code, expected_json, num_events: int = 1):
         assert_event_contains_subset_file(new_events[0], expected_json)
 
 
+def check_ssrf_bypassed_ip(ip: str):
+    response = s.post("/api/stored_ssrf", timeout=10,
+                      headers={"X-Forwarded-For": ip})
+    assert_response_code_is(
+        response, 200, f"[{response.text}] Bypassed IP {ip} should not be blocked")
+
+
 def check_stored_ssrf(ip: str):
     response = s.post("/api/stored_ssrf", timeout=10)
     assert_response_code_is(
@@ -88,6 +95,9 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
                   "evil-stored-ssrf-hostname")
 
     check_ssrf_with_event(500, "expect_detection_blocked.json")
+
+    # test with allowedIPAddresses, should not be blocked
+    check_ssrf_bypassed_ip("93.184.216.34")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_ssrf_with_event(

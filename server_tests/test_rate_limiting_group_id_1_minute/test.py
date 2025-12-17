@@ -7,7 +7,7 @@ import os
 
 
 '''
-Test for rate limiting group id 
+Test for rate limiting group id
 '''
 
 
@@ -75,6 +75,14 @@ def run_test(s: TestServer, c: CoreApi):
             "/test_ratelimiting_1", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
         assert_response_code_is(
             response, 200, "Expected 200 for /test_ratelimiting_1")
+
+    methods = ["get", "GeT", "GET", "GET"]
+    for method in methods:
+        response = s.get_raw(
+            "/test_ratelimiting_1", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie}, method=method)
+        assert_response_code_is_not(
+            response, 200, f"Rate limiting bypass for using method \"{method}\""
+        )
 
     tests = [
         "/test_ratelimiting_1", "/test_ratelimiting_1/", "/test__ratelimiting_1", "//test_ratelimiting_1",

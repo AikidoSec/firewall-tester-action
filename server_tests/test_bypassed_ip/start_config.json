@@ -1,0 +1,52 @@
+{
+  "block": true,
+  "success": true,
+  "heartbeatIntervalInMS": 600000,
+  "endpoints": [
+    {
+      "method": "GET",
+      "route": "/test_ratelimiting_1",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": ["185.245.255.212"],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
+        "windowSizeInMS": 60000
+      }
+    },
+    {
+      "method": "POST",
+      "route": "/api/create",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": true,
+        "maxRequests": 1,
+        "windowSizeInMS": 60000
+      }
+    },
+    {
+      "method": "GET",
+      "route": "/api/pets",
+      "forceProtectionOff": false,
+      "graphql": null,
+      "allowedIPAddresses": [],
+      "rateLimiting": {
+        "enabled": false,
+        "maxRequests": 100,
+        "windowSizeInMS": 60000
+      }
+    }
+  ],
+  "blockedUserIds": ["789"],
+  "allowedIPAddresses": [
+    "93.184.216.34",
+    "23.45.67.89/24",
+    "2606:2800:220:1:248:1893:25c8:1946",
+    "2001:0db9:abcd:1234::/64"
+  ],
+  "receivedAnyStats": false,
+  "blockedIPAddresses": []
+}

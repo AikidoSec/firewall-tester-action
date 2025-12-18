@@ -9,6 +9,11 @@ Stored SSRF Attack Detection Test
 
 This test verifies that the firewall can detect and block stored SSRF attacks targeting IMDS endpoints.
 
+Stored SSRF attacks happen when an attacker can alter how hostnames are resolved by
+e.g. having inserted an entry in /etc/hosts, or having spoofed the DNS.
+If the hostname is a trusted host (like metadata.goog), there was no spoofing of hostnames, 
+so it's not a stored SSRF attack.
+
 Test Steps:
 1. Save original /etc/hosts file from target container
 2. Start mock IMDS server that adds multiple IP addresses (169.254.169.254, 100.100.100.200, fd00:ec2::254) to the lo interface
@@ -32,6 +37,10 @@ Test Steps:
 def save_etc_hosts(target_container_name: str):
     subprocess.run(
         f"docker exec  -u 0 {target_container_name} sh -c 'cp /etc/hosts /tmp/hosts.original'", shell=True)
+    subprocess.run(
+        f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.google.internal >> /tmp/hosts.original'", shell=True)
+    subprocess.run(
+        f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.goog >> /tmp/hosts.original'", shell=True)
     time.sleep(1)
 
 
@@ -89,6 +98,14 @@ def check_stored_ssrf(ip: str):
         response, "blocked", f"evil-stored-ssrf-hostname -> {ip} [{response.text}]")
 
 
+def check_stored_ssrf_with_url(domain: str, url: int):
+    response = s.post("/api/stored_ssrf", {"urlIndex": url})
+    assert_response_code_is(
+        response, 200, f"IP addresses for Google Cloud Metadata Service should be allowed: {domain} -> {url} [{response.text}]")
+    assert_response_body_contains(
+        response, "Success", f"IP addresses for Google Cloud Metadata Service  direct IMDS IP access should be allowed: {domain} -> 169.254.169.254 [{response.text}]")
+
+
 def run_test(s: TestServer, c: CoreApi, target_container_name: str):
     save_etc_hosts(target_container_name)
     set_etc_hosts(target_container_name, "169.254.169.254",
@@ -127,6 +144,15 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
     for ip in IDMS_IPS_V4 + IDMS_IPS_V6:
         set_etc_hosts(target_container_name, ip, "evil-stored-ssrf-hostname")
         check_stored_ssrf(ip)
+
+    # metadata.google.internal (url=1) is a trusted host, should not be blocked
+    check_stored_ssrf_with_url("metadata.google.internal", 1)
+
+    # metadata.goog (url=2) is a trusted host, should not be blocked
+    check_stored_ssrf_with_url("metadata.goog", 2)
+
+    # 169.254.169.254 (url=3) is an IP, not a hostname resolution spoofing case, should not be blocked
+    check_stored_ssrf_with_url("169.254.169.254", 3)
 
 
 if __name__ == "__main__":

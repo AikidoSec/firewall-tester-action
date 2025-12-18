@@ -31,16 +31,11 @@ export function updateListsHandler(req: RequestWithAppData, res: Response) {
   }
 
   if (
-    !req.body.blockedIPAddresses ||
-    !Array.isArray(req.body.blockedIPAddresses)
+    req.body.blockedIPAddresses &&
+    Array.isArray(req.body.blockedIPAddresses)
   ) {
-    res.status(400).json({
-      message: 'blockedIPAddresses is missing or invalid'
-    })
-    return
+    updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses)
   }
-
-  updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses)
 
   if (
     req.body.blockedUserAgents &&

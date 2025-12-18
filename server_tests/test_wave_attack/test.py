@@ -188,19 +188,24 @@ def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
         new_events) == 0, f"Expected 0 events, got {len(new_events)} (ip: {ip})"
 
 
-def check_wave_attack_with_same_ip_sliding_window(ip, user_id):
+def check_wave_attack_with_same_ip_sliding_window_and_LRU(ip, user_id):
     start_events = c.get_events("detected_attack_wave")
-    for _ in range(15):
-        time.sleep(10)
+    for _ in range(14):
+        time.sleep(1)
         method, path = get_random_path_filename()
         _ = s.request(method, path,
                       headers={"X-Forwarded-For": ip, "user": user_id})
+    time.sleep(60)
+    # send 1 more request
+    method, path = get_random_path_filename()
+    _ = s.request(method, path,
+                  headers={"X-Forwarded-For": ip, "user": user_id})
     c.wait_for_new_events(10, old_events_length=len(
         start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
     assert len(
-        new_events) == 0, f"Test sent 15 suspicious requests with 10 seconds sleep between each request (same IP). Expected 0 attack wave events, but got {len(new_events)} event(s)"
+        new_events) == 0, f"Test sent 14 suspicious requests with 1 second sleep between each request (same IP) and 1 more request after 60 seconds. Expected 0 attack wave events, but got {len(new_events)} event(s)"
 
 
 def check_wave_attack_with_bypass_ip(ip, user_id):
@@ -234,7 +239,7 @@ def run_test(s: TestServer, c: CoreApi):
         get_random_path_extension, "2.16.53.7", "1236")
     check_wave_attack_with_same_ip(get_random_path_query, "2.16.53.8", "1237")
 
-    check_wave_attack_with_same_ip_sliding_window("2.16.53.9", "1238")
+    check_wave_attack_with_same_ip_sliding_window_and_LRU("2.16.53.9", "1238")
     check_wave_attack_with_bypass_ip("2.16.53.10", "1239")
 
 

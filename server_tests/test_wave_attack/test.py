@@ -188,7 +188,7 @@ def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
         new_events) == 0, f"Expected 0 events, got {len(new_events)} (ip: {ip})"
 
 
-def check_wave_attack_with_same_ip_sliding_window(ip, user_id):
+def check_wave_attack_with_same_ip_sliding_window_and_LRU(ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for _ in range(14):
         time.sleep(1)
@@ -239,7 +239,7 @@ def run_test(s: TestServer, c: CoreApi):
         get_random_path_extension, "2.16.53.7", "1236")
     check_wave_attack_with_same_ip(get_random_path_query, "2.16.53.8", "1237")
 
-    check_wave_attack_with_same_ip_sliding_window("2.16.53.9", "1238")
+    check_wave_attack_with_same_ip_sliding_window_and_LRU("2.16.53.9", "1238")
     check_wave_attack_with_bypass_ip("2.16.53.10", "1239")
 
 

@@ -45,6 +45,16 @@ jobs:
         id: build
         run: npm run bundle
 
+      # Ensure dist/index.js ends with a newline to match git expectations
+      - name: Normalize dist/index.js
+        id: normalize
+        run: |
+          if [ -f dist/index.js ]; then
+            # Remove all trailing newlines, then add exactly one newline
+            # This ensures the file ends with exactly one newline to match git expectations
+            python3 -c "import sys; data = open('dist/index.js', 'rb').read(); data = data.rstrip(b'\n') + b'\n'; open('dist/index.js', 'wb').write(data)"
+          fi
+
       # This will fail the workflow if the `dist/` directory is different than
       # expected.
       - name: Compare Directories

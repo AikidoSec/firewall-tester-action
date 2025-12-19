@@ -51,13 +51,25 @@ jobs:
         run: |
           # Normalize all files in dist/ to end with exactly one newline
           if [ -d dist/ ]; then
+            echo "Normalizing files in dist/ directory..."
+            file_count=0
             find dist/ -type f \( -name "*.js" -o -name "*.map" \) -print0 | while IFS= read -r -d '' file; do
-              python3 -c "import sys; f=sys.argv[1]; d=open(f,'rb').read(); open(f,'wb').write(d.rstrip(b'\n')+b'\n')" "$file"
+              echo "Normalizing: $file"
+              if python3 -c "import sys; f=sys.argv[1]; d=open(f,'rb').read(); open(f,'wb').write(d.rstrip(b'\n')+b'\n')" "$file"; then
+                file_count=$((file_count + 1))
+                echo "  ✓ Successfully normalized $file"
+              else
+                echo "  ✗ Failed to normalize $file"
+                exit 1
+              fi
             done
+            echo "Normalization complete. Processed $file_count file(s)."
+          else
+            echo "Warning: dist/ directory does not exist"
           fi
 
       # This will fail the workflow if the `dist/` directory is different than
-      # expected.
+      # expected (ignoring trailing newline differences).
       - name: Compare Directories
         id: diff
         run: |
@@ -66,11 +78,55 @@ jobs:
             ls -la ./
             exit 1
           fi
-          if [ "$(git diff --ignore-space-at-eol --text dist/ | wc -l)" -gt "0" ]; then
-            echo "Detected uncommitted changes after build. See status below:"
-            git diff --ignore-space-at-eol --text dist/
-            exit 1
-          fi
+          # Compare files while ignoring trailing newline differences
+          python3 << 'EOF'
+          import os
+          import subprocess
+          import sys
+
+          def normalize_content(data):
+              """Normalize content by removing trailing newlines and adding exactly one."""
+              return data.rstrip(b'\n') + b'\n'
+
+          def compare_files(file1, file2):
+              """Compare two files ignoring trailing newline differences."""
+              try:
+                  with open(file1, 'rb') as f:
+                      content1 = normalize_content(f.read())
+                  with open(file2, 'rb') as f:
+                      content2 = normalize_content(f.read())
+                  return content1 == content2
+              except FileNotFoundError:
+                  return False
+
+          # Get list of files in dist/
+          dist_files = []
+          for root, dirs, files in os.walk('dist'):
+              for file in files:
+                  if file.endswith(('.js', '.map')):
+                      dist_files.append(os.path.join(root, file))
+
+          differences = []
+          for dist_file in dist_files:
+              # Get the corresponding file from git
+              git_file = dist_file
+              if not os.path.exists(git_file):
+                  differences.append(f"New file: {dist_file}")
+                  continue
+              
+              if not compare_files(dist_file, git_file):
+                  differences.append(dist_file)
+
+          if differences:
+              print("Detected differences after normalization:")
+              for diff in differences:
+                  print(f"  - {diff}")
+              print("\nFull git diff:")
+              subprocess.run(['git', 'diff', '--ignore-space-at-eol', '--text', 'dist/'])
+              sys.exit(1)
+          else:
+              print("✓ dist/ directory matches expected output (after normalization)")
+          EOF
 
       # If `dist/` was different than expected, upload the expected version as a
       # workflow artifact.

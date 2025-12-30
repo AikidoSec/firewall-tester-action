@@ -101,9 +101,9 @@ def check_stored_ssrf(ip: str):
 def check_stored_ssrf_with_url(domain: str, url: int):
     response = s.post("/api/stored_ssrf", {"urlIndex": url})
     assert_response_code_is(
-        response, 200, f"IP addresses for Google Cloud Metadata Service should be allowed: {domain} -> {url} [{response.text}]")
+        response, 200, f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} ->  169.254.169.254 [{response.text}]")
     assert_response_body_contains(
-        response, "Success", f"IP addresses for Google Cloud Metadata Service  direct IMDS IP access should be allowed: {domain} -> 169.254.169.254 [{response.text}]")
+        response, "Success", f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} -> 169.254.169.254 [{response.text}]")
 
 
 def run_test(s: TestServer, c: CoreApi, target_container_name: str):

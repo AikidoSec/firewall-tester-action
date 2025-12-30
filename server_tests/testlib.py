@@ -320,6 +320,13 @@ def assert_response_body_contains(response, text, message=None):
         assert text in response.text, f"Test '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
 
 
+def assert_response_body_does_not_contain(response, text, message=None):
+    if message is None:
+        assert text not in response.text, f"Test '{text}' is part of response body: {response.text}"
+    else:
+        assert text not in response.text, f"Test '{text}' is part of response body: {json.dumps(response.text)}. Message: {message}"
+
+
 def assert_events_length_is(events, length):
     assert isinstance(events, list), "Error: Events is not a list."
     assert len(

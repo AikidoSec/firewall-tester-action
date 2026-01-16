@@ -2,7 +2,7 @@
   "type": "detected_attack",
   "request": {
     "method": "GET",
-    "route": "/api/read",
+    "route": "REGEX:^/api/read(\\(\\.:format\\))?$",
     "url": "REGEX:^https?://localhost:\\d+/api/read\\?path=\\.\\./secrets/key\\.txt$"
   },
   "attack": {

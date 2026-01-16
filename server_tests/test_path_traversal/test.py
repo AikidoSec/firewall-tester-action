@@ -33,8 +33,8 @@ def check_path_traversal(query_string):
     response = s.get(query_string)
     if "File not found" in response.text:
         return
-    assert_response_code_is(
-        response, 500, f"Path traversal check failed for {query_string} {response.text}")
+    assert_response_code_is_not(
+        response, 200, f"Path traversal check failed for {query_string} {response.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):

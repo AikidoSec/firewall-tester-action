@@ -218,6 +218,14 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 timeout=test_timeout
             )
 
+            # Log test output
+            if process.stdout:
+                logger.debug(
+                    f"{'-'*20}[{test_dir} :stdout] {'-'*20}:\n{process.stdout} \n{'-'*50}")
+            if process.stderr:
+                logger.debug(
+                    f"{'-'*30}[{test_dir} :stderr] {'-'*30}:\n{process.stderr} \n{'-'*100}")
+
             if process.returncode != 0:
                 # Extract the actual assertion error and stack trace from the output
                 error_lines = process.stderr.split('\n')

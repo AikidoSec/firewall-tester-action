@@ -11,6 +11,7 @@ from core_api import CoreApi
 
 
 def run_test(s: TestServer, c: CoreApi):
+    time.sleep(30)
     response = s.post("/api/execute", {"userCommand": "whoami"})
     assert_response_code_is(response, 500, response.text)
 

@@ -197,7 +197,11 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 4. Cold turkey :
         # Cold turkey for python
         if not control_port:
-            requests.get(f"http://localhost:{start_port}/")
+            try:
+                requests.get(f"http://localhost:{start_port}/")
+            except Exception as e:
+                logger.error(
+                    f"Error getting server: {e} \n{traceback.format_exc()}")
             time.sleep(1)
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))

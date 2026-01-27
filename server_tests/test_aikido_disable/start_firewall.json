@@ -1,0 +1,25 @@
+{
+  "success": true,
+  "configUpdatedAt": 0,
+  "blockedIPAddresses": [
+    {
+      "source": "geoip",
+      "description": "Russia",
+      "ips": ["37.0.0.0/8", "46.0.0.0/8"]
+    }
+  ],
+  "allowedIPAddresses": [
+    {
+      "source": "geoip",
+      "description": "Belgium",
+      "ips": ["2.16.0.0/13"]
+    }
+  ],
+  "blockedUserAgents": [
+    {
+      "pattern": "Googlebot",
+      "description": "Block Googlebot"
+    }
+  ]
+}
+

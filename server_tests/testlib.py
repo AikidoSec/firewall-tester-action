@@ -353,6 +353,78 @@ def assert_event_contains_subset_file(event, event_subset_file):
     assert_event_contains_subset(event, event_subset)
 
 
+class AssertionCollector:
+    """
+    Collects assertion failures to report all at once instead of failing on the first one.
+    Use soft_assert() for independent checks that should all be evaluated.
+    For prerequisite checks (where subsequent code depends on the result),
+    use soft_assert() + early return pattern:
+        if not collector.soft_assert(condition, msg):
+            return  # dependent code can't run
+    Call raise_if_failures() at the end to report all collected failures.
+    """
+
+    FAILURE_MARKER = "[FAIL]"
+
+    def __init__(self):
+        self.failures = []
+
+    def soft_assert(self, condition, message="Assertion failed"):
+        """Record failure but continue execution. Returns True if passed, False if failed."""
+        if not condition:
+            self.failures.append(message)
+            return False
+        return True
+
+    def add_failure(self, message):
+        """Directly add a failure message to the collector."""
+        self.failures.append(message)
+
+    def soft_assert_response_code_is(self, response, status_code, message=None):
+        actual = get_response_status_code(response)
+        msg = f"Expected status {status_code}, got {actual}"
+        if message:
+            msg += f" - {message}"
+        return self.soft_assert(actual == status_code, msg)
+
+    def soft_assert_response_code_is_not(self, response, status_code, message=None):
+        actual = get_response_status_code(response)
+        msg = f"Status code should not be {status_code}, got {actual}"
+        if message:
+            msg += f" - {message}"
+        return self.soft_assert(actual != status_code, msg)
+
+    def soft_assert_response_body_contains(self, response, text, message=None):
+        if message is None:
+            msg = f"Text '{text}' is not part of response body: {response.text}"
+        else:
+            msg = f"Text '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
+        return self.soft_assert(text in response.text, msg)
+
+    def soft_assert_response_body_does_not_contain(self, response, text, message=None):
+        if message is None:
+            msg = f"Text '{text}' is part of response body: {response.text}"
+        else:
+            msg = f"Text '{text}' is part of response body: {json.dumps(response.text)}. Message: {message}"
+        return self.soft_assert(text not in response.text, msg)
+
+    @property
+    def has_failures(self):
+        return len(self.failures) > 0
+
+    @property
+    def failure_count(self):
+        return len(self.failures)
+
+    def raise_if_failures(self):
+        """Raise combined AssertionError with all collected failures."""
+        if self.failures:
+            lines = [f"{len(self.failures)} assertion(s) failed:"]
+            for i, failure in enumerate(self.failures, 1):
+                lines.append(f"{self.FAILURE_MARKER} {failure}")
+            raise AssertionError("\n".join(lines))
+
+
 def assert_line_contains_sensitive_data(line, line_number):
     patterns = {
         "SQL Query": r"select .* from|insert .* into",

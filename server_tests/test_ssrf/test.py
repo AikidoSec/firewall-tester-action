@@ -70,11 +70,11 @@ def generate_combinations(ip_str):
     return all_results
 
 
-def check_ssrf_with_event(response_code, expected_json):
+def check_ssrf_with_event(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/request", {"url": "http://127.0.0.1:4000"}, timeout=10)
-    assert_response_code_is(response, response_code)
+    collector.soft_assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -82,27 +82,33 @@ def check_ssrf_with_event(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, 1)
+    # Prerequisite: need at least 1 event to check its contents
+    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
+        return
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def check_ssrf(route, ip):
+def check_ssrf(collector, s, route, ip):
     response = s.post(route, {"url": ip}, timeout=10)
     if len(response.text) == 0:
         return
-    assert_response_code_is_not(
+    collector.soft_assert_response_code_is_not(
         response, 200, f"[{route}] SSRF check failed for {ip} {response.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
 
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500,
+                          "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_ssrf_with_event(200, "expect_detection_not_blocked.json")
+    check_ssrf_with_event(collector, s, c, 200,
+                          "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500,
+                          "expect_detection_blocked.json")
 
     ips = [
         #     This is not a domain, but it will return 500
@@ -192,8 +198,10 @@ def run_test(s: TestServer, c: CoreApi):
         ips.append(f"http://127.0.0.1:4000" + chr(i) + "/")
 
     for ip in ips:
-        check_ssrf("/api/request", ip)
-        check_ssrf("/api/request2", ip)
+        check_ssrf(collector, s, "/api/request", ip)
+        check_ssrf(collector, s, "/api/request2", ip)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

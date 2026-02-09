@@ -15,10 +15,12 @@ import os
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     for _ in range(5):
         response = s.get(
             "/",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
 
     # sleep for 10 seconds
     time.sleep(10)
@@ -29,18 +31,19 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(response, 429)
 
     for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
 
     # check that the rate limiting is working
     for i in range(10):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
+        collector.soft_assert_response_code_is(
+            response, 429, "Expected 429 for /api/pets/")
 
     tests = [
         "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
@@ -63,13 +66,13 @@ def run_test(s: TestServer, c: CoreApi):
     for test in tests:
         response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
 
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
 
     for i in range(10):
         response = s.get_raw(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, "Expected 200 for /test_ratelimiting_1")
 
     tests = [
@@ -91,22 +94,24 @@ def run_test(s: TestServer, c: CoreApi):
 
     for test in tests:
         response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
 
     # Headers: X-Http-Method-Override, X-HTTP-Method-Override, X-Http-Method, X-HTTP-Method, X-Method-Override
     for header in ["X-Http-Method-Override", "X-HTTP-Method-Override", "X-Http-Method", "X-HTTP-Method", "X-Method-Override"]:
         response = s.post("/test_ratelimiting_1",
                           headers={header: "GET", "X-Forwarded-For": "2.16.53.5"}, data="")
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f" Rate limiting bypass for {header}")
 
     # Parameters in the URL: _method, method, httpMethod, _HttpMethod
     for param in ["_method", "method", "httpMethod", "_HttpMethod"]:
         response = s.post(f"/test_ratelimiting_1?{param}=GET",
                           headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f" Rate limiting bypass for {param}")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

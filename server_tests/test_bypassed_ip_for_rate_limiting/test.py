@@ -14,10 +14,12 @@ import os
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     for _ in range(100):
         response = s.get(
             "/api/pets/",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, "Failed for header X-Forwarded-For: 2.16.53.5")
 
     c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
@@ -26,16 +28,18 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
         if i < 10:
-            assert_response_code_is(response, 200)
+            collector.soft_assert_response_code_is(response, 200)
         else:
-            assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(response, 429)
 
     c.update_runtime_config_file("start_config.json")
 
     for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

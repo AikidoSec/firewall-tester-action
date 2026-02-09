@@ -14,6 +14,8 @@ Steps:
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     # Baseline: start_config.json applied by runner
     non_allowed_ip = "1.3.3.7"
     ipv4_single = "185.245.255.212"
@@ -24,26 +26,30 @@ def run_test(s: TestServer, c: CoreApi):
 
     # 1) With allowlist: non-allowed blocked
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    assert_response_body_contains(response, "not allowed")
-    assert_response_code_is(response, 403)
+    collector.soft_assert_response_body_contains(response, "not allowed")
+    collector.soft_assert_response_code_is(response, 403)
 
     # 1a) allowed entries are permitted
     for allowed_ip in [ipv4_single, ipv4_cidr_member, ipv4_mapped, ipv6_single, ipv6_cidr_member]:
         resp = s.get("/api/pets/", headers={"X-Forwarded-For": allowed_ip})
-        assert_response_code_is(resp, 200)
-        assert isinstance(resp.json(), list)
+        collector.soft_assert_response_code_is(resp, 200)
+        if resp.status_code == 200:
+            collector.soft_assert(isinstance(resp.json(), list), f"Response body should be a list for allowed IP {allowed_ip}")
 
     # 2) Remove allowlist: previously blocked IP should pass
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    assert_response_code_is(response, 200)
-    assert isinstance(response.json(), list)
+    collector.soft_assert_response_code_is(response, 200)
+    if response.status_code == 200:
+        collector.soft_assert(isinstance(response.json(), list), "Response body should be a list after removing allowlist")
 
     # 3) Restore allowlist: non-allowed blocked again
     c.update_runtime_config_file("start_config.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    assert_response_code_is(response, 403)
-    assert_response_body_contains(response, "not allowed")
+    collector.soft_assert_response_code_is(response, 403)
+    collector.soft_assert_response_body_contains(response, "not allowed")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

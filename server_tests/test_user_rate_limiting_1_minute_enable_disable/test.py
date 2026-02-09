@@ -31,10 +31,12 @@ def get_random():
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     for i in range(5):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429, response.text)
 
     # sleep for 10 seconds
     time.sleep(5)
@@ -42,22 +44,22 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 429, response.text)
+        collector.soft_assert_response_code_is(response, 429, response.text)
 
     for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429, response.text)
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    assert_response_code_is(response, 429, response.text)
+    collector.soft_assert_response_code_is(response, 429, response.text)
 
     c.update_runtime_config_file("disable_rate_limit.json")
 
     for i in range(20):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429, response.text)
 
     # enable rate limiting and update max requests to 10 (reset counter)
     c.update_runtime_config_file("enable_rate_limit.json")
@@ -65,13 +67,15 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429, response.text)
 
     time.sleep(5)
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        assert_response_code_is(response, 429, response.text)
+        collector.soft_assert_response_code_is(response, 429, response.text)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

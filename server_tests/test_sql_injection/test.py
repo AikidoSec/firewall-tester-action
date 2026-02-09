@@ -15,11 +15,11 @@ import os
 '''
 
 
-def check_sql_injection(response_code, response_body, event_id, expected_json):
+def check_sql_injection(collector, s, c, response_code, response_body, event_id, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_body_contains(response, response_body)
+    collector.soft_assert_response_body_contains(response, response_body)
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -27,11 +27,13 @@ def check_sql_injection(response_code, response_body, event_id, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, 1)
+    # Prerequisite: need at least 1 event to check its contents
+    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
+        return
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def check_sql_injection_payload(payload):
+def check_sql_injection_payload(collector, s, payload):
     response = s.post(
         "/api/create", payload)
     if response.status_code == 200:
@@ -41,26 +43,32 @@ def check_sql_injection_payload(payload):
         # all the pets must be in Aikido Security
         in_aikido_security = all(
             pet["owner"] == "Aikido Security" for pet in pets_json)
-        assert in_aikido_security, "All pets must be in Aikido Security, payload: " + \
-            str(payload)
+        collector.soft_assert(in_aikido_security, "All pets must be in Aikido Security, payload: " +
+                              str(payload))
     else:
-        assert_response_code_is(response, 500, "Payload: " + str(payload))
+        collector.soft_assert_response_code_is(
+            response, 500, "Payload: " + str(payload))
 
 
-def check_sql_injection_select(payload):
+def check_sql_injection_select(collector, s, payload):
     response = s.get(f"/api/pets/{payload}")
-    assert_response_code_is_not(response, 200, "Payload: " + payload)
+    collector.soft_assert_response_code_is_not(
+        response, 200, "Payload: " + payload)
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_sql_injection(500, "", 1, "expect_detection_blocked.json")
+    collector = AssertionCollector()
+
+    check_sql_injection(collector, s, c, 500, "", 1,
+                        "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_sql_injection(200, "", 2,
+    check_sql_injection(collector, s, c, 200, "", 2,
                         "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_sql_injection(500, "", 3, "expect_detection_blocked.json")
+    check_sql_injection(collector, s, c, 500, "", 3,
+                        "expect_detection_blocked.json")
     s.get("/clear")
     payloads = [
         "Malicious Pet', 'Gru from the Minions') --",
@@ -86,7 +94,7 @@ def run_test(s: TestServer, c: CoreApi):
         payload = {
             "name": payload
         }
-        check_sql_injection_payload(payload)
+        check_sql_injection_payload(collector, s, payload)
 
     # parameter pollution
     json_payloads = [
@@ -158,7 +166,9 @@ def run_test(s: TestServer, c: CoreApi):
     ]
 
     for payload in json_payloads:
-        check_sql_injection_payload(payload)
+        check_sql_injection_payload(collector, s, payload)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

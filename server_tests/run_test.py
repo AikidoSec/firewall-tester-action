@@ -69,6 +69,7 @@ class TestResult:
     status: TestStatus = TestStatus.FAILED
     error_message: Optional[str] = None
     duration: Optional[float] = None
+    failed_assertions: Optional[List[str]] = None
 
     def complete(self, status: TestStatus, error_message: Optional[str] = None):
         self.end_time = datetime.now()
@@ -234,12 +235,29 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                 # Extract the actual assertion error and stack trace from the output
                 error_lines = process.stderr.split('\n')
 
-                # Find the full assertion error message
-                assertion_error = None
+                # Extract individual [FAIL] markers for soft assertion failures
+                failed_assertions = []
                 for line in error_lines:
+                    stripped = line.strip()
+                    if stripped.startswith("[FAIL]"):
+                        failed_assertions.append(stripped[len("[FAIL] "):])
+                result.failed_assertions = failed_assertions if failed_assertions else None
+
+                # Find the full assertion error message (may be multi-line for soft assertions)
+                assertion_error = None
+                assertion_start_idx = None
+                for i, line in enumerate(error_lines):
                     if 'AssertionError:' in line:
-                        assertion_error = line.strip()
+                        assertion_start_idx = i
                         break
+
+                if assertion_start_idx is not None:
+                    assertion_lines = []
+                    for i in range(assertion_start_idx, len(error_lines)):
+                        stripped = error_lines[i].strip()
+                        if stripped:
+                            assertion_lines.append(stripped)
+                    assertion_error = "\n".join(assertion_lines)
 
                 # Find the last stack trace line from test.py
                 test_stack_line = None
@@ -249,7 +267,15 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         test_stack_line = line.strip()
 
                 if assertion_error and test_stack_line:
-                    error_message = f"{test_stack_line}<br>`{assertion_error}`"
+                    if failed_assertions:
+                        error_message = (
+                            f"{len(failed_assertions)} assertion(s) failed<br>"
+                            + "<br>".join(
+                                f"`{fa}`" for fa in failed_assertions
+                            )
+                        )
+                    else:
+                        error_message = f"{test_stack_line}<br>`{assertion_error}`"
                     raise Exception(error_message)
                 else:
                     raise Exception(
@@ -359,11 +385,30 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
             }
             status = status_emoji[result.status]
             duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
-            error = result.error_message if result.error_message else "-"
+            if result.failed_assertions:
+                error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
+            elif result.error_message:
+                error = result.error_message
+            else:
+                error = "-"
             # Escape pipe characters in error messages to prevent table formatting issues
             error = error.replace("|", "\\|")
             f.write(
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
+
+        # Write detailed failure information for tests with multiple assertion failures
+        failed_with_details = [
+            r for r in test_results if r.failed_assertions]
+        if failed_with_details:
+            f.write("\n### Failed Assertions Details\n\n")
+            for result in failed_with_details:
+                f.write(f"<details>\n")
+                f.write(
+                    f"<summary>{result.test_dir} - {len(result.failed_assertions)} failed assertion(s)</summary>\n\n")
+                for i, assertion in enumerate(result.failed_assertions, 1):
+                    escaped = assertion.replace("|", "\\|")
+                    f.write(f"{i}. `{escaped}`\n")
+                f.write(f"\n</details>\n\n")
 
 
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):

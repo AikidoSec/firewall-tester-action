@@ -128,7 +128,7 @@ def get_random_path_query():
     return "GET", f"/api/pets/?path={get_query()}"
 
 
-def check_wave_attack(get_method_path, ip, user_id, len_samples):
+def check_wave_attack(collector, get_method_path, ip, user_id, len_samples):
     start_events = c.get_events("detected_attack_wave")
     for i in range(16):
         method, path = get_method_path()
@@ -139,41 +139,71 @@ def check_wave_attack(get_method_path, ip, user_id, len_samples):
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
 
-    assert len(
-        new_events) == 1, f"Expected 1 event, got {len(new_events)} (ip: {ip})"
-    assert new_events[0][
-        "type"] == "detected_attack_wave", f"Expected detected_attack_wave event, got {new_events[0]['type']}"
-    assert new_events[0]["request"][
-        "ipAddress"] == ip, f"Expected ipAddress {ip}, got {new_events[0]['request']['ipAddress']}"
+    # Prerequisite: need exactly 1 event to inspect its contents
+    if not collector.soft_assert(
+            len(new_events) == 1, f"Expected 1 event, got {len(new_events)} (ip: {ip})"):
+        return
 
-    assert "user" in new_events[0][
-        "attack"], f"Expected user in attack, got {new_events[0]['attack']}"
-    assert "id" in new_events[0]["attack"][
-        "user"], f"Expected id in user, got {new_events[0]['attack']['user']}"
-    assert new_events[0]["attack"]["user"][
-        "id"] == user_id, f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}"
+    collector.soft_assert(
+        new_events[0]["type"] == "detected_attack_wave",
+        f"Expected detected_attack_wave event, got {new_events[0]['type']}")
+    collector.soft_assert(
+        new_events[0]["request"]["ipAddress"] == ip,
+        f"Expected ipAddress {ip}, got {new_events[0]['request']['ipAddress']}")
 
-    assert "samples" in new_events[0]["attack"]["metadata"], "Samples not found in metadata"
-    assert isinstance(new_events[0]["attack"]["metadata"]
-                      ["samples"], str), "Samples is not a string"
+    collector.soft_assert(
+        "user" in new_events[0]["attack"],
+        f"Expected user in attack, got {new_events[0]['attack']}")
+    if "user" in new_events[0]["attack"]:
+        collector.soft_assert(
+            "id" in new_events[0]["attack"]["user"],
+            f"Expected id in user, got {new_events[0]['attack']['user']}")
+        if "id" in new_events[0]["attack"]["user"]:
+            collector.soft_assert(
+                new_events[0]["attack"]["user"]["id"] == user_id,
+                f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}")
+
+    collector.soft_assert(
+        "samples" in new_events[0]["attack"]["metadata"],
+        "Samples not found in metadata")
+    if "samples" not in new_events[0]["attack"]["metadata"]:
+        return
+
+    collector.soft_assert(
+        isinstance(new_events[0]["attack"]["metadata"]["samples"], str),
+        "Samples is not a string")
     samples = new_events[0]["attack"]["metadata"]["samples"]
     try:
         samples = json.loads(samples)
     except json.JSONDecodeError:
-        assert False, f"Samples is not a valid JSON string: {samples}"
+        collector.add_failure(f"Samples is not a valid JSON string: {samples}")
+        return
+
     # type of samples is list
-    assert isinstance(samples, list), "Samples is not a list"
-    assert len(
-        samples) == len_samples, f"Expected {len_samples} samples, got {len(samples)}"
+    collector.soft_assert(isinstance(samples, list), "Samples is not a list")
+    if not isinstance(samples, list):
+        return
+
+    collector.soft_assert(
+        len(samples) == len_samples,
+        f"Expected {len_samples} samples, got {len(samples)}")
     for sample in samples:
-        assert isinstance(sample, dict), "Sample is not a dictionary"
-        assert "method" in sample, "Method not found in sample"
-        assert "url" in sample, "Url not found in sample"
-        assert sample["method"] == "GET", f"Method is not GET, got {sample['method']}"
-        assert isinstance(sample["url"], str), "Url is not a string"
+        collector.soft_assert(isinstance(sample, dict),
+                              "Sample is not a dictionary")
+        if not isinstance(sample, dict):
+            continue
+        collector.soft_assert("method" in sample, "Method not found in sample")
+        collector.soft_assert("url" in sample, "Url not found in sample")
+        if "method" in sample:
+            collector.soft_assert(
+                sample["method"] == "GET",
+                f"Method is not GET, got {sample['method']}")
+        if "url" in sample:
+            collector.soft_assert(
+                isinstance(sample["url"], str), "Url is not a string")
 
 
-def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
+def check_wave_attack_with_same_ip(collector, get_method_path, ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for i in range(16):
         method, path = get_method_path()
@@ -184,11 +214,12 @@ def check_wave_attack_with_same_ip(get_method_path, ip, user_id):
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
 
-    assert len(
-        new_events) == 0, f"Expected 0 events, got {len(new_events)} (ip: {ip})"
+    collector.soft_assert(
+        len(new_events) == 0,
+        f"Expected 0 events, got {len(new_events)} (ip: {ip})")
 
 
-def check_wave_attack_with_same_ip_sliding_window_and_LRU(ip, user_id):
+def check_wave_attack_with_same_ip_sliding_window_and_LRU(collector, ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for _ in range(14):
         time.sleep(1)
@@ -204,11 +235,12 @@ def check_wave_attack_with_same_ip_sliding_window_and_LRU(ip, user_id):
         start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
-    assert len(
-        new_events) == 0, f"Test sent 14 suspicious requests with 1 second sleep between each request (same IP) and 1 more request after 60 seconds. Expected 0 attack wave events, but got {len(new_events)} event(s)"
+    collector.soft_assert(
+        len(new_events) == 0,
+        f"Test sent 14 suspicious requests with 1 second sleep between each request (same IP) and 1 more request after 60 seconds. Expected 0 attack wave events, but got {len(new_events)} event(s)")
 
 
-def check_wave_attack_with_bypass_ip(ip, user_id):
+def check_wave_attack_with_bypass_ip(collector, ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for _ in range(15):
         method, path = get_random_path_filename()
@@ -218,29 +250,37 @@ def check_wave_attack_with_bypass_ip(ip, user_id):
         start_events), filter_type="detected_attack_wave")
     all_events = c.get_events("detected_attack_wave")
     new_events = all_events[len(start_events):]
-    assert len(
-        new_events) == 0, f"Test sent 15 suspicious requests with bypass IP {ip} (allowedIPAddresses). Expected 0 attack wave events, but got {len(new_events)} event(s)"
+    collector.soft_assert(
+        len(new_events) == 0,
+        f"Test sent 15 suspicious requests with bypass IP {ip} (allowedIPAddresses). Expected 0 attack wave events, but got {len(new_events)} event(s)")
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_wave_attack(get_random_path_filename,
+    collector = AssertionCollector()
+
+    check_wave_attack(collector, get_random_path_filename,
                       "2.16.53.5", "1234", len(filenames))
-    check_wave_attack(get_random_path_directory,
+    check_wave_attack(collector, get_random_path_directory,
                       "2.16.53.6", "1235", len(directories))
-    check_wave_attack(get_random_path_extension, "2.16.53.7",
+    check_wave_attack(collector, get_random_path_extension, "2.16.53.7",
                       "1236", len(file_extensions))
-    check_wave_attack(get_random_path_query, "2.16.53.8", "1237", len(queries))
+    check_wave_attack(collector, get_random_path_query,
+                      "2.16.53.8", "1237", len(queries))
 
+    check_wave_attack_with_same_ip(collector,
+                                   get_random_path_filename, "2.16.53.5", "1234")
+    check_wave_attack_with_same_ip(collector,
+                                   get_random_path_directory, "2.16.53.6", "1235")
+    check_wave_attack_with_same_ip(collector,
+                                   get_random_path_extension, "2.16.53.7", "1236")
     check_wave_attack_with_same_ip(
-        get_random_path_filename, "2.16.53.5", "1234")
-    check_wave_attack_with_same_ip(
-        get_random_path_directory, "2.16.53.6", "1235")
-    check_wave_attack_with_same_ip(
-        get_random_path_extension, "2.16.53.7", "1236")
-    check_wave_attack_with_same_ip(get_random_path_query, "2.16.53.8", "1237")
+        collector, get_random_path_query, "2.16.53.8", "1237")
 
-    check_wave_attack_with_same_ip_sliding_window_and_LRU("2.16.53.9", "1238")
-    check_wave_attack_with_bypass_ip("2.16.53.10", "1239")
+    check_wave_attack_with_same_ip_sliding_window_and_LRU(
+        collector, "2.16.53.9", "1238")
+    check_wave_attack_with_bypass_ip(collector, "2.16.53.10", "1239")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

@@ -16,12 +16,13 @@ def get_random_ip():
 
 
 def run_test(s: TestServer, c: CoreApi):
-    # RateLimitingGroupID=1234567890
+    collector = AssertionCollector()
+
     cookie = "RateLimitingGroupID=1234567890"
     for _ in range(5):
         response = s.get(
             "/",  headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
 
     # sleep for 10 seconds
     time.sleep(10)
@@ -32,18 +33,18 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(response, 429)
 
     for _ in range(100):
 
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
 
     for i in range(10):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
+        collector.soft_assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
 
     tests = [
         "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
@@ -57,7 +58,7 @@ def run_test(s: TestServer, c: CoreApi):
         "\\api\\pets", "/api\\pets", "\\api/pets",
         "/api/pets?id=1", "/api/pets?", "/api/pets?#fragment",
         "/api/pets;v=1", "/api;v=1/pets", "/api/pets;foo=bar",
-        "/api/péts", "/api/péts", "/api/pets%C3%A9",
+        "/api/péts", "/api/péts", "/api/pets%C3%A9",
         "/api/pets%00", "/api/pets(%20)", "/api/pets..",
         "/api/pets.;", "/api/pets.%2E", "/api/pets.json",
         "/api/pets%2f..%2fsecret", "/api/pets%2f/", "/api/%2e%2e/pets"
@@ -67,20 +68,20 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get_raw(
             test, headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
 
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
 
     for i in range(10):
         response = s.get_raw(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, "Expected 200 for /test_ratelimiting_1")
 
     methods = ["get", "GeT", "GET", "GET"]
     for method in methods:
         response = s.get_raw(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie}, method=method)
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f"Rate limiting bypass for using method \"{method}\""
         )
 
@@ -95,7 +96,7 @@ def run_test(s: TestServer, c: CoreApi):
         "\\test_ratelimiting_1", "/test_ratelimiting_1\\", "\\test_ratelimiting_1\\",
         "/test_ratelimiting_1?x=1", "/test_ratelimiting_1?", "/test_ratelimiting_1?#frag",
         "/test_ratelimiting_1;v=1", "/;v=1/test_ratelimiting_1",
-        "/test_ratelimitiṅg_1", "/tést_ratelimiting_1", "/tést_ratelimiting_1", "/test_ratelimiting_1%C2%A0",
+        "/test_ratelimitiṅg_1", "/tést_ratelimiting_1", "/tést_ratelimiting_1", "/test_ratelimiting_1%C2%A0",
         "/test_ratelimiting_1%00", "/test_ratelimiting_1(%20)", "/test_ratelimiting_1..",
         "/test_ratelimiting_1.;", "/test_ratelimiting_1.%2E", "/test_ratelimiting_1.json",
         "/test_ratelimiting_1%2f..%2fsecret", "/test_ratelimiting_1%2f/", "/%2e%2e/test_ratelimiting_1"
@@ -104,8 +105,10 @@ def run_test(s: TestServer, c: CoreApi):
     for test in tests:
         response = s.get_raw(
             test, headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        assert_response_code_is_not(
+        collector.soft_assert_response_code_is_not(
             response, 200, f"Should not be 200 for {test} ")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

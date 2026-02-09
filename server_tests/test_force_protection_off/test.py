@@ -10,41 +10,45 @@ from core_api import CoreApi
 '''
 
 
-def check_force_protection_off(response_code):
+def check_force_protection_off(collector, s, response_code):
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code, "shell injection")
+    collector.soft_assert_response_code_is(response, response_code, "shell injection")
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(response, response_code, "sql injection")
+    collector.soft_assert_response_code_is(response, response_code, "sql injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code, "path traversal")
+    collector.soft_assert_response_code_is(response, response_code, "path traversal")
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_force_protection_off(500)
+    collector = AssertionCollector()
+
+    check_force_protection_off(collector, s, 500)
 
     c.update_runtime_config_file("change_config_force_protection_off.json")
-    check_force_protection_off(200)
+    check_force_protection_off(collector, s, 200)
 
     # chechk that rate limiting it's not impacted by force protection off
     for i in range(5):
         response = s.get("/test_ratelimiting_1")
-        assert_response_code_is(response, 200, response.text)
+        collector.soft_assert_response_code_is(response, 200, response.text)
 
     for i in range(10):
         response = s.get("/test_ratelimiting_1")
         if i < 5:
             pass
         else:
-            assert_response_code_is(response, 429, response.text)
+            collector.soft_assert_response_code_is(response, 429, response.text)
 
     c.update_runtime_config_file("start_config.json")
-    check_force_protection_off(500)
+    check_force_protection_off(collector, s, 500)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

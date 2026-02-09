@@ -43,10 +43,10 @@ def start_mock_servers(target_container_name: str):
                 f"Mock IMDS server did not start after {i} seconds")
 
 
-def check_ssrf_with_event(response_code, expected_json):
+def check_ssrf_with_event(collector, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf_2", timeout=10)
-    assert_response_code_is(response, response_code, f"[{response.text}]")
+    collector.soft_assert_response_code_is(response, response_code, f"[{response.text}]")
 
     c.wait_for_new_events(30, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -54,14 +54,23 @@ def check_ssrf_with_event(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, 1)
-    assert_event_contains_subset_file(new_events[0], expected_json)
+    if not collector.soft_assert(
+            len(new_events) >= 1,
+            f"Events list contains {len(new_events)} elements, expected at least 1"):
+        return
+
+    try:
+        assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
 def run_test(s: TestServer, c: CoreApi, target_container_name: str):
+    collector = AssertionCollector()
     set_etc_hosts(target_container_name, "169.254.169.254",
                   "evil-stored-ssrf-hostname")
-    check_ssrf_with_event(200, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, 200, "expect_detection_blocked.json")
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

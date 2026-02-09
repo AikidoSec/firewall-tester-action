@@ -8,24 +8,26 @@ from core_api import CoreApi
 '''
 
 
-def check_attacks_blocked(response_code):
+def check_attacks_blocked(collector, s, response_code):
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(response, response_code, "sql injection")
+    collector.soft_assert_response_code_is(response, response_code, "sql injection")
 
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code, "shell injection")
+    collector.soft_assert_response_code_is(response, response_code, "shell injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code, "path traversal")
+    collector.soft_assert_response_code_is(response, response_code, "path traversal")
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_attacks_blocked(500)
+    collector = AssertionCollector()
+    check_attacks_blocked(collector, s, 500)
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

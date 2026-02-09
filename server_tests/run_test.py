@@ -14,6 +14,7 @@ from typing import List, Optional
 from datetime import datetime
 from enum import Enum
 import shlex
+import re
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -344,6 +345,17 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
     subprocess.run(" ".join(command), shell=True, check=True)
 
 
+def _linkify_line_ref(text: str, test_dir: str) -> str:
+    """Replace [line N] with a clickable GitHub link to the test source."""
+    match = re.search(r'\[line (\d+)\]', text)
+    if match:
+        line_num = match.group(1)
+        url = f"https://github.com/AikidoSec/firewall-tester-action/blob/main/server_tests/{test_dir}/test.py#L{line_num}"
+        link = f"[line {line_num}]({url})"
+        text = text.replace(match.group(0), link)
+    return text
+
+
 def write_summary_to_github_step_summary(test_results: List[TestResult]):
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if not summary_path:
@@ -407,7 +419,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                     f"<summary>{result.test_dir} - {len(result.failed_assertions)} failed assertion(s)</summary>\n\n")
                 for i, assertion in enumerate(result.failed_assertions, 1):
                     escaped = assertion.replace("|", "\\|")
-                    f.write(f"{i}. `{escaped}`\n")
+                    escaped = _linkify_line_ref(escaped, result.test_dir)
+                    f.write(f"{i}. {escaped}\n")
                 f.write(f"\n</details>\n\n")
 
 

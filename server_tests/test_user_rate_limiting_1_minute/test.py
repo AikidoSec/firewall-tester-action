@@ -76,7 +76,7 @@ def run_test(s: TestServer, c: CoreApi):
             response, 200, "Expected 200 for /test_ratelimiting_1")
 
     tests = [
-        "/test_ratelimiting_1", "/test_ratelimiting_1/", "/test__ratelimiting_1", "//test_ratelimiting_1",
+        "/test_ratelimiting_1", "/test_ratelimiting_1/", "/test_ratelimiting_1/.//", "//test_ratelimiting_1",
         "/test_ratelimiting_1/.", "/test_ratelimiting_1/../test_ratelimiting_1", "/TEST_RATELIMITING_1", "/test_RATELIMITING_1",
         "/%74est_ratelimiting_1", "/t%65st_ratelimiting_1", "/tes%74_ratelimiting_1", "/test_%72atelimiting_1",
         "/test_ratelimitin%67_1", "/test_ratelimiting_%31", "/%2574est_ratelimiting_1", "/test_ratelimiting_%2531",

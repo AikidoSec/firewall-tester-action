@@ -346,14 +346,43 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
 
 
 def _linkify_line_ref(text: str, test_dir: str) -> str:
-    """Replace [line N] with a clickable GitHub link to the test source."""
-    match = re.search(r'\[line (\d+)\]', text)
-    if match:
-        line_num = match.group(1)
+    """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
+    def _make_link(line_num: str) -> str:
         url = f"https://github.com/AikidoSec/firewall-tester-action/blob/main/server_tests/{test_dir}/test.py#L{line_num}"
-        link = f"[line {line_num}]({url})"
-        text = text.replace(match.group(0), link)
+        return f"[line {line_num}]({url})"
+
+    # Match the entire bracket prefix: [line N] or [line N → line M → ...]
+    bracket_match = re.match(r'\[(line \d+(?:\s*→\s*line \d+)*)\]\s*', text)
+    if bracket_match:
+        inner = bracket_match.group(1)
+        # Replace each "line N" with a link
+        linked = re.sub(r'line (\d+)', lambda m: _make_link(m.group(1)), inner)
+        text = linked + " " + text[bracket_match.end():]
     return text
+
+
+def _get_source_context(test_dir: str, assertion_text: str, context_lines: int = 3) -> Optional[str]:
+    """Extract lines around each failure frame from test.py (context_lines before + the line + context_lines after)."""
+    line_nums = [int(m) for m in re.findall(r'line (\d+)', assertion_text)]
+    if not line_nums:
+        return None
+    test_file = os.path.join(os.path.dirname(__file__), test_dir, "test.py")
+    try:
+        with open(test_file, 'r') as f:
+            lines = f.readlines()
+        snippets = []
+        for line_num in line_nums:
+            start = max(0, line_num - 1 - context_lines)
+            end = min(len(lines), line_num + context_lines)
+            snippet_lines = []
+            for i in range(start, end):
+                marker = "→" if (i + 1) == line_num else " "
+                snippet_lines.append(
+                    f"{marker} {i + 1:>4} | {lines[i].rstrip()}")
+            snippets.append("\n".join(snippet_lines))
+        return "\n\n".join(snippets)
+    except Exception:
+        return None
 
 
 def write_summary_to_github_step_summary(test_results: List[TestResult]):
@@ -421,6 +450,15 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                     escaped = assertion.replace("|", "\\|")
                     escaped = _linkify_line_ref(escaped, result.test_dir)
                     f.write(f"{i}. {escaped}\n")
+                    snippet = _get_source_context(result.test_dir, assertion)
+                    if snippet:
+                        f.write(f"   <details>\n")
+                        f.write(f"   <summary>Show source</summary>\n\n")
+                        f.write(f"   ```python\n")
+                        for snippet_line in snippet.split("\n"):
+                            f.write(f"   {snippet_line}\n")
+                        f.write(f"   ```\n")
+                        f.write(f"   </details>\n")
                 f.write(f"\n</details>\n\n")
 
 

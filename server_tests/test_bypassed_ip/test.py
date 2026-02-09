@@ -136,8 +136,8 @@ def run_test(s: TestServer, c: CoreApi):
         f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}")
     # rateLimited
     collector.soft_assert(
-        heartbeat["stats"]["requests"]["rateLimited"] == 0,
-        f"Rate limited should be 0, found {heartbeat['stats']['requests']['rateLimited']}")
+        "rateLimited" in heartbeat["stats"]["requests"] and heartbeat["stats"]["requests"]["rateLimited"] == 0,
+        f"Rate limited should be 0, found {heartbeat['stats']['requests'].get('rateLimited', 'not found')}")
 
     for stat in heartbeat["stats"]["operations"].values():
         collector.soft_assert(

@@ -369,18 +369,26 @@ class AssertionCollector:
     def __init__(self):
         self.failures = []
 
-    def _get_test_caller_info(self):
-        """Walk the stack to find the caller in a test.py file and return 'line N'."""
+    def _get_test_caller_frames(self, max_frames=3):
+        """Walk the stack and return up to max_frames frames from test.py (outermost first)."""
+        frames = []
         for frame_info in inspect.stack():
             if frame_info.filename.endswith("test.py"):
-                return f"line {frame_info.lineno}"
-        return None
+                frames.append(frame_info.lineno)
+                if len(frames) >= max_frames:
+                    break
+        frames.reverse()
+        return frames
 
     def soft_assert(self, condition, message="Assertion failed"):
         """Record failure but continue execution. Returns True if passed, False if failed."""
         if not condition:
-            caller = self._get_test_caller_info()
-            prefix = f"[{caller}] " if caller else ""
+            frames = self._get_test_caller_frames()
+            if frames:
+                refs = " → ".join(f"line {ln}" for ln in frames)
+                prefix = f"[{refs}] "
+            else:
+                prefix = ""
             self.failures.append(f"{prefix}{message}")
             return False
         return True

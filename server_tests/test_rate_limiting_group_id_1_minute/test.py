@@ -44,7 +44,8 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(10):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        collector.soft_assert_response_code_is(response, 429, "Expected 429 for /api/pets/")
+        collector.soft_assert_response_code_is(
+            response, 429, "Expected 429 for /api/pets/")
 
     tests = [
         "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
@@ -58,7 +59,7 @@ def run_test(s: TestServer, c: CoreApi):
         "\\api\\pets", "/api\\pets", "\\api/pets",
         "/api/pets?id=1", "/api/pets?", "/api/pets?#fragment",
         "/api/pets;v=1", "/api;v=1/pets", "/api/pets;foo=bar",
-        "/api/péts", "/api/péts", "/api/pets%C3%A9",
+        "/api/péts", "/api/péts", "/api/pets%C3%A9",
         "/api/pets%00", "/api/pets(%20)", "/api/pets..",
         "/api/pets.;", "/api/pets.%2E", "/api/pets.json",
         "/api/pets%2f..%2fsecret", "/api/pets%2f/", "/api/%2e%2e/pets"
@@ -96,7 +97,7 @@ def run_test(s: TestServer, c: CoreApi):
         "\\test_ratelimiting_1", "/test_ratelimiting_1\\", "\\test_ratelimiting_1\\",
         "/test_ratelimiting_1?x=1", "/test_ratelimiting_1?", "/test_ratelimiting_1?#frag",
         "/test_ratelimiting_1;v=1", "/;v=1/test_ratelimiting_1",
-        "/test_ratelimitiṅg_1", "/tést_ratelimiting_1", "/tést_ratelimiting_1", "/test_ratelimiting_1%C2%A0",
+        "/test_ratelimitiṅg_1", "/tést_ratelimiting_1", "/tést_ratelimiting_1", "/test_ratelimiting_1%C2%A0",
         "/test_ratelimiting_1%00", "/test_ratelimiting_1(%20)", "/test_ratelimiting_1..",
         "/test_ratelimiting_1.;", "/test_ratelimiting_1.%2E", "/test_ratelimiting_1.json",
         "/test_ratelimiting_1%2f..%2fsecret", "/test_ratelimiting_1%2f/", "/%2e%2e/test_ratelimiting_1"

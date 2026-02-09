@@ -345,6 +345,17 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
     subprocess.run(" ".join(command), shell=True, check=True)
 
 
+def _escape_markdown(text: str) -> str:
+    """Escape characters that can break GitHub markdown rendering."""
+    # Escape HTML-like angle brackets to prevent them being parsed as tags
+    text = text.replace("<", "&lt;").replace(">", "&gt;")
+    # Escape pipe for table cells
+    text = text.replace("|", "\\|")
+    # Escape backticks to prevent inline code spans
+    text = text.replace("`", "\\`")
+    return text
+
+
 def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
     def _make_link(line_num: str) -> str:
@@ -432,8 +443,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 error = result.error_message
             else:
                 error = "-"
-            # Escape pipe characters in error messages to prevent table formatting issues
-            error = error.replace("|", "\\|")
+            # Escape characters that could break markdown table formatting
+            error = _escape_markdown(error)
             f.write(
                 f"| {result.test_dir} | {status} | {duration} | {error} |\n")
 
@@ -447,7 +458,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 f.write(
                     f"<summary>{result.test_dir} - {len(result.failed_assertions)} failed assertion(s)</summary>\n\n")
                 for i, assertion in enumerate(result.failed_assertions, 1):
-                    escaped = assertion.replace("|", "\\|")
+                    escaped = _escape_markdown(assertion)
                     escaped = _linkify_line_ref(escaped, result.test_dir)
                     f.write(f"{i}. {escaped}\n")
                     snippet = _get_source_context(result.test_dir, assertion)
@@ -455,7 +466,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                         f.write(f"   <details>\n")
                         f.write(f"   <summary>Show source</summary>\n\n")
                         f.write(f"   ```python\n")
-                        for snippet_line in snippet.split("\n"):
+                        # in reverse order
+                        for snippet_line in reversed(snippet.split("\n")):
                             f.write(f"   {snippet_line}\n")
                         f.write(f"   ```\n")
                         f.write(f"   </details>\n")

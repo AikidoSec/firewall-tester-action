@@ -139,10 +139,14 @@ def run_test(s: TestServer, c: CoreApi):
         "rateLimited" in heartbeat["stats"]["requests"] and heartbeat["stats"]["requests"]["rateLimited"] == 0,
         f"Rate limited should be 0, found {heartbeat['stats']['requests'].get('rateLimited', 'not found')}")
 
-    for stat in heartbeat["stats"]["operations"].values():
-        collector.soft_assert(
-            stat["attacksDetected"]["total"] == 0,
-            f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}")
+    if "operations" in heartbeat["stats"]:
+        for stat in heartbeat["stats"]["operations"].values():
+            collector.soft_assert(
+                stat["attacksDetected"]["total"] == 0,
+                f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}")
+    else:
+        collector.add_failure(
+            f"'operations' key not found in heartbeat stats: {list(heartbeat['stats'].keys())}")
 
     collector.raise_if_failures()
 

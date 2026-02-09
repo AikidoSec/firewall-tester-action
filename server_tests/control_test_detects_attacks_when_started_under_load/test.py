@@ -18,7 +18,7 @@ def send_attacks(collector):
     for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
         collector.soft_assert_response_code_is(response, 500,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
             response, "firewall has blocked a path traversal", f"{response.text} {cs.get_server_logs()}")
 
@@ -27,7 +27,7 @@ def send_attacks(collector):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
         collector.soft_assert_response_code_is(response, 500,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
             response, "firewall has blocked an SQL injection", f"{response.text} {cs.get_server_logs()}")
 
@@ -35,7 +35,7 @@ def send_attacks(collector):
     for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
         collector.soft_assert_response_code_is(response, 500,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
             response, "firewall has blocked a shell injection", f"{response.text} {cs.get_server_logs()}")
 
@@ -44,7 +44,7 @@ def send_attacks(collector):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081"}, timeout=10)
         collector.soft_assert_response_code_is(response, 500,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
             response, "firewall has blocked a server-side request forgery", f"{response.text} {cs.get_server_logs()}")
 

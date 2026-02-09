@@ -17,7 +17,7 @@ def check_path_traversal_with_event(collector, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.get("/api/read?path=../secrets/key.txt")
     collector.soft_assert_response_code_is(response, response_code,
-                            f"Path traversal check failed {response.text}")
+                                           f"Path traversal check failed {response.text}")
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -47,13 +47,16 @@ def check_path_traversal(collector, query_string):
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    check_path_traversal_with_event(collector, 500, "expect_detection_blocked.json")
+    check_path_traversal_with_event(
+        collector, 500, "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_path_traversal_with_event(collector, 200, "expect_detection_not_blocked.json")
+    check_path_traversal_with_event(
+        collector, 200, "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_path_traversal_with_event(collector, 500, "expect_detection_blocked.json")
+    check_path_traversal_with_event(
+        collector, 500, "expect_detection_blocked.json")
 
     paths = [
         "../secrets/key.txt",

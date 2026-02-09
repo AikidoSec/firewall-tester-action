@@ -16,78 +16,94 @@ from core_api import CoreApi
 """
 
 
-def send_100_requests():
+def send_100_requests(collector):
     for _ in range(5):
         response = s.get("/api/pets/")
-        assert_response_code_is(response, 200,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
+        collector.soft_assert_response_code_is(response, 200,
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
 
 
-def send_attacks(expected_code: int, expected_message: str):
+def send_attacks(collector, expected_code: int, expected_message: str):
     # path traversal attacks
     for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
-        assert_response_code_is(response, expected_code,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
-        assert_response_body_contains(
+        collector.soft_assert_response_code_is(response, expected_code,
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
+        collector.soft_assert_response_body_contains(
             response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # sql injection attacks
     for _ in range(2):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-        assert_response_code_is(response, expected_code,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
-        assert_response_body_contains(
+        collector.soft_assert_response_code_is(response, expected_code,
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
+        collector.soft_assert_response_body_contains(
             response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # shell injection attacks
     for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
-        assert_response_code_is(response, expected_code,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
-        assert_response_body_contains(
+        collector.soft_assert_response_code_is(response, expected_code,
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
+        collector.soft_assert_response_body_contains(
             response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # ssrf attacks
     for _ in range(2):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081/health"}, timeout=10)
-        assert_response_code_is(response, expected_code,
-                                f"Request failed: {response.text} {cs.get_server_logs()}")
-        assert_response_body_contains(
+        collector.soft_assert_response_code_is(response, expected_code,
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
+        collector.soft_assert_response_body_contains(
             response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
 
 def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
+    collector = AssertionCollector()
+
     cs.check_health()
     cs.uninstall_aikido()
     cs.install_aikido_version("1.4.0")
     cs.start_server()
     s.get("/api/pets/")
+
     old_start_events = c.get_events("started")
-    assert_events_length_is(old_start_events, 1)
-    send_100_requests()
-    send_attacks(500, "firewall has blocked")
+    if not collector.soft_assert(
+            len(old_start_events) == 1,
+            f"Expected 1 old started event, got {len(old_start_events)}"):
+        collector.raise_if_failures()
+        return
+
+    send_100_requests(collector)
+    send_attacks(collector, 500, "firewall has blocked")
 
     cs.stop_server()
     cs.install_aikido()
     cs.start_server()
     s.get("/api/pets/")
+
     current_start_events = c.get_events("started")
-    assert_events_length_is(current_start_events, 1)
+    if not collector.soft_assert(
+            len(current_start_events) == 1,
+            f"Expected 1 current started event, got {len(current_start_events)}"):
+        collector.raise_if_failures()
+        return
 
-    assert old_start_events[0]["agent"]["version"] != current_start_events[0]["agent"][
-        "version"], f"Old version: {old_start_events[0]['agent']['version']} must be different from current version: {current_start_events[0]['agent']['version']}"
+    collector.soft_assert(
+        old_start_events[0]["agent"]["version"] != current_start_events[0]["agent"]["version"],
+        f"Old version: {old_start_events[0]['agent']['version']} must be different from current version: {current_start_events[0]['agent']['version']}")
 
-    send_100_requests()
-    send_attacks(500, "firewall has blocked")
+    send_100_requests(collector)
+    send_attacks(collector, 500, "firewall has blocked")
 
     cs.stop_server()
     cs.uninstall_aikido()
     cs.start_server()
 
-    send_attacks(200, "")
+    send_attacks(collector, 200, "")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

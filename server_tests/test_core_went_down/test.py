@@ -2,26 +2,26 @@ from testlib import *
 from core_api import CoreApi
 
 
-def check_attacks_blocked(response_code):
+def check_attacks_blocked(collector, s, response_code):
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(response, response_code, "sql injection")
+    collector.soft_assert_response_code_is(response, response_code, "sql injection")
 
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code, "shell injection")
+    collector.soft_assert_response_code_is(response, response_code, "shell injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code, "path traversal")
+    collector.soft_assert_response_code_is(response, response_code, "path traversal")
 
 
-def check_event_is_submitted_shell_injection(response_code, expected_json):
+def check_event_is_submitted_shell_injection(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code)
+    collector.soft_assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -29,21 +29,25 @@ def check_event_is_submitted_shell_injection(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_is(new_events, 1)
+    # Prerequisite: need exactly 1 event to check its contents
+    if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new event, got {len(new_events)}"):
+        return
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_attacks_blocked(500)
+    collector = AssertionCollector()
+
+    check_attacks_blocked(collector, s, 500)
 
     c.set_mock_server_down()
     time.sleep(70)
 
-    check_attacks_blocked(500)
+    check_attacks_blocked(collector, s, 500)
 
     for _ in range(5):
         response = s.get("/test_ratelimiting_1")
-        assert_response_code_is(response, 200, response.text)
+        collector.soft_assert_response_code_is(response, 200, response.text)
 
     time.sleep(5)
 
@@ -52,24 +56,26 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            assert_response_code_is(response, 429, response.text)
+            collector.soft_assert_response_code_is(response, 429, response.text)
 
     c.set_mock_server_up()
 
     check_event_is_submitted_shell_injection(
-        500, "expect_detection_blocked.json")
+        collector, s, c, 500, "expect_detection_blocked.json")
 
     c.set_mock_server_timeout()
 
     time.sleep(70)
 
-    check_attacks_blocked(500)
+    check_attacks_blocked(collector, s, 500)
 
     c.set_mock_server_up()
     time.sleep(30)
 
     check_event_is_submitted_shell_injection(
-        500, "expect_detection_blocked.json")
+        collector, s, c, 500, "expect_detection_blocked.json")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

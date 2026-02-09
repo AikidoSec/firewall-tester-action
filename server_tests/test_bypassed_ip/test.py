@@ -31,6 +31,8 @@ def get_request_data():
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     # IPs that should be bypassed according to start_config.json
     bypass_ips = [
         {"ip": "93.184.216.34",    "type": "public IPv4"},
@@ -54,7 +56,7 @@ def run_test(s: TestServer, c: CoreApi):
                 "X-Forwarded-For": ip["ip"]
             }
             response = s.post(url, body, headers=headers_with_ip)
-            assert_response_code_is(
+            collector.soft_assert_response_code_is(
                 response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should not be blocked {response.text}"
             )
 
@@ -62,45 +64,45 @@ def run_test(s: TestServer, c: CoreApi):
         # 1. path traversal attack
         response = s.get("/api/read?path=../secrets/key.txt",
                          headers={"X-Forwarded-For": ip["ip"]})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request should not be blocked: {response.text}")
         # 2. sql injection attack
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"}, headers={"X-Forwarded-For": ip["ip"]})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request should not be blocked: {response.text}")
         # 3. shell injection attack
         response = s.post(
             "/api/execute", {"userCommand": "whoami"}, headers={"X-Forwarded-For": ip["ip"]})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request should not be blocked: {response.text}")
 
         # 4. bot blocking should be bypassed (send request with blocked user agent)
         # Using pattern like "1234googlebot1234" which matches the blockedUserAgents pattern "Googlebot"
         response = s.get(
             "/test_ratelimiting_2", headers={"X-Forwarded-For": ip["ip"], "User-Agent": "1234googlebot1234"})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request with blocked user agent should not be blocked from bypass IP {ip['ip']} ({ip['type']}): {response.text}")
 
         # 5. geo blocking should be bypassed (send request from IP that would normally be geo-blocked)
         # Note: Some bypass IPs (93.184.216.34 and 23.45.67.89) are in blockedIPAddresses ranges in start_firewall.json, so they should still work
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": ip["ip"]})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking: {response.text}")
 
         # 6. route-level Admin IP restrictions should be bypassed (endpoint-level `allowedIPAddresses`)
         # The /test_ratelimiting_1 endpoint has allowedIPAddresses: ["185.245.255.212"], but bypassed IPs should still access it
         response = s.get(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": ip["ip"]})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass route-level Admin IP restrictions: {response.text}")
 
         # # 7. blocked user IDs should be bypassed (blockedUserIds)
         # User "789" is in blockedUserIds, but requests from bypassed IPs should still work
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": ip["ip"], "user": "789"})
-        assert_response_code_is(
+        collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs: {response.text}")
 
     # Wait a bit to give the agent time to potentially send heartbeat / stats
@@ -110,25 +112,43 @@ def run_test(s: TestServer, c: CoreApi):
 
     all_heartbeat_events = c.get_events("heartbeat")
     new_heartbeat_events = all_heartbeat_events[len(start_heartbeat_events):]
-    assert_events_length_is(new_heartbeat_events, 1)
+
+    # Prerequisite: need exactly 1 heartbeat event to inspect its contents
+    if not collector.soft_assert(
+            len(new_heartbeat_events) == 1,
+            f"Expected 1 heartbeat event, got {len(new_heartbeat_events)}"):
+        collector.raise_if_failures()
+        return
+
     heartbeat = new_heartbeat_events[0]
     # routes should not contain  "method": "POST", "path": "/api/create",
     for route in heartbeat["routes"]:
-        assert "POST" not in route["method"] and "/api/create" not in route[
-            "path"], f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data"
+        collector.soft_assert(
+            not ("POST" in route["method"] and "/api/create" in route["path"]),
+            f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data")
 
-    assert heartbeat["stats"]["requests"][
-        "total"] == 1, f"Requests total should be 1, found {heartbeat['stats']['requests']['total']}"
+    collector.soft_assert(
+        heartbeat["stats"]["requests"]["total"] == 1,
+        f"Requests total should be 1, found {heartbeat['stats']['requests']['total']}")
     # attacksDetected
-    assert heartbeat["stats"]["requests"]["attacksDetected"][
-        "total"] == 0, f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}"
+    collector.soft_assert(
+        heartbeat["stats"]["requests"]["attacksDetected"]["total"] == 0,
+        f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}")
     # rateLimited
-    assert heartbeat["stats"]["requests"][
-        "rateLimited"] == 0, f"Rate limited should be 0, found {heartbeat['stats']['requests']['rateLimited']}"
+    collector.soft_assert(
+        "rateLimited" in heartbeat["stats"]["requests"] and heartbeat["stats"]["requests"]["rateLimited"] == 0,
+        f"Rate limited should be 0, found {heartbeat['stats']['requests'].get('rateLimited', 'not found')}")
 
-    for stat in heartbeat["stats"]["operations"].values():
-        assert stat["attacksDetected"][
-            "total"] == 0, f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}"
+    if "operations" in heartbeat["stats"]:
+        for stat in heartbeat["stats"]["operations"].values():
+            collector.soft_assert(
+                stat["attacksDetected"]["total"] == 0,
+                f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}")
+    else:
+        collector.add_failure(
+            f"'operations' key not found in heartbeat stats: {list(heartbeat['stats'].keys())}")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

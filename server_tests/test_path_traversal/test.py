@@ -13,11 +13,11 @@ from core_api import CoreApi
 '''
 
 
-def check_path_traversal_with_event(response_code, expected_json):
+def check_path_traversal_with_event(collector, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.get("/api/read?path=../secrets/key.txt")
-    assert_response_code_is(response, response_code,
-                            f"Path traversal check failed {response.text}")
+    collector.soft_assert_response_code_is(response, response_code,
+                                           f"Path traversal check failed {response.text}")
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -25,27 +25,38 @@ def check_path_traversal_with_event(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, 1)
-    assert_event_contains_subset_file(new_events[0], expected_json)
+    if not collector.soft_assert(
+            len(new_events) >= 1,
+            f"Events list contains {len(new_events)} elements, expected at least 1"):
+        return
+
+    try:
+        assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
-def check_path_traversal(query_string):
+def check_path_traversal(collector, query_string):
     response = s.get(query_string)
     if "File not found" in response.text:
         return
-    assert_response_code_is_not(
+    collector.soft_assert_response_code_is_not(
         response, 200, f"Path traversal check failed for {query_string} {response.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
 
-    check_path_traversal_with_event(500, "expect_detection_blocked.json")
+    check_path_traversal_with_event(
+        collector, 500, "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_path_traversal_with_event(200, "expect_detection_not_blocked.json")
+    check_path_traversal_with_event(
+        collector, 200, "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_path_traversal_with_event(500, "expect_detection_blocked.json")
+    check_path_traversal_with_event(
+        collector, 500, "expect_detection_blocked.json")
 
     paths = [
         "../secrets/key.txt",
@@ -128,8 +139,10 @@ def run_test(s: TestServer, c: CoreApi):
         ]
 
         for variant in variants:
-            check_path_traversal("/api/read?" + variant)
-            check_path_traversal("/api/read2?" + variant)
+            check_path_traversal(collector, "/api/read?" + variant)
+            check_path_traversal(collector, "/api/read2?" + variant)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

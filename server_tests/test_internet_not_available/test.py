@@ -11,9 +11,11 @@ from core_api import CoreApi
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
     time.sleep(30)
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, 500, response.text)
+    collector.soft_assert_response_code_is(response, 500, response.text)
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

@@ -13,10 +13,10 @@ import os
 '''
 
 
-def check_shell_injection(response_code, expected_json):
+def check_shell_injection(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(response, response_code)
+    collector.soft_assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -24,34 +24,41 @@ def check_shell_injection(response_code, expected_json):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, 1)
+    # Prerequisite: need at least 1 event to check its contents
+    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
+        return
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def check_shell_injection_command_post(command):
+def check_shell_injection_command_post(collector, s, command):
     response = s.post("/api/execute", {"userCommand": command})
     if " not found" in response.text or " must be a string without null bytes" in response.text:
         return
-    assert_response_code_is_not(
+    collector.soft_assert_response_code_is_not(
         response, 200, f"shell injection POST /api/execute {command} , response: {response.text}")
 
 
-def check_shell_injection_command_get(command):
+def check_shell_injection_command_get(collector, s, command):
     response = s.get(f"/api/execute/{command}")
     if " not found" in response.text or " must be a string without null bytes" in response.text or " No such file or directory" in response.text:
         return
-    assert_response_code_is_not(
+    collector.soft_assert_response_code_is_not(
         response, 200, f"shell injection GET /api/execute/{command} , response: {response.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):
-    check_shell_injection(500, "expect_detection_blocked.json")
+    collector = AssertionCollector()
+
+    check_shell_injection(collector, s, c, 500,
+                          "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_shell_injection(200, "expect_detection_not_blocked.json")
+    check_shell_injection(collector, s, c, 200,
+                          "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
-    check_shell_injection(500, "expect_detection_blocked.json")
+    check_shell_injection(collector, s, c, 500,
+                          "expect_detection_blocked.json")
     commands = [
         # Basic commands
         "whoami",
@@ -192,8 +199,10 @@ def run_test(s: TestServer, c: CoreApi):
     ]
 
     for command in commands:
-        check_shell_injection_command_post(command)
-        check_shell_injection_command_get(command)
+        check_shell_injection_command_post(collector, s, command)
+        check_shell_injection_command_get(collector, s, command)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

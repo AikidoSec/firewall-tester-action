@@ -72,26 +72,33 @@ def get_api_spec_simple():
     return url, body, headers
 
 
-def run_api_spec_tests(fns, expected_json, s: TestServer, c: CoreApi):
+def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi):
     start_events = c.get_events("heartbeat")
     for fn in fns:
         response = s.post(*fn())
-        assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(response, 200)
 
     c.wait_for_new_events(70, old_events_length=len(
         start_events), filter_type="heartbeat")
 
     all_events = c.get_events("heartbeat")
     new_events = all_events[len(start_events):]
-    assert_events_length_is(new_events, 1)
+
+    # Prerequisite: need exactly 1 event to check its contents
+    if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new heartbeat event, got {len(new_events)}"):
+        return
     assert_event_contains_subset_file(new_events[0], expected_json)
 
 
 def run_test(s: TestServer, c: CoreApi):
-    run_api_spec_tests([
+    collector = AssertionCollector()
+
+    run_api_spec_tests(collector, [
         get_api_spec_with_body,
         get_api_spec_simple,
     ], "expect_api_spec.json", s, c)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

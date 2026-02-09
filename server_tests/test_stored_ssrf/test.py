@@ -67,10 +67,10 @@ def start_mock_servers(target_container_name: str):
                 f"Mock IMDS server did not start after {i} seconds")
 
 
-def check_ssrf_with_event(response_code, expected_json, num_events: int = 1):
+def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_events: int = 1):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf", timeout=10)
-    assert_response_code_is(response, response_code, f"[{response.text}]")
+    collector.soft_assert_response_code_is(response, response_code, f"[{response.text}]")
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -78,50 +78,54 @@ def check_ssrf_with_event(response_code, expected_json, num_events: int = 1):
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
-    assert_events_length_at_least(new_events, num_events)
+    # Prerequisite: need at least num_events to check contents
+    if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)}"):
+        return
     if num_events == 1:
         assert_event_contains_subset_file(new_events[0], expected_json)
 
 
-def check_ssrf_bypassed_ip(ip: str):
+def check_ssrf_bypassed_ip(collector, s, ip: str):
     response = s.post("/api/stored_ssrf", timeout=10,
                       headers={"X-Forwarded-For": ip})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 200, f"[{response.text}] Bypassed IP {ip} should not be blocked")
 
 
-def check_stored_ssrf(ip: str):
+def check_stored_ssrf(collector, s, ip: str):
     response = s.post("/api/stored_ssrf", timeout=10)
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 500, f"evil-stored-ssrf-hostname -> {ip} [{response.text}]")
-    assert_response_body_contains(
+    collector.soft_assert_response_body_contains(
         response, "blocked", f"evil-stored-ssrf-hostname -> {ip} [{response.text}]")
 
 
-def check_stored_ssrf_with_url(domain: str, url: int):
+def check_stored_ssrf_with_url(collector, s, domain: str, url: int):
     response = s.post("/api/stored_ssrf", {"urlIndex": url})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 200, f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} ->  169.254.169.254 [{response.text}]")
-    assert_response_body_contains(
+    collector.soft_assert_response_body_contains(
         response, "Success", f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} -> 169.254.169.254 [{response.text}]")
 
 
 def run_test(s: TestServer, c: CoreApi, target_container_name: str):
+    collector = AssertionCollector()
+
     save_etc_hosts(target_container_name)
     set_etc_hosts(target_container_name, "169.254.169.254",
                   "evil-stored-ssrf-hostname")
 
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500, "expect_detection_blocked.json")
 
     # test with allowedIPAddresses, should not be blocked
-    check_ssrf_bypassed_ip("93.184.216.34")
+    check_ssrf_bypassed_ip(collector, s, "93.184.216.34")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
-    check_ssrf_with_event(
+    check_ssrf_with_event(collector, s, c,
         200, "expect_detection_not_blocked.json", num_events=0)
 
     c.update_runtime_config_file("start_config.json")
-    check_ssrf_with_event(500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500, "expect_detection_blocked.json")
 
     IDMS_IPS_V4 = [
         "169.254.169.254",
@@ -143,16 +147,18 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
 
     for ip in IDMS_IPS_V4 + IDMS_IPS_V6:
         set_etc_hosts(target_container_name, ip, "evil-stored-ssrf-hostname")
-        check_stored_ssrf(ip)
+        check_stored_ssrf(collector, s, ip)
 
     # metadata.google.internal (url=1) is a trusted host, should not be blocked
-    check_stored_ssrf_with_url("metadata.google.internal", 1)
+    check_stored_ssrf_with_url(collector, s, "metadata.google.internal", 1)
 
     # metadata.goog (url=2) is a trusted host, should not be blocked
-    check_stored_ssrf_with_url("metadata.goog", 2)
+    check_stored_ssrf_with_url(collector, s, "metadata.goog", 2)
 
     # 169.254.169.254 (url=3) is an IP, not a hostname resolution spoofing case, should not be blocked
-    check_stored_ssrf_with_url("169.254.169.254", 3)
+    check_stored_ssrf_with_url(collector, s, "169.254.169.254", 3)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

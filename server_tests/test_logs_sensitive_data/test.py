@@ -8,6 +8,7 @@ import re
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
 
     _ = s.get(
         "/api/pets/", headers={"X-Forwarded-For": "1.3.3.7", "Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
@@ -41,6 +42,8 @@ def run_test(s: TestServer, c: CoreApi):
         if "aikido" not in line and "zen" not in line:
             continue
         assert_line_contains_sensitive_data(line, i)
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

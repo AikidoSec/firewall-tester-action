@@ -27,34 +27,36 @@ def create_token(json_data: dict):
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     # ------ user blocking ------
 
     response = s.get_raw("/api/pets/", headers={
         "user": "123456"})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 200, f"Expected 200 for user 123456 {response.read()}")
 
     response = s.get_raw("/api/pets/", headers={
         "user": "789"})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 403, f"Expected 403 for user 789 {response.read()}")
 
     # ------ Bot blocking ------
 
     response = s.get("/api/pets/", headers={
         "User-Agent": "1234googlebot1234"})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 403, f"Expected 403 for  {response.text}")
 
     # ------ Big request ------
     file_path = os.path.join(os.path.dirname(__file__), "test.json")
     response = s.post("/api/create", json.load(open(file_path, 'r')))
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 200, f"Expected 200 for /api/create {response.text}")
 
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    assert_response_code_is(
+    collector.soft_assert_response_code_is(
         response, 500, f"Expected 500 for /api/create {response.text}")
 
     # ------ Big Nested JSON ------
@@ -65,7 +67,7 @@ def run_test(s: TestServer, c: CoreApi):
     }
     response = s.post("/api/create", data=body)
     pets = s.get("/api/pets/")
-    assert 'Gru' not in pets.text, f"Bypass for big nested json, pets: {pets.text}"
+    collector.soft_assert('Gru' not in pets.text, f"Bypass for big nested json, pets: {pets.text}")
 
     # ------ Big Nested JSON in token ------
     token = create_token(json_data)
@@ -75,7 +77,7 @@ def run_test(s: TestServer, c: CoreApi):
     }
     response = s.post("/api/create", data=body)
     pets = s.get("/api/pets/")
-    assert 'Gru' not in pets.text, f"Bypass for big nested json in token, pets: {pets.text}"
+    collector.soft_assert('Gru' not in pets.text, f"Bypass for big nested json in token, pets: {pets.text}")
 
     # ------ Token in token ------
     token = create_token({"a": "b"})
@@ -87,7 +89,9 @@ def run_test(s: TestServer, c: CoreApi):
     }
     response = s.post("/api/create", data=body)
     pets = s.get("/api/pets/")
-    assert 'Gru' not in pets.text, f"Bypass for token in token, pets: {pets.text}"
+    collector.soft_assert('Gru' not in pets.text, f"Bypass for token in token, pets: {pets.text}")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

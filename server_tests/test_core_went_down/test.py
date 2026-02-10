@@ -7,15 +7,18 @@ def check_attacks_blocked(collector, s, response_code):
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    collector.soft_assert_response_code_is(response, response_code, "sql injection")
+    collector.soft_assert_response_code_is(
+        response, response_code, "sql injection")
 
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(response, response_code, "shell injection")
+    collector.soft_assert_response_code_is(
+        response, response_code, "shell injection")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    collector.soft_assert_response_code_is(response, response_code, "path traversal")
+    collector.soft_assert_response_code_is(
+        response, response_code, "path traversal")
 
 
 def check_event_is_submitted_shell_injection(collector, s, c, response_code, expected_json):
@@ -32,7 +35,10 @@ def check_event_is_submitted_shell_injection(collector, s, c, response_code, exp
     # Prerequisite: need exactly 1 event to check its contents
     if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new event, got {len(new_events)}"):
         return
-    assert_event_contains_subset_file(new_events[0], expected_json)
+    try:
+        assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -56,7 +62,8 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            collector.soft_assert_response_code_is(response, 429, response.text)
+            collector.soft_assert_response_code_is(
+                response, 429, response.text)
 
     c.set_mock_server_up()
 

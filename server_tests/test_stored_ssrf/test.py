@@ -11,7 +11,7 @@ This test verifies that the firewall can detect and block stored SSRF attacks ta
 
 Stored SSRF attacks happen when an attacker can alter how hostnames are resolved by
 e.g. having inserted an entry in /etc/hosts, or having spoofed the DNS.
-If the hostname is a trusted host (like metadata.goog), there was no spoofing of hostnames, 
+If the hostname is a trusted host (like metadata.goog), there was no spoofing of hostnames,
 so it's not a stored SSRF attack.
 
 Test Steps:
@@ -70,7 +70,8 @@ def start_mock_servers(target_container_name: str):
 def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_events: int = 1):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf", timeout=10)
-    collector.soft_assert_response_code_is(response, response_code, f"[{response.text}]")
+    collector.soft_assert_response_code_is(
+        response, response_code, f"[{response.text}]")
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -81,8 +82,10 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
     # Prerequisite: need at least num_events to check contents
     if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)}"):
         return
-    if num_events == 1:
+    try:
         assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
 def check_ssrf_bypassed_ip(collector, s, ip: str):
@@ -115,17 +118,19 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
     set_etc_hosts(target_container_name, "169.254.169.254",
                   "evil-stored-ssrf-hostname")
 
-    check_ssrf_with_event(collector, s, c, 500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500,
+                          "expect_detection_blocked.json")
 
     # test with allowedIPAddresses, should not be blocked
     check_ssrf_bypassed_ip(collector, s, "93.184.216.34")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_ssrf_with_event(collector, s, c,
-        200, "expect_detection_not_blocked.json", num_events=0)
+                          200, "expect_detection_not_blocked.json", num_events=0)
 
     c.update_runtime_config_file("start_config.json")
-    check_ssrf_with_event(collector, s, c, 500, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 500,
+                          "expect_detection_blocked.json")
 
     IDMS_IPS_V4 = [
         "169.254.169.254",

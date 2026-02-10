@@ -27,7 +27,11 @@ def check_shell_injection(collector, s, c, response_code, expected_json):
     # Prerequisite: need at least 1 event to check its contents
     if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
         return
-    assert_event_contains_subset_file(new_events[0], expected_json)
+
+    try:
+        assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
 def check_shell_injection_command_post(collector, s, command):

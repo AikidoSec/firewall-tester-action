@@ -221,7 +221,7 @@ class TestServer:
         return logs.decode("utf-8")
 
 
-def assert_event_contains_subset(event, event_subset, dry_mode=False):
+def assert_event_contains_subset(event, event_subset, dry_mode=False, _path=""):
     """
     Recursively checks that all keys and values in the subset JSON exist in the event JSON
     and have the same values. If a key in the subset is a list, all its elements must exist in the
@@ -229,6 +229,7 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
 
     :param event: The event JSON dictionary
     :param subset: The subset JSON dictionary
+    :param _path: Internal parameter tracking the current JSON path for error messages
     :raises AssertionError: If the subset is not fully contained within the event
     """
     def result(assertion_error):
@@ -236,31 +237,38 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
             return False
         raise assertion_error
 
-    print(f"Searching {event_subset} in {event} (dry_mode = {dry_mode})...")
+    path_label = _path or "(root)"
+    print(f"Searching {event_subset} in {event} at {path_label} (dry_mode = {dry_mode})...")
 
     if event is None:
-        print(f"Event is None!")
+        print(f"Event is None at {path_label}!")
         return False
 
     if isinstance(event_subset, dict):
         found_all_keys = True
         for key, value in event_subset.items():
+            child_path = f"{_path}.{key}" if _path else key
             if key not in event:
-                return result(AssertionError(f"Key '{key}' not found in '{event}'."))
-            if not assert_event_contains_subset(event[key], value, dry_mode):
+                return result(AssertionError(
+                    f"Key '{key}' not found at path '{child_path}'. "
+                    f"Available keys: {list(event.keys()) if isinstance(event, dict) else type(event).__name__}"))
+            if not assert_event_contains_subset(event[key], value, dry_mode, child_path):
                 found_all_keys = False
         return found_all_keys
     elif isinstance(event_subset, list):
         if not isinstance(event, list):
-            return result(AssertionError(f"Expected a list in event but found '{event}'."))
-        for event_subset_item in event_subset:
+            return result(AssertionError(
+                f"Expected a list at path '{path_label}' but found {type(event).__name__}: '{event}'"))
+        for idx, event_subset_item in enumerate(event_subset):
             found_item = False
             for event_item in event:
-                if assert_event_contains_subset(event_item, event_subset_item, dry_mode=True):
+                if assert_event_contains_subset(event_item, event_subset_item, dry_mode=True, _path=f"{path_label}[{idx}]"):
                     found_item = True
                     break
             if not found_item:
-                return result(AssertionError(f"Item '{event_subset_item}' not found in {event}."))
+                return result(AssertionError(
+                    f"Item not found at path '{path_label}[{idx}]': "
+                    f"expected '{event_subset_item}' but no matching element in {json.dumps(event, default=str)[:500]}"))
     else:
         # {\n  \"command\": \"`whoami`\"\n} and {\"command\": \"`whoami`\"} are the same string
         try:
@@ -276,10 +284,13 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
             if re.match(regex, event):
                 return True
             else:
-                return result(AssertionError(f"Value mismatch: {event} does not match regex: {regex}"))
+                return result(AssertionError(
+                    f"Regex mismatch at path '{path_label}': "
+                    f"'{event}' does not match pattern '{regex}'"))
 
         if event_subset != event:
-            return result(AssertionError(f"Value mismatch: {event_subset} != {event}"))
+            return result(AssertionError(
+                f"Value mismatch at path '{path_label}': expected '{event_subset}', got '{event}'"))
 
     return True
 
@@ -346,11 +357,18 @@ def assert_started_event_is_valid(event):
 def assert_event_contains_subset_file(event, event_subset_file):
     caller_frame = inspect.currentframe().f_back
     caller_filename = caller_frame.f_code.co_filename
+    caller_lineno = caller_frame.f_lineno
+    subset_path = os.path.join(os.path.dirname(caller_filename), event_subset_file)
     event_subset = None
-    with open(os.path.join(os.path.dirname(caller_filename), event_subset_file), 'r') as file:
+    with open(subset_path, 'r') as file:
         event_subset = json.load(file)
-    assert event_subset
-    assert_event_contains_subset(event, event_subset)
+    assert event_subset, f"Subset file '{event_subset_file}' is empty or invalid"
+    try:
+        assert_event_contains_subset(event, event_subset)
+    except AssertionError as e:
+        raise AssertionError(
+            f"[line {caller_lineno}] Event does not match subset file '{event_subset_file}': {e}"
+        ) from None
 
 
 class AssertionCollector:

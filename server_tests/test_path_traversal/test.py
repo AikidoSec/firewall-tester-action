@@ -60,6 +60,11 @@ def run_test(s: TestServer, c: CoreApi):
 
     paths = [
         "../secrets/key.txt",
+        "//./etc/passwd",
+        "/.//etc/passwd",
+        "/././etc/passwd",
+        "/././etc/./passwd/./",
+        "/././etc/passwd/../passwd"
         ".%252E/etc/passwd",
         ".%252E/secrets/key.txt",
         "////etc/passwd",

@@ -360,13 +360,13 @@ def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
     def _make_link(line_num: str) -> str:
         url = f"https://github.com/AikidoSec/firewall-tester-action/blob/main/server_tests/{test_dir}/test.py#L{line_num}"
-        return f"[line {line_num}]({url})"
+        return f'<a href="{url}">line {line_num}</a>'
 
     # Match the entire bracket prefix: [line N] or [line N → line M → ...]
     bracket_match = re.match(r'\[(line \d+(?:\s*→\s*line \d+)*)\]\s*', text)
     if bracket_match:
         inner = bracket_match.group(1)
-        # Replace each "line N" with a link
+        # Replace each "line N" with an HTML link
         linked = re.sub(r'line (\d+)', lambda m: _make_link(m.group(1)), inner)
         text = linked + " " + text[bracket_match.end():]
     return text

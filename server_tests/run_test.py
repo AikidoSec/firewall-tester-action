@@ -460,17 +460,20 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 for i, assertion in enumerate(result.failed_assertions, 1):
                     escaped = _escape_markdown(assertion)
                     escaped = _linkify_line_ref(escaped, result.test_dir)
+                    # Indent must align with text after "N. " marker:
+                    # "1. " = 3 chars, "10. " = 4 chars, "100. " = 5 chars
+                    indent = " " * (len(str(i)) + 2)
                     f.write(f"{i}. {escaped}\n")
                     snippet = _get_source_context(result.test_dir, assertion)
                     if snippet:
-                        f.write(f"   <details>\n")
-                        f.write(f"   <summary>Show source</summary>\n\n")
-                        f.write(f"   ```python\n")
+                        f.write(f"{indent}<details>\n")
+                        f.write(f"{indent}<summary>Show source</summary>\n\n")
+                        f.write(f"{indent}```python\n")
                         # in reverse order
                         for snippet_line in reversed(snippet.split("\n")):
-                            f.write(f"   {snippet_line}\n")
-                        f.write(f"   ```\n")
-                        f.write(f"   </details>\n")
+                            f.write(f"{indent}{snippet_line}\n")
+                        f.write(f"{indent}```\n")
+                        f.write(f"{indent}</details>\n")
                 f.write(f"\n</details>\n\n")
 
 

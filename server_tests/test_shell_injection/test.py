@@ -35,7 +35,7 @@ def check_shell_injection_command_post(collector, s, command):
     if " not found" in response.text or " must be a string without null bytes" in response.text:
         return
     collector.soft_assert_response_code_is_not(
-        response, 200, f"shell injection POST /api/execute {command} , response: {response.text}")
+        response, 200, f"shell injection POST /api/execute {repr(command)} , response: {repr(response.text)[:100]}")
 
 
 def check_shell_injection_command_get(collector, s, command):
@@ -43,7 +43,7 @@ def check_shell_injection_command_get(collector, s, command):
     if " not found" in response.text or " must be a string without null bytes" in response.text or " No such file or directory" in response.text:
         return
     collector.soft_assert_response_code_is_not(
-        response, 200, f"shell injection GET /api/execute/{command} , response: {response.text}")
+        response, 200, f"shell injection GET /api/execute/{repr(command)} , response: {repr(response.text)[:100]}")
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -196,7 +196,30 @@ def run_test(s: TestServer, c: CoreApi):
 
         # Array notation (bash)
         "a=(w h o a m i);${a[@]}",
+        "ls<-."
     ]
+    commands = []
+
+    # \r \v \f \n \t \b \a \e \0 \x00 \u000B \u0000
+    special_characters = [
+        "\r",
+        "\v",
+        "\f",
+        "\n",
+        "\t",
+        "\b",
+        "\a",
+        "\0",
+        "\x00",
+        "\u000B",
+        "\u0000",
+    ]
+    for special_character in special_characters:
+        commands.append(f"id{special_character}-un")
+        commands.append(f"ls{special_character}-la")
+        commands.append(f"cat{special_character}/etc/passwd")
+        commands.append(
+            f"echo{special_character}'bHMgLWxh'{special_character}|{special_character}base64{special_character}-d{special_character}|{special_character}bash")
 
     for command in commands:
         check_shell_injection_command_post(collector, s, command)

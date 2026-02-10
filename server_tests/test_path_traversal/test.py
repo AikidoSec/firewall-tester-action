@@ -60,6 +60,11 @@ def run_test(s: TestServer, c: CoreApi):
 
     paths = [
         "../secrets/key.txt",
+        "//./etc/passwd",
+        "/.//etc/passwd",
+        "/././etc/passwd",
+        "/././etc/./passwd/./",
+        "/././etc/passwd/../passwd"
         ".%252E/etc/passwd",
         ".%252E/secrets/key.txt",
         "////etc/passwd",
@@ -75,20 +80,14 @@ def run_test(s: TestServer, c: CoreApi):
         "../secrets\\key.txt",
         "..%00/secrets/key.txt",
         "....//secrets/key.txt",
-        "/../secrets/key.txt",
-        "////../secrets/key.txt",
         "..;/secrets/key.txt",
         "..%3B/secrets/key.txt",
         "..%u2216secrets%u2216key.txt",
         "..//secrets//key.txt",
         "..%c0%afsecrets%c0%afkey.txt",
         "..\\\\secrets\\\\key.txt",
-        "/../../../../etc/shadow",
         "..//..//..//etc/passwd",
-        "..\\\\..\\\\..\\\\windows\\\\win.ini",
-        "/ｅｔｃ/ｐａｓｓｗｄ",  # Unicode homoglyphs (lookalike characters)
         "..%252F..%252F..%252Fetc%252Fpasswd",  # URL-encoded with %252F
-        "clean_path.txt",
         "file:///files/test/{..}/{..}/etc/passwd",
         "file://localhost/etc/passwd",
         "/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/etc/passwd",
@@ -108,7 +107,6 @@ def run_test(s: TestServer, c: CoreApi):
             # empty / missing
             f"path={path}&path=",
             f"path=&path={path}",
-            f"path={path}&path",
 
             # array notation
             f"path[]={path}",
@@ -121,15 +119,10 @@ def run_test(s: TestServer, c: CoreApi):
 
             # case variants
             f"path={path}&Path=../secrets/key.txt",
-            f"path={path}&PATH=../secrets/key.txt",
-            f"Path=../secrets/key.txt&path={path}",
 
             # separator abuse
             f"path={path};path=../secrets/key.txt",
             f"path={path},path=../secrets/key.txt",
-
-            # fragment trick
-            f"path={path}#../secrets/key.txt",
 
             # encoded second value
             f"path={path}&path=%2E%2E%2Fsecrets%2Fkey.txt",

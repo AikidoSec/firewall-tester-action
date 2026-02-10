@@ -87,7 +87,10 @@ def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi)
     # Prerequisite: need exactly 1 event to check its contents
     if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new heartbeat event, got {len(new_events)}"):
         return
-    assert_event_contains_subset_file(new_events[0], expected_json)
+    try:
+        assert_event_contains_subset_file(new_events[0], expected_json)
+    except AssertionError as e:
+        collector.add_failure(str(e))
 
 
 def run_test(s: TestServer, c: CoreApi):

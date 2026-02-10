@@ -360,13 +360,13 @@ def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
     def _make_link(line_num: str) -> str:
         url = f"https://github.com/AikidoSec/firewall-tester-action/blob/main/server_tests/{test_dir}/test.py#L{line_num}"
-        return f"[line {line_num}]({url})"
+        return f'<a href="{url}">line {line_num}</a>'
 
     # Match the entire bracket prefix: [line N] or [line N → line M → ...]
     bracket_match = re.match(r'\[(line \d+(?:\s*→\s*line \d+)*)\]\s*', text)
     if bracket_match:
         inner = bracket_match.group(1)
-        # Replace each "line N" with a link
+        # Replace each "line N" with an HTML link
         linked = re.sub(r'line (\d+)', lambda m: _make_link(m.group(1)), inner)
         text = linked + " " + text[bracket_match.end():]
     return text
@@ -460,17 +460,20 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
                 for i, assertion in enumerate(result.failed_assertions, 1):
                     escaped = _escape_markdown(assertion)
                     escaped = _linkify_line_ref(escaped, result.test_dir)
+                    # Indent must align with text after "N. " marker:
+                    # "1. " = 3 chars, "10. " = 4 chars, "100. " = 5 chars
+                    indent = " " * (len(str(i)) + 2)
                     f.write(f"{i}. {escaped}\n")
                     snippet = _get_source_context(result.test_dir, assertion)
                     if snippet:
-                        f.write(f"   <details>\n")
-                        f.write(f"   <summary>Show source</summary>\n\n")
-                        f.write(f"   ```python\n")
+                        f.write(f"{indent}<details>\n")
+                        f.write(f"{indent}<summary>Show source</summary>\n\n")
+                        f.write(f"{indent}```python\n")
                         # in reverse order
                         for snippet_line in reversed(snippet.split("\n")):
-                            f.write(f"   {snippet_line}\n")
-                        f.write(f"   ```\n")
-                        f.write(f"   </details>\n")
+                            f.write(f"{indent}{snippet_line}\n")
+                        f.write(f"{indent}```\n")
+                        f.write(f"{indent}</details>\n")
                 f.write(f"\n</details>\n\n")
 
 

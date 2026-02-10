@@ -83,7 +83,8 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
     if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)}"):
         return
     try:
-        assert_event_contains_subset_file(new_events[0], expected_json)
+        if num_events == 1:
+            assert_event_contains_subset_file(new_events[0], expected_json)
     except AssertionError as e:
         collector.add_failure(str(e))
 

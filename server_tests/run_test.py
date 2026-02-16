@@ -15,6 +15,7 @@ from datetime import datetime
 from enum import Enum
 import shlex
 import re
+import io
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -396,85 +397,158 @@ def _get_source_context(test_dir: str, assertion_text: str, context_lines: int =
         return None
 
 
+def _build_summary_header(test_results: List[TestResult]) -> str:
+    """Build the overview and results table (always included)."""
+    buf = io.StringIO()
+    buf.write("\n## Test Results Summary\n\n")
+
+    total_tests = len(test_results)
+    passed_tests = sum(
+        1 for r in test_results if r.status == TestStatus.PASSED)
+    skipped_tests = sum(
+        1 for r in test_results if r.status == TestStatus.SKIPPED)
+    timeout_tests = sum(
+        1 for r in test_results if r.status == TestStatus.TIMEOUT)
+    failed_tests = sum(
+        1 for r in test_results if r.status == TestStatus.FAILED)
+
+    buf.write("### Overview\n\n")
+    buf.write(f"- **Total Tests:** {total_tests}\n")
+    buf.write(f"- **Passed:** {passed_tests}\n")
+    buf.write(f"- **Skipped:** {skipped_tests}\n")
+    buf.write(f"- **Timed Out:** {timeout_tests}\n")
+    buf.write(f"- **Failed:** {failed_tests}\n")
+
+    buf.write("### Detailed Results\n\n")
+    buf.write("| Test | Status | Duration | Error Message |\n")
+    buf.write("|------|--------|----------|---------------|\n")
+
+    for result in test_results:
+        status_emoji = {
+            TestStatus.PASSED: "✅ PASS",
+            TestStatus.FAILED: "❌ FAIL",
+            TestStatus.SKIPPED: "⏭️ SKIP",
+            TestStatus.TIMEOUT: "⏰ TIMEOUT"
+        }
+        status = status_emoji[result.status]
+        duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
+        if result.failed_assertions:
+            error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
+        elif result.error_message:
+            error = result.error_message
+        else:
+            error = "-"
+        error = _escape_markdown(error)
+        buf.write(
+            f"| {result.test_dir} | {status} | {duration} | {error} |\n")
+
+    return buf.getvalue()
+
+
+def _build_details_block(result: TestResult, include_snippets: bool, max_assertions: Optional[int] = None) -> str:
+    """Build a single <details> block for one failed test."""
+    buf = io.StringIO()
+    total = len(result.failed_assertions)
+    assertions = result.failed_assertions
+    if max_assertions and max_assertions < total:
+        assertions = assertions[:max_assertions]
+
+    buf.write(f"<details>\n")
+    buf.write(
+        f"<summary>{result.test_dir} - {total} failed assertion(s)</summary>\n\n")
+    for i, assertion in enumerate(assertions, 1):
+        escaped = _escape_markdown(assertion)
+        escaped = _linkify_line_ref(escaped, result.test_dir)
+        indent = " " * (len(str(i)) + 2)
+        buf.write(f"{i}. {escaped}\n")
+        if include_snippets:
+            snippet = _get_source_context(result.test_dir, assertion)
+            if snippet:
+                buf.write(f"{indent}<details>\n")
+                buf.write(f"{indent}<summary>Show source</summary>\n\n")
+                buf.write(f"{indent}```python\n")
+                for snippet_line in reversed(snippet.split("\n")):
+                    buf.write(f"{indent}{snippet_line}\n")
+                buf.write(f"{indent}```\n")
+                buf.write(f"{indent}</details>\n")
+    if max_assertions and max_assertions < total:
+        buf.write(
+            f"\n*... and {total - max_assertions} more assertion(s) truncated to fit summary size limit.*\n")
+    buf.write(f"\n</details>\n\n")
+    return buf.getvalue()
+
+
+# GitHub step summary limit is 1024 KB; use 1020 KB as safe threshold
+_SUMMARY_SIZE_LIMIT = 1020 * 1024
+
+
 def write_summary_to_github_step_summary(test_results: List[TestResult]):
     summary_path = os.environ.get('GITHUB_STEP_SUMMARY')
     if not summary_path:
         logger.warning("GITHUB_STEP_SUMMARY environment variable not set")
         return
 
+    header = _build_summary_header(test_results)
+
+    failed_with_details = [
+        r for r in test_results if r.failed_assertions]
+
+    if not failed_with_details:
+        # No details section needed – just write the header
+        with open(summary_path, 'a') as f:
+            f.write(header)
+        return
+
+    details_heading = "\n### Failed Assertions Details\n\n"
+
+    # Strategy 1: full details with snippets
+    details_blocks = [_build_details_block(
+        r, include_snippets=True) for r in failed_with_details]
+    full_content = header + details_heading + "".join(details_blocks)
+
+    if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
+        with open(summary_path, 'a') as f:
+            f.write(full_content)
+        return
+
+    logger.warning(
+        f"Summary with snippets is {len(full_content.encode('utf-8')) // 1024}KB, "
+        f"exceeds {_SUMMARY_SIZE_LIMIT // 1024}KB limit – removing source snippets")
+
+    # Strategy 2: details without snippets
+    details_blocks = [_build_details_block(
+        r, include_snippets=False) for r in failed_with_details]
+    full_content = header + details_heading + "".join(details_blocks)
+
+    if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
+        with open(summary_path, 'a') as f:
+            f.write(full_content)
+        return
+
+    logger.warning(
+        f"Summary without snippets is {len(full_content.encode('utf-8')) // 1024}KB, "
+        f"still exceeds limit – capping assertions per test")
+
+    # Strategy 3: no snippets + cap assertions per test, progressively reduce
+    for cap in [20, 10, 5]:
+        details_blocks = [_build_details_block(
+            r, include_snippets=False, max_assertions=cap) for r in failed_with_details]
+        full_content = header + details_heading + "".join(details_blocks)
+        if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
+            with open(summary_path, 'a') as f:
+                f.write(full_content)
+            return
+
+    # Strategy 4: only header + a note that details were truncated
+    logger.warning(
+        "Summary still too large – writing header only with truncation notice")
+    truncation_notice = (
+        "\n### Failed Assertions Details\n\n"
+        "> ⚠️ Detailed assertion failures were omitted because the summary exceeded "
+        "GitHub's 1024KB size limit. Check the test logs for full details.\n\n"
+    )
     with open(summary_path, 'a') as f:
-        f.write("\n## Test Results Summary\n\n")
-
-        # Write summary statistics
-        total_tests = len(test_results)
-        passed_tests = sum(
-            1 for r in test_results if r.status == TestStatus.PASSED)
-        skipped_tests = sum(
-            1 for r in test_results if r.status == TestStatus.SKIPPED)
-        timeout_tests = sum(
-            1 for r in test_results if r.status == TestStatus.TIMEOUT)
-        failed_tests = sum(
-            1 for r in test_results if r.status == TestStatus.FAILED)
-
-        f.write("### Overview\n\n")
-        f.write(f"- **Total Tests:** {total_tests}\n")
-        f.write(f"- **Passed:** {passed_tests}\n")
-        f.write(f"- **Skipped:** {skipped_tests}\n")
-        f.write(f"- **Timed Out:** {timeout_tests}\n")
-        f.write(f"- **Failed:** {failed_tests}\n")
-
-        # Write detailed results table
-        f.write("### Detailed Results\n\n")
-        f.write("| Test | Status | Duration | Error Message |\n")
-        f.write("|------|--------|----------|---------------|\n")
-
-        for result in test_results:
-            status_emoji = {
-                TestStatus.PASSED: "✅ PASS",
-                TestStatus.FAILED: "❌ FAIL",
-                TestStatus.SKIPPED: "⏭️ SKIP",
-                TestStatus.TIMEOUT: "⏰ TIMEOUT"
-            }
-            status = status_emoji[result.status]
-            duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
-            if result.failed_assertions:
-                error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
-            elif result.error_message:
-                error = result.error_message
-            else:
-                error = "-"
-            # Escape characters that could break markdown table formatting
-            error = _escape_markdown(error)
-            f.write(
-                f"| {result.test_dir} | {status} | {duration} | {error} |\n")
-
-        # Write detailed failure information for tests with multiple assertion failures
-        failed_with_details = [
-            r for r in test_results if r.failed_assertions]
-        if failed_with_details:
-            f.write("\n### Failed Assertions Details\n\n")
-            for result in failed_with_details:
-                f.write(f"<details>\n")
-                f.write(
-                    f"<summary>{result.test_dir} - {len(result.failed_assertions)} failed assertion(s)</summary>\n\n")
-                for i, assertion in enumerate(result.failed_assertions, 1):
-                    escaped = _escape_markdown(assertion)
-                    escaped = _linkify_line_ref(escaped, result.test_dir)
-                    # Indent must align with text after "N. " marker:
-                    # "1. " = 3 chars, "10. " = 4 chars, "100. " = 5 chars
-                    indent = " " * (len(str(i)) + 2)
-                    f.write(f"{i}. {escaped}\n")
-                    snippet = _get_source_context(result.test_dir, assertion)
-                    if snippet:
-                        f.write(f"{indent}<details>\n")
-                        f.write(f"{indent}<summary>Show source</summary>\n\n")
-                        f.write(f"{indent}```python\n")
-                        # in reverse order
-                        for snippet_line in reversed(snippet.split("\n")):
-                            f.write(f"{indent}{snippet_line}\n")
-                        f.write(f"{indent}```\n")
-                        f.write(f"{indent}</details>\n")
-                f.write(f"\n</details>\n\n")
+        f.write(header + truncation_notice)
 
 
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):

@@ -31,6 +31,14 @@
     {
       "hostname": "münchen-allowed.example.com",
       "mode": "allow"
+    },
+    {
+      "hostname": "172.18.0.1",
+      "mode": "allow"
+    },
+    {
+      "hostname": "172.17.0.1",
+      "mode": "allow"
     }
   ]
 }

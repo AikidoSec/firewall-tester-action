@@ -141,11 +141,11 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
         response, 200, f"{response.text} - allowed Punycode domain xn--mnchen-allowed-gsb.example.com should be accessible")
 
     # If the firewall supports percent-encoding, we test it
-    test_percent_encoded = True
+    test_percent_encoded = False
     response = s.post(
         "/api/request", {"url": "http://m%C3%BCnchen-allowed.example.com"})
-    if response.status_code != 200:
-        test_percent_encoded = False
+    if response.status_code == 200 and "ok" in response.text:
+        test_percent_encoded = True
 
     if test_percent_encoded:
         """Test URL percent-encoding bypass attempts"""

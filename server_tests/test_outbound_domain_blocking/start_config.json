@@ -14,7 +14,9 @@
       }
     }
   ],
-  "allowedIPAddresses": ["1.2.3.4"],
+  "allowedIPAddresses": [
+    "1.2.3.4"
+  ],
   "receivedAnyStats": false,
   "block": true,
   "blockNewOutgoingRequests": true,
@@ -37,6 +39,14 @@
     },
     {
       "hostname": "münchen-allowed.example.com",
+      "mode": "allow"
+    },
+    {
+      "hostname": "172.18.0.1",
+      "mode": "allow"
+    },
+    {
+      "hostname": "172.17.0.1",
       "mode": "allow"
     }
   ]

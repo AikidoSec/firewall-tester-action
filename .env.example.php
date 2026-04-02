@@ -10,7 +10,7 @@ ACTIONS_STEP_DEBUG=true
 # GitHub Actions inputs should follow `INPUT_<name>` format (case-sensitive).
 # Hyphens should not be converted to underscores!
 INPUT_DOCKERFILE_PATH=zen-demo/zen-demo-php/Dockerfile
-INPUT_MAX_PARALLEL_TEST=5
+INPUT_MAX_PARALLEL_TESTS=5
 INPUT_CONFIG_UPDATE_DELAY=120
 INPUT_SKIP_TESTS=test1
 INPUT_TEST_TIMEOUT=900

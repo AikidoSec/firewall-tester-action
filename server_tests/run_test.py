@@ -19,9 +19,18 @@ import io
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
-# ip addr show docker0 | grep 'inet ' | awk '{print $2}' | cut -d/ -f1
-DOCKER_HOST_IP = "172.17.0.1" if os.environ.get(
-    "GITHUB_ACTIONS") == "true" else "172.18.0.1"
+
+
+def get_docker_host_ip() -> str:
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return "172.17.0.1"
+    # Docker Desktop on macOS/Windows provides host.docker.internal
+    if os.uname().sysname != "Linux":
+        return "host.docker.internal"
+    return os.environ.get("DOCKER_HOST_IP", "172.18.0.1")
+
+
+DOCKER_HOST_IP = get_docker_host_ip()
 
 
 class GitHubActionsFormatter(logging.Formatter):

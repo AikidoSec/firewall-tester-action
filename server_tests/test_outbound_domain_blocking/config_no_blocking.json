@@ -39,6 +39,11 @@
     {
       "hostname": "172.17.0.1",
       "mode": "allow"
+    },
+    {
+      "hostname": "host.docker.internal",
+      "mode": "allow"
     }
   ]
 }
+

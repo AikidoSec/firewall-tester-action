@@ -34,3 +34,45 @@ jobs:
 | `skip_tests`          | Comma-separated list of tests to skip (e.g. `test_allowed_ip,test_sql_injection`)                      |
 | `test_timeout`        | Timeout (in seconds) for each test (default: `60`)                                                     |
 | `sleep_before_test`   | Number of seconds to wait before starting the test (default: `1`)                                      |
+
+## Running locally
+
+You'll need Docker, Node.js >= 20, and Python 3.
+
+Clone the demo app you want to test into `./zen-demo/`:
+
+```sh
+git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo/zen-demo-nodejs
+# or whichever language you're working on
+```
+
+Then install dependencies:
+
+```sh
+npm install
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Run tests for a language:
+
+```sh
+npm run local-action-nodejs
+npm run local-action-php
+npm run local-action-java
+npm run local-action-python
+npm run local-action-ruby
+npm run local-action-go
+npm run local-action-dotnet
+```
+
+To run a single test, pass the name after `--`:
+
+```sh
+npm run local-action-nodejs -- test_sql_injection
+npm run local-action-php -- test_shell_injection,test_path_traversal
+```
+
+Each language has a corresponding `.env.example.<lang>` file where you can adjust the Dockerfile path, parallelism, timeouts, etc.

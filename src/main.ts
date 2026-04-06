@@ -1,7 +1,8 @@
 import * as core from '@actions/core'
 import { startServer, stopServer } from './coremock/app.js'
-import { spawn } from 'child_process'
+import { spawn, type ChildProcess } from 'child_process'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 // Handle process termination signals
 process.on('SIGINT', () => {
@@ -62,12 +63,18 @@ export async function run(): Promise<void> {
     core.debug(`Ignore failures: ${ignore_failures}`)
     core.debug(`Test type: ${test_type}`)
     // Spawn the Python process
-    const this_file_dir = path.dirname(new URL(import.meta.url).pathname)
+    const this_file_dir = path.dirname(fileURLToPath(import.meta.url))
+    const run_test_path = path.resolve(
+      this_file_dir,
+      '..',
+      'server_tests',
+      'run_test.py'
+    )
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
         [
-          `${this_file_dir}/../server_tests/run_test.py`,
+          run_test_path,
           '--dockerfile_path',
           dockerfile_path,
           '--max_parallel_tests',
@@ -119,30 +126,62 @@ export async function run(): Promise<void> {
 }
 
 async function startPostgres() {
-  const proc = spawn(
-    'docker',
-    [
-      'run',
-      '--rm',
-      '--name',
-      'postgres',
-      '-e',
-      'POSTGRES_PASSWORD=mysecretpassword',
-      '-e',
-      'POSTGRES_USER=myuser',
-      '-e',
-      'POSTGRES_DB=mydb',
-      '-p',
-      '5432:5432',
-      '-d',
-      'postgres',
-      '-c',
-      'max_connections=200'
-    ],
-    {
-      stdio: 'inherit'
-    }
-  )
+  let proc: ChildProcess
+  // if os is windows
+  // docker run --rm --name postgres -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=myuser -e POSTGRES_DB=mydb -p 5432:5432 -d --isolation process innovesys/postgresql-windows:latest -c max_connections=200
+  if (process.platform === 'win32') {
+    proc = spawn(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '--name',
+        'postgres',
+        '-e',
+        'POSTGRES_PASSWORD=mysecretpassword',
+        '-e',
+        'POSTGRES_USER=myuser',
+        '-e',
+        'POSTGRES_DB=mydb',
+        '-p',
+        '5432:5432',
+        '-d',
+        '--isolation',
+        'process',
+        'innovesys/postgresql-windows:latest',
+        '-c',
+        'max_connections=200'
+      ],
+      {
+        stdio: 'inherit'
+      }
+    )
+  } else {
+    proc = spawn(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '--name',
+        'postgres',
+        '-e',
+        'POSTGRES_PASSWORD=mysecretpassword',
+        '-e',
+        'POSTGRES_USER=myuser',
+        '-e',
+        'POSTGRES_DB=mydb',
+        '-p',
+        '5432:5432',
+        '-d',
+        'postgres',
+        '-c',
+        'max_connections=200'
+      ],
+      {
+        stdio: 'inherit'
+      }
+    )
+  }
   console.log(`Started Postgres: ${proc.pid}`)
   // wait for postgres to be ready
   await new Promise((resolve) => {

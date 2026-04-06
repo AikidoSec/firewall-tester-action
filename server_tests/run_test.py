@@ -25,9 +25,64 @@ def get_docker_host_ip() -> str:
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
     # Docker Desktop on macOS/Windows provides host.docker.internal
-    if os.uname().sysname != "Linux":
+    if not sys.platform.startswith("linux"):
         return "host.docker.internal"
     return os.environ.get("DOCKER_HOST_IP", "172.18.0.1")
+
+
+def quote_postgres_identifier(identifier: str) -> str:
+    # PostgreSQL identifiers are escaped by doubling quotes.
+    return identifier.replace('"', '""')
+
+
+def create_test_database(test_dir: str) -> str:
+    escaped_db_name = quote_postgres_identifier(test_dir)
+    create_db_commands_windows = [
+        [
+            "docker",
+            "exec",
+            "postgres",
+            "C:\\pgsql\\bin\\createdb.exe",
+            "-U",
+            "myuser",
+            test_dir,
+        ],
+        [
+            "docker",
+            "exec",
+            "postgres",
+            "C:\\pgsql\\bin\\psql.exe",
+            "-U",
+            "myuser",
+            "-d",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            f'CREATE DATABASE "{escaped_db_name}"',
+        ],
+    ]
+    create_db_commands_linux = [
+        ["docker", "exec", "postgres", "createdb", "-U", "myuser", test_dir],
+        ["docker", "exec", "postgres", "psql", "-U", "myuser", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
+    ]
+    last_error: Optional[subprocess.CalledProcessError] = None
+    
+    create_db_commands = create_db_commands_windows if sys.platform.startswith("win32") else create_db_commands_linux
+    for command in create_db_commands:
+        try:
+            subprocess.run(command, check=True)
+            return test_dir
+        except subprocess.CalledProcessError as error:
+            last_error = error
+            logger.warning(f"Database create command failed: {' '.join(command)}")
+
+    if last_error:
+        logger.warning(
+            "Falling back to shared 'postgres' database because test database creation failed"
+        )
+        return "postgres"
+    raise RuntimeError("Unable to create database; no command was executed")
 
 
 DOCKER_HOST_IP = get_docker_host_ip()
@@ -162,14 +217,13 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
-        subprocess.run(create_database_command, shell=True, check=True)
+        database_name = create_test_database(test_dir)
         time.sleep(1)
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable",
+            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{database_name}?sslmode=disable",
             "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
             "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
             "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",

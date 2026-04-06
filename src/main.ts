@@ -126,62 +126,35 @@ export async function run(): Promise<void> {
 }
 
 async function startPostgres() {
-  let proc: ChildProcess
   // if os is windows
   // docker run --rm --name postgres -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=myuser -e POSTGRES_DB=mydb -p 5432:5432 -d --isolation process innovesys/postgresql-windows:latest -c max_connections=200
+  const dockerArgs = [
+    'run',
+    '--rm',
+    '--name',
+    'postgres',
+    '-e',
+    'POSTGRES_PASSWORD=mysecretpassword',
+    '-e',
+    'POSTGRES_USER=myuser',
+    '-e',
+    'POSTGRES_DB=mydb',
+    '-p',
+    '5432:5432',
+    '-d'
+  ]
+  
   if (process.platform === 'win32') {
-    proc = spawn(
-      'docker',
-      [
-        'run',
-        '--rm',
-        '--name',
-        'postgres',
-        '-e',
-        'POSTGRES_PASSWORD=mysecretpassword',
-        '-e',
-        'POSTGRES_USER=myuser',
-        '-e',
-        'POSTGRES_DB=mydb',
-        '-p',
-        '5432:5432',
-        '-d',
-        '--isolation',
-        'process',
-        'innovesys/postgresql-windows:latest',
-        '-c',
-        'max_connections=200'
-      ],
-      {
-        stdio: 'inherit'
-      }
-    )
+    dockerArgs.push('--isolation', 'process', 'innovesys/postgresql-windows:latest')
   } else {
-    proc = spawn(
-      'docker',
-      [
-        'run',
-        '--rm',
-        '--name',
-        'postgres',
-        '-e',
-        'POSTGRES_PASSWORD=mysecretpassword',
-        '-e',
-        'POSTGRES_USER=myuser',
-        '-e',
-        'POSTGRES_DB=mydb',
-        '-p',
-        '5432:5432',
-        '-d',
-        'postgres',
-        '-c',
-        'max_connections=200'
-      ],
-      {
-        stdio: 'inherit'
-      }
-    )
+    dockerArgs.push('postgres')
   }
+  
+  dockerArgs.push('-c', 'max_connections=200')
+  
+  const proc = spawn('docker', dockerArgs, {
+    stdio: 'inherit'
+  })
   console.log(`Started Postgres: ${proc.pid}`)
   // wait for postgres to be ready
   await new Promise((resolve) => {

@@ -199,3 +199,30 @@ jobs:
           ignore_failures: true
           extra_args: "-e RAILS_ENV=test -e AIKIDO_CLIENT_IP_HEADER=HTTP_X_FORWARDED_FOR"
           app_port: 3000
+
+  test-dotnet-framework:
+    name: Dotnet Framework Tests (zen-demo-dotnet-framework)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout action
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout demo app
+        uses: actions/checkout@v4
+        with: 
+          repository: Aikido-demo-apps/zen-demo-dotnet-framework
+          path: ./zen-demo
+          ref: main
+          submodules: recursive
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          sleep_before_test: 15
+          max_parallel_tests: 5
+          app_port: 80
+          ignore_failures: true
+          test_timeout: 900 # 15 minutes

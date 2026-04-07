@@ -272,16 +272,31 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 5. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        command = [
+            sys.executable,
+            os.path.join(server_tests_dir, test_dir, "test.py"),
+            "--test_name",
+            test_dir,
+            "--server_port",
+            str(start_port),
+            "--token",
+            token,
+            "--config_update_delay",
+            str(config_update_delay),
+            "--core_port",
+            "3000",
+        ]
         if control_port:
-            command += f" --control_server_port {control_port}"
+            command += ["--control_server_port", str(control_port)]
+        test_env = os.environ.copy()
+        test_env["PYTHONPATH"] = server_tests_dir
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
         try:
             process = subprocess.run(
                 command,
-                shell=True,
+                env=test_env,
                 check=False,
                 capture_output=True,
                 text=True,

@@ -502,13 +502,13 @@ def _build_summary_header(test_results: List[TestResult]) -> str:
     buf.write("|------|--------|----------|---------------|\n")
 
     for result in test_results:
-        status_emoji = {
-            TestStatus.PASSED: "✅ PASS",
-            TestStatus.FAILED: "❌ FAIL",
-            TestStatus.SKIPPED: "⏭️ SKIP",
-            TestStatus.TIMEOUT: "⏰ TIMEOUT"
+        status_label = {
+            TestStatus.PASSED: "PASS",
+            TestStatus.FAILED: "FAIL",
+            TestStatus.SKIPPED: "SKIP",
+            TestStatus.TIMEOUT: "TIMEOUT"
         }
-        status = status_emoji[result.status]
+        status = status_label[result.status]
         duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
         if result.failed_assertions:
             error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
@@ -573,7 +573,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 
     if not failed_with_details:
         # No details section needed – just write the header
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(header)
         return
 
@@ -585,7 +585,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     full_content = header + details_heading + "".join(details_blocks)
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 
@@ -599,7 +599,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     full_content = header + details_heading + "".join(details_blocks)
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 
@@ -613,7 +613,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
             r, include_snippets=False, max_assertions=cap) for r in failed_with_details]
         full_content = header + details_heading + "".join(details_blocks)
         if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-            with open(summary_path, 'a') as f:
+            with open(summary_path, 'a', encoding='utf-8') as f:
                 f.write(full_content)
             return
 
@@ -622,10 +622,10 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         "Summary still too large – writing header only with truncation notice")
     truncation_notice = (
         "\n### Failed Assertions Details\n\n"
-        "> ⚠️ Detailed assertion failures were omitted because the summary exceeded "
+        "> Detailed assertion failures were omitted because the summary exceeded "
         "GitHub's 1024KB size limit. Check the test logs for full details.\n\n"
     )
-    with open(summary_path, 'a') as f:
+    with open(summary_path, 'a', encoding='utf-8') as f:
         f.write(header + truncation_notice)
 
 
@@ -664,7 +664,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                                     start_time=datetime.now())
                 result.complete(TestStatus.SKIPPED, "Skipped")
                 test_results.append(result)
-                logger.info(f"Test {test_dir} ⏭️ SKIPPED")
+                logger.info(f"Test {test_dir} SKIPPED")
                 continue
 
             token = CoreApi.get_app_token(CORE_URL)
@@ -691,14 +691,14 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
             try:
                 result = future.result()
                 test_results.append(result)
-                status_emoji = {
-                    TestStatus.PASSED: "✅ PASSED",
-                    TestStatus.FAILED: "❌ FAILED",
-                    TestStatus.SKIPPED: "⏭️ SKIPPED",
-                    TestStatus.TIMEOUT: "⏰ TIMED OUT"
+                status_label = {
+                    TestStatus.PASSED: "PASSED",
+                    TestStatus.FAILED: "FAILED",
+                    TestStatus.SKIPPED: "SKIPPED",
+                    TestStatus.TIMEOUT: "TIMED OUT"
                 }
                 logger.info(
-                    f"Test {test_dir} {status_emoji[result.status]} in {result.duration:.2f} seconds")
+                    f"Test {test_dir} {status_label[result.status]} in {result.duration:.2f} seconds")
                 if result.status == TestStatus.FAILED:
                     logger.error(
                         f"Error in test {test_dir}: {result.error_message}")

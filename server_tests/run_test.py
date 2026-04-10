@@ -19,7 +19,9 @@ import io
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
-def get_docker_host_ip() -> str:
+
+
+def get_default_docker_host_ip() -> str:
     docker_host_ip = os.environ.get("DOCKER_HOST_IP")
     if docker_host_ip:
         return docker_host_ip
@@ -29,6 +31,109 @@ def get_docker_host_ip() -> str:
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
     return "172.18.0.1"
+
+
+def get_windows_nat_gateway_ip() -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["docker", "network", "inspect", "nat"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+        networks = json.loads(result.stdout)
+        if not networks:
+            return None
+
+        ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
+        if not ipam_configs:
+            return None
+
+        return ipam_configs[0].get("Gateway")
+    except Exception:
+        return None
+
+
+def get_windows_host_candidates() -> List[str]:
+    candidates: List[str] = []
+    for host in (
+        "host.docker.internal",
+        "gateway.docker.internal",
+        get_windows_nat_gateway_ip(),
+    ):
+        if host and host not in candidates:
+            candidates.append(host)
+    return candidates
+
+
+def can_connect_from_windows_postgres_container(host: str, port: int) -> bool:
+    host_literal = host.replace("'", "''")
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        f"$hostName = '{host_literal}'; "
+        f"$port = {port}; "
+        "$client = [System.Net.Sockets.TcpClient]::new(); "
+        "try { "
+        "$asyncResult = $client.BeginConnect($hostName, $port, $null, $null); "
+        "if (-not $asyncResult.AsyncWaitHandle.WaitOne(3000)) { exit 1 } "
+        "$client.EndConnect($asyncResult) | Out-Null; "
+        "exit 0 "
+        "} catch { "
+        "exit 1 "
+        "} finally { "
+        "$client.Dispose(); "
+        "}"
+    )
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "postgres",
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                script,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def resolve_docker_host_for_service(service_name: str, port: int, env_vars: List[str]) -> str:
+    for env_var in env_vars:
+        host = os.environ.get(env_var)
+        if host:
+            logger.info(
+                f"Using {service_name} Docker host from {env_var}: {host}:{port}"
+            )
+            return host
+
+    default_host = get_default_docker_host_ip()
+    if not sys.platform.startswith("win32"):
+        logger.info(f"Using default {service_name} Docker host: {default_host}:{port}")
+        return default_host
+
+    for candidate in get_windows_host_candidates():
+        reachable = can_connect_from_windows_postgres_container(candidate, port)
+        logger.info(
+            f"Probing Windows Docker host for {service_name}: {candidate}:{port} -> "
+            f"{'reachable' if reachable else 'unreachable'}"
+        )
+        if reachable:
+            return candidate
+
+    logger.warning(
+        f"Unable to verify a Windows Docker host for {service_name} on port {port}; "
+        f"falling back to {default_host}"
+    )
+    return default_host
 
 
 def quote_postgres_identifier(identifier: str) -> str:
@@ -85,10 +190,6 @@ def create_test_database(test_dir: str) -> str:
         return "postgres"
     raise RuntimeError("Unable to create database; no command was executed")
 
-
-DOCKER_HOST_IP = get_docker_host_ip()
-
-
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
         level = record.levelname.lower()
@@ -119,6 +220,12 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 
 
 logger = get_logger()
+DOCKER_CORE_HOST = resolve_docker_host_for_service(
+    "core", 3000, ["DOCKER_CORE_HOST", "DOCKER_HOST_IP"]
+)
+DOCKER_POSTGRES_HOST = resolve_docker_host_for_service(
+    "postgres", 5432, ["DOCKER_POSTGRES_HOST", "DOCKER_HOST_IP"]
+)
 
 
 class TestStatus(Enum):
@@ -224,11 +331,11 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{database_name}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_POSTGRES_HOST}:5432/{database_name}?sslmode=disable",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_CORE_HOST}:3000",
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')

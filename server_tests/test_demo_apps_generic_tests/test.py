@@ -15,15 +15,26 @@ sys.setrecursionlimit(40001)
 '''
 
 
-def build_nested_dict(depth: int, json_data: dict = {}):
-    if depth == 0:
-        return {"a": "b"}
-    json_data[f"key{depth}"] = build_nested_dict(depth - 1,  {})
-    return json_data
+def build_nested_dict(depth: int):
+    result = {"a": "b"}
+    for level in range(1, depth + 1):
+        result = {f"key{level}": result}
+    return result
 
 
-def create_token(json_data: dict):
-    return f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.{base64.b64encode(json.dumps(json_data).encode()).decode()}.1234567890"
+def build_nested_json_text(depth: int):
+    result = '{"a":"b"}'
+    for level in range(1, depth + 1):
+        result = '{"key' + str(level) + '":' + result + '}'
+    return result
+
+
+def create_token(json_data):
+    if isinstance(json_data, str):
+        payload = json_data
+    else:
+        payload = json.dumps(json_data)
+    return f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.{base64.b64encode(payload.encode()).decode()}.1234567890"
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -70,7 +81,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert('Gru' not in pets.text, f"Bypass for big nested json, pets: {pets.text}")
 
     # ------ Big Nested JSON in token ------
-    token = create_token(json_data)
+    token = create_token(build_nested_json_text(8000))
     body = {
         "a": token,
         "name": "Malicious Pet', 'Gru from the Minions') --"

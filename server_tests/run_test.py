@@ -22,12 +22,16 @@ DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 
 
 def get_docker_host_ip() -> str:
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        return "172.17.0.1"
-    # Docker Desktop on macOS/Windows provides host.docker.internal
+    docker_host_ip = os.environ.get("DOCKER_HOST_IP")
+    if docker_host_ip:
+        return docker_host_ip
+    # Docker Desktop on macOS/Windows provides host.docker.internal,
+    # including on GitHub Actions Windows runners.
     if not sys.platform.startswith("linux"):
         return "host.docker.internal"
-    return os.environ.get("DOCKER_HOST_IP", "172.18.0.1")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return "172.17.0.1"
+    return "172.18.0.1"
 
 
 def quote_postgres_identifier(identifier: str) -> str:

@@ -1,6 +1,7 @@
 import * as core from '@actions/core'
 import { startServer, stopServer } from './coremock/app.js'
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn } from 'child_process'
+import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -143,23 +144,44 @@ async function startPostgres() {
     '5432:5432',
     '-d'
   ]
-  
+
   if (process.platform === 'win32') {
-    dockerArgs.push('--isolation', 'process', 'innovesys/postgresql-windows:latest')
+    const thisFileDir = path.dirname(fileURLToPath(import.meta.url))
+    const srcDir = path.resolve(thisFileDir, '..', 'src')
+    const windowsEntrypointPath = path.join(
+      srcDir,
+      'windows-postgres-entrypoint.ps1'
+    )
+
+    if (!fs.existsSync(windowsEntrypointPath)) {
+      throw new Error(
+        `Windows Postgres entrypoint not found: ${windowsEntrypointPath}`
+      )
+    }
+
+    dockerArgs.push(
+      '--mount',
+      `type=bind,source=${srcDir},target=C:\\action-src,readonly`,
+      '--entrypoint',
+      'pwsh',
+      '--isolation',
+      'process',
+      'innovesys/postgresql-windows:latest',
+      '-NoLogo',
+      '-NoProfile',
+      '-File',
+      'C:\\action-src\\windows-postgres-entrypoint.ps1'
+    )
   } else {
     dockerArgs.push('postgres')
+    dockerArgs.push('-c', 'max_connections=200')
   }
-  
-  dockerArgs.push('-c', 'max_connections=200')
-  
+
   const proc = spawn('docker', dockerArgs, {
     stdio: 'inherit'
   })
   console.log(`Started Postgres: ${proc.pid}`)
-  // wait for postgres to be ready
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10000)
-  })
+  await waitForPostgresReady()
   proc.on('close', (code) => {
     if (code !== 0) {
       core.setFailed(`Failed to start Postgres: ${code}`)
@@ -176,6 +198,41 @@ async function startPostgres() {
   proc.on('message', (msg) => {
     console.log(`Postgres: ${msg}`)
   })
+}
+
+async function waitForPostgresReady() {
+  const readyCommand =
+    process.platform === 'win32'
+      ? [
+          'exec',
+          'postgres',
+          'C:\\pgsql\\bin\\pg_isready.exe',
+          '-U',
+          'myuser',
+          '-h',
+          '127.0.0.1',
+          '-p',
+          '5432'
+        ]
+      : ['exec', 'postgres', 'pg_isready', '-U', 'myuser', '-h', '127.0.0.1', '-p', '5432']
+
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const result = await new Promise<number>((resolve) => {
+      const proc = spawn('docker', readyCommand, { stdio: 'ignore' })
+      proc.on('close', (code) => resolve(code ?? 1))
+      proc.on('error', () => resolve(1))
+    })
+
+    if (result === 0) {
+      return
+    }
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000)
+    })
+  }
+
+  throw new Error('Postgres did not become ready after 60 seconds')
 }
 
 function stopPostgres() {

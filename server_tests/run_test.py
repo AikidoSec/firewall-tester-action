@@ -19,33 +19,11 @@ import io
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
-
-
-def get_windows_nat_gateway_ip() -> Optional[str]:
-    try:
-        result = subprocess.run(
-            ["docker", "network", "inspect", "nat"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        networks = json.loads(result.stdout)
-        gateway = networks[0]["IPAM"]["Config"][0].get("Gateway")
-        if gateway:
-            return gateway
-    except (subprocess.SubprocessError, json.JSONDecodeError, KeyError, IndexError, TypeError):
-        pass
-    return None
-
-
 def get_docker_host_ip() -> str:
     docker_host_ip = os.environ.get("DOCKER_HOST_IP")
     if docker_host_ip:
         return docker_host_ip
     if not sys.platform.startswith("linux"):
-        windows_gateway = get_windows_nat_gateway_ip()
-        if windows_gateway:
-            return windows_gateway
         # Docker Desktop on macOS/Windows provides host.docker.internal.
         return "host.docker.internal"
     if os.environ.get("GITHUB_ACTIONS") == "true":

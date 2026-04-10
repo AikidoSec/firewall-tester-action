@@ -1,7 +1,7 @@
 import require$$0$3 from 'os';
 import require$$0$4, { timingSafeEqual, randomInt } from 'crypto';
 import require$$1$1 from 'fs';
-import require$$1$8 from 'path';
+import path from 'path';
 import require$$2$1 from 'http';
 import require$$3$1 from 'https';
 import 'net';
@@ -30,7 +30,7 @@ import require$$1$7 from 'node:dns';
 import require$$5$4 from 'string_decoder';
 import require$$2$3, { spawn } from 'child_process';
 import require$$6$2 from 'timers';
-import require$$1$9 from 'tty';
+import require$$1$8 from 'tty';
 import require$$0$b from 'buffer';
 import require$$0$c, { fileURLToPath } from 'url';
 import require$$7$2 from 'node:path';
@@ -29125,7 +29125,7 @@ function requirePathUtils () {
 	};
 	Object.defineProperty(pathUtils, "__esModule", { value: true });
 	pathUtils.toPlatformPath = pathUtils.toWin32Path = pathUtils.toPosixPath = void 0;
-	const path = __importStar(require$$1$8);
+	const path$1 = __importStar(path);
 	/**
 	 * toPosixPath converts the given path to the posix form. On Windows, \\ will be
 	 * replaced with /.
@@ -29157,7 +29157,7 @@ function requirePathUtils () {
 	 * @return string The platform-specific path.
 	 */
 	function toPlatformPath(pth) {
-	    return pth.replace(/[/\\]/g, path.sep);
+	    return pth.replace(/[/\\]/g, path$1.sep);
 	}
 	pathUtils.toPlatformPath = toPlatformPath;
 	
@@ -29212,7 +29212,7 @@ function requireIoUtil () {
 		Object.defineProperty(exports$1, "__esModule", { value: true });
 		exports$1.getCmdPath = exports$1.tryGetExecutablePath = exports$1.isRooted = exports$1.isDirectory = exports$1.exists = exports$1.READONLY = exports$1.UV_FS_O_EXLOCK = exports$1.IS_WINDOWS = exports$1.unlink = exports$1.symlink = exports$1.stat = exports$1.rmdir = exports$1.rm = exports$1.rename = exports$1.readlink = exports$1.readdir = exports$1.open = exports$1.mkdir = exports$1.lstat = exports$1.copyFile = exports$1.chmod = void 0;
 		const fs = __importStar(require$$1$1);
-		const path = __importStar(require$$1$8);
+		const path$1 = __importStar(path);
 		_a = fs.promises
 		// export const {open} = 'fs'
 		, exports$1.chmod = _a.chmod, exports$1.copyFile = _a.copyFile, exports$1.lstat = _a.lstat, exports$1.mkdir = _a.mkdir, exports$1.open = _a.open, exports$1.readdir = _a.readdir, exports$1.readlink = _a.readlink, exports$1.rename = _a.rename, exports$1.rm = _a.rm, exports$1.rmdir = _a.rmdir, exports$1.stat = _a.stat, exports$1.symlink = _a.symlink, exports$1.unlink = _a.unlink;
@@ -29281,7 +29281,7 @@ function requireIoUtil () {
 		        if (stats && stats.isFile()) {
 		            if (exports$1.IS_WINDOWS) {
 		                // on Windows, test for valid extension
-		                const upperExt = path.extname(filePath).toUpperCase();
+		                const upperExt = path$1.extname(filePath).toUpperCase();
 		                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
 		                    return filePath;
 		                }
@@ -29310,11 +29310,11 @@ function requireIoUtil () {
 		                if (exports$1.IS_WINDOWS) {
 		                    // preserve the case of the actual file (since an extension was appended)
 		                    try {
-		                        const directory = path.dirname(filePath);
-		                        const upperName = path.basename(filePath).toUpperCase();
+		                        const directory = path$1.dirname(filePath);
+		                        const upperName = path$1.basename(filePath).toUpperCase();
 		                        for (const actualName of yield exports$1.readdir(directory)) {
 		                            if (upperName === actualName.toUpperCase()) {
-		                                filePath = path.join(directory, actualName);
+		                                filePath = path$1.join(directory, actualName);
 		                                break;
 		                            }
 		                        }
@@ -29402,7 +29402,7 @@ function requireIo () {
 	Object.defineProperty(io, "__esModule", { value: true });
 	io.findInPath = io.which = io.mkdirP = io.rmRF = io.mv = io.cp = void 0;
 	const assert_1 = require$$5$5;
-	const path = __importStar(require$$1$8);
+	const path$1 = __importStar(path);
 	const ioUtil = __importStar(requireIoUtil());
 	/**
 	 * Copies a file or folder.
@@ -29422,7 +29422,7 @@ function requireIo () {
 	        }
 	        // If dest is an existing directory, should copy inside.
 	        const newDest = destStat && destStat.isDirectory() && copySourceDirectory
-	            ? path.join(dest, path.basename(source))
+	            ? path$1.join(dest, path$1.basename(source))
 	            : dest;
 	        if (!(yield ioUtil.exists(source))) {
 	            throw new Error(`no such file or directory: ${source}`);
@@ -29437,7 +29437,7 @@ function requireIo () {
 	            }
 	        }
 	        else {
-	            if (path.relative(source, newDest) === '') {
+	            if (path$1.relative(source, newDest) === '') {
 	                // a file cannot be copied to itself
 	                throw new Error(`'${newDest}' and '${source}' are the same file`);
 	            }
@@ -29459,7 +29459,7 @@ function requireIo () {
 	            let destExists = true;
 	            if (yield ioUtil.isDirectory(dest)) {
 	                // If dest is directory copy src into dest
-	                dest = path.join(dest, path.basename(source));
+	                dest = path$1.join(dest, path$1.basename(source));
 	                destExists = yield ioUtil.exists(dest);
 	            }
 	            if (destExists) {
@@ -29471,7 +29471,7 @@ function requireIo () {
 	                }
 	            }
 	        }
-	        yield mkdirP(path.dirname(dest));
+	        yield mkdirP(path$1.dirname(dest));
 	        yield ioUtil.rename(source, dest);
 	    });
 	}
@@ -29566,7 +29566,7 @@ function requireIo () {
 	        // build the list of extensions to try
 	        const extensions = [];
 	        if (ioUtil.IS_WINDOWS && process.env['PATHEXT']) {
-	            for (const extension of process.env['PATHEXT'].split(path.delimiter)) {
+	            for (const extension of process.env['PATHEXT'].split(path$1.delimiter)) {
 	                if (extension) {
 	                    extensions.push(extension);
 	                }
@@ -29581,7 +29581,7 @@ function requireIo () {
 	            return [];
 	        }
 	        // if any path separators, return empty
-	        if (tool.includes(path.sep)) {
+	        if (tool.includes(path$1.sep)) {
 	            return [];
 	        }
 	        // build the list of directories
@@ -29592,7 +29592,7 @@ function requireIo () {
 	        // across platforms.
 	        const directories = [];
 	        if (process.env.PATH) {
-	            for (const p of process.env.PATH.split(path.delimiter)) {
+	            for (const p of process.env.PATH.split(path$1.delimiter)) {
 	                if (p) {
 	                    directories.push(p);
 	                }
@@ -29601,7 +29601,7 @@ function requireIo () {
 	        // find all matches
 	        const matches = [];
 	        for (const directory of directories) {
-	            const filePath = yield ioUtil.tryGetExecutablePath(path.join(directory, tool), extensions);
+	            const filePath = yield ioUtil.tryGetExecutablePath(path$1.join(directory, tool), extensions);
 	            if (filePath) {
 	                matches.push(filePath);
 	            }
@@ -29710,7 +29710,7 @@ function requireToolrunner () {
 	const os = __importStar(require$$0$3);
 	const events = __importStar(require$$4$1);
 	const child = __importStar(require$$2$3);
-	const path = __importStar(require$$1$8);
+	const path$1 = __importStar(path);
 	const io = __importStar(requireIo());
 	const ioUtil = __importStar(requireIoUtil());
 	const timers_1 = require$$6$2;
@@ -30065,7 +30065,7 @@ function requireToolrunner () {
 	                (this.toolPath.includes('/') ||
 	                    (IS_WINDOWS && this.toolPath.includes('\\')))) {
 	                // prefer options.cwd if it is specified, however options.cwd may also need to be rooted
-	                this.toolPath = path.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+	                this.toolPath = path$1.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
 	            }
 	            // if the tool is only a file name, then resolve it from the PATH
 	            // otherwise verify it exists (add extension on Windows if necessary)
@@ -30554,7 +30554,7 @@ function requireCore () {
 		const file_command_1 = requireFileCommand();
 		const utils_1 = requireUtils$4();
 		const os = __importStar(require$$0$3);
-		const path = __importStar(require$$1$8);
+		const path$1 = __importStar(path);
 		const oidc_utils_1 = requireOidcUtils();
 		/**
 		 * The code to exit an action
@@ -30609,7 +30609,7 @@ function requireCore () {
 		    else {
 		        (0, command_1.issueCommand)('add-path', {}, inputPath);
 		    }
-		    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
+		    process.env['PATH'] = `${inputPath}${path$1.delimiter}${process.env['PATH']}`;
 		}
 		exports$1.addPath = addPath;
 		/**
@@ -31651,7 +31651,7 @@ function requireSupportsColor () {
 	if (hasRequiredSupportsColor) return supportsColor_1;
 	hasRequiredSupportsColor = 1;
 	const os = require$$0$3;
-	const tty = require$$1$9;
+	const tty = require$$1$8;
 	const hasFlag = requireHasFlag();
 
 	const {env} = process;
@@ -31797,7 +31797,7 @@ function requireNode () {
 	if (hasRequiredNode) return node.exports;
 	hasRequiredNode = 1;
 	(function (module, exports$1) {
-		const tty = require$$1$9;
+		const tty = require$$1$8;
 		const util = require$$6$1;
 
 		/**
@@ -32096,7 +32096,7 @@ function requireDepd () {
 	 * Module dependencies.
 	 */
 
-	var relative = require$$1$8.relative;
+	var relative = path.relative;
 
 	/**
 	 * Module exports.
@@ -57474,7 +57474,7 @@ function requireMimeTypes () {
 		 */
 
 		var db = requireMimeDb();
-		var extname = require$$1$8.extname;
+		var extname = path.extname;
 		var mimeScore = requireMimeScore();
 
 		/**
@@ -69015,7 +69015,7 @@ function requireContentDisposition () {
 	 * @private
 	 */
 
-	var basename = require$$1$8.basename;
+	var basename = path.basename;
 	var Buffer = requireSafeBuffer().Buffer;
 
 	/**
@@ -69889,7 +69889,7 @@ function requireSend () {
 	var ms = requireMs();
 	var onFinished = requireOnFinished();
 	var parseRange = requireRangeParser();
-	var path = require$$1$8;
+	var path$1 = path;
 	var statuses = requireStatuses();
 	var Stream = require$$13;
 	var util = require$$6$1;
@@ -69899,11 +69899,11 @@ function requireSend () {
 	 * @private
 	 */
 
-	var extname = path.extname;
-	var join = path.join;
-	var normalize = path.normalize;
-	var resolve = path.resolve;
-	var sep = path.sep;
+	var extname = path$1.extname;
+	var join = path$1.join;
+	var normalize = path$1.normalize;
+	var resolve = path$1.resolve;
+	var sep = path$1.sep;
 
 	/**
 	 * Regular expression for identifying a bytes Range header.
@@ -72092,7 +72092,7 @@ function requireServeStatic () {
 	var encodeUrl = requireEncodeurl();
 	var escapeHtml = requireEscapeHtml();
 	var parseUrl = requireParseurl();
-	var resolve = require$$1$8.resolve;
+	var resolve = path.resolve;
 	var send = requireSend();
 	var url = require$$0$c;
 
@@ -72930,8 +72930,8 @@ async function run() {
         coreExports.debug(`Ignore failures: ${ignore_failures}`);
         coreExports.debug(`Test type: ${test_type}`);
         // Spawn the Python process
-        const this_file_dir = require$$1$8.dirname(fileURLToPath(import.meta.url));
-        const run_test_path = require$$1$8.resolve(this_file_dir, '..', 'server_tests', 'run_test.py');
+        const this_file_dir = path.dirname(fileURLToPath(import.meta.url));
+        const run_test_path = path.resolve(this_file_dir, '..', 'server_tests', 'run_test.py');
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
                 run_test_path,
@@ -72985,60 +72985,41 @@ async function run() {
     }
 }
 async function startPostgres() {
-    let proc;
     // if os is windows
     // docker run --rm --name postgres -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=myuser -e POSTGRES_DB=mydb -p 5432:5432 -d --isolation process innovesys/postgresql-windows:latest -c max_connections=200
+    const dockerArgs = [
+        'run',
+        '--rm',
+        '--name',
+        'postgres',
+        '-e',
+        'POSTGRES_PASSWORD=mysecretpassword',
+        '-e',
+        'POSTGRES_USER=myuser',
+        '-e',
+        'POSTGRES_DB=mydb',
+        '-p',
+        '5432:5432',
+        '-d'
+    ];
     if (process.platform === 'win32') {
-        proc = spawn('docker', [
-            'run',
-            '--rm',
-            '--name',
-            'postgres',
-            '-e',
-            'POSTGRES_PASSWORD=mysecretpassword',
-            '-e',
-            'POSTGRES_USER=myuser',
-            '-e',
-            'POSTGRES_DB=mydb',
-            '-p',
-            '5432:5432',
-            '-d',
-            '--isolation',
-            'process',
-            'innovesys/postgresql-windows:latest',
-            '-c',
-            'max_connections=200'
-        ], {
-            stdio: 'inherit'
-        });
+        const thisFileDir = path.dirname(fileURLToPath(import.meta.url));
+        const srcDir = path.resolve(thisFileDir, '..', 'src');
+        const windowsEntrypointPath = path.join(srcDir, 'windows-postgres-entrypoint.ps1');
+        if (!require$$1$1.existsSync(windowsEntrypointPath)) {
+            throw new Error(`Windows Postgres entrypoint not found: ${windowsEntrypointPath}`);
+        }
+        dockerArgs.push('--mount', `type=bind,source=${srcDir},target=C:\\action-src,readonly`, '--entrypoint', 'pwsh', '--isolation', 'process', 'innovesys/postgresql-windows:latest', '-NoLogo', '-NoProfile', '-File', 'C:\\action-src\\windows-postgres-entrypoint.ps1');
     }
     else {
-        proc = spawn('docker', [
-            'run',
-            '--rm',
-            '--name',
-            'postgres',
-            '-e',
-            'POSTGRES_PASSWORD=mysecretpassword',
-            '-e',
-            'POSTGRES_USER=myuser',
-            '-e',
-            'POSTGRES_DB=mydb',
-            '-p',
-            '5432:5432',
-            '-d',
-            'postgres',
-            '-c',
-            'max_connections=200'
-        ], {
-            stdio: 'inherit'
-        });
+        dockerArgs.push('postgres');
+        dockerArgs.push('-c', 'max_connections=200');
     }
-    console.log(`Started Postgres: ${proc.pid}`);
-    // wait for postgres to be ready
-    await new Promise((resolve) => {
-        setTimeout(resolve, 10000);
+    const proc = spawn('docker', dockerArgs, {
+        stdio: 'inherit'
     });
+    console.log(`Started Postgres: ${proc.pid}`);
+    await waitForPostgresReady();
     proc.on('close', (code) => {
         if (code !== 0) {
             coreExports.setFailed(`Failed to start Postgres: ${code}`);
@@ -73055,6 +73036,35 @@ async function startPostgres() {
     proc.on('message', (msg) => {
         console.log(`Postgres: ${msg}`);
     });
+}
+async function waitForPostgresReady() {
+    const readyCommand = process.platform === 'win32'
+        ? [
+            'exec',
+            'postgres',
+            'C:\\pgsql\\bin\\pg_isready.exe',
+            '-U',
+            'myuser',
+            '-h',
+            '127.0.0.1',
+            '-p',
+            '5432'
+        ]
+        : ['exec', 'postgres', 'pg_isready', '-U', 'myuser', '-h', '127.0.0.1', '-p', '5432'];
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+        const result = await new Promise((resolve) => {
+            const proc = spawn('docker', readyCommand, { stdio: 'ignore' });
+            proc.on('close', (code) => resolve(code ?? 1));
+            proc.on('error', () => resolve(1));
+        });
+        if (result === 0) {
+            return;
+        }
+        await new Promise((resolve) => {
+            setTimeout(resolve, 1000);
+        });
+    }
+    throw new Error('Postgres did not become ready after 60 seconds');
 }
 function stopPostgres() {
     const proc = spawn('docker', ['stop', 'postgres'], {

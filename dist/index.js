@@ -72932,6 +72932,14 @@ async function run() {
         // Spawn the Python process
         const this_file_dir = path.dirname(fileURLToPath(import.meta.url));
         const run_test_path = path.resolve(this_file_dir, '..', 'server_tests', 'run_test.py');
+        const testEnv = {
+            ...process.env
+        };
+        const postgresDockerHost = await getPostgresDockerHost();
+        if (postgresDockerHost) {
+            testEnv.DOCKER_POSTGRES_HOST = postgresDockerHost;
+            console.log(`Using Postgres Docker host: ${postgresDockerHost}`);
+        }
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
                 run_test_path,
@@ -72960,7 +72968,8 @@ async function run() {
                 '--test_type',
                 test_type
             ], {
-                stdio: 'inherit'
+                stdio: 'inherit',
+                env: testEnv
             });
             proc.on('close', (code) => {
                 if (code !== 0) {
@@ -73019,6 +73028,22 @@ async function startPostgres() {
     console.log('Started Postgres container');
     await waitForPostgresReady();
 }
+async function getPostgresDockerHost() {
+    if (process.platform !== 'win32') {
+        return undefined;
+    }
+    const inspectOutput = await captureCommand('docker', [
+        'inspect',
+        'postgres',
+        '--format',
+        '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+    ]);
+    const postgresIp = inspectOutput.trim();
+    if (!postgresIp) {
+        throw new Error('Unable to resolve Postgres container IP on Windows');
+    }
+    return postgresIp;
+}
 async function waitForPostgresReady() {
     const readyCommand = process.platform === 'win32'
         ? [
@@ -73069,6 +73094,31 @@ async function runCommand(command, args) {
                 return;
             }
             resolve();
+        });
+        proc.on('error', (err) => {
+            reject(err);
+        });
+    });
+}
+async function captureCommand(command, args) {
+    return await new Promise((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        const proc = spawn(command, args, {
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        proc.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+        });
+        proc.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+        proc.on('close', (code) => {
+            if (code !== 0) {
+                reject(new Error(`${command} ${args.join(' ')} exited with code ${code}: ${stderr.trim()}`));
+                return;
+            }
+            resolve(stdout);
         });
         proc.on('error', (err) => {
             reject(err);

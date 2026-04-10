@@ -71,6 +71,16 @@ export async function run(): Promise<void> {
       'server_tests',
       'run_test.py'
     )
+    const testEnv = {
+      ...process.env
+    }
+
+    const postgresDockerHost = await getPostgresDockerHost()
+    if (postgresDockerHost) {
+      testEnv.DOCKER_POSTGRES_HOST = postgresDockerHost
+      console.log(`Using Postgres Docker host: ${postgresDockerHost}`)
+    }
+
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
@@ -102,7 +112,8 @@ export async function run(): Promise<void> {
           test_type
         ],
         {
-          stdio: 'inherit'
+          stdio: 'inherit',
+          env: testEnv
         }
       )
 
@@ -182,6 +193,26 @@ async function startPostgres() {
   await waitForPostgresReady()
 }
 
+async function getPostgresDockerHost(): Promise<string | undefined> {
+  if (process.platform !== 'win32') {
+    return undefined
+  }
+
+  const inspectOutput = await captureCommand('docker', [
+    'inspect',
+    'postgres',
+    '--format',
+    '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+  ])
+  const postgresIp = inspectOutput.trim()
+
+  if (!postgresIp) {
+    throw new Error('Unable to resolve Postgres container IP on Windows')
+  }
+
+  return postgresIp
+}
+
 async function waitForPostgresReady() {
   const readyCommand =
     process.platform === 'win32'
@@ -241,6 +272,41 @@ async function runCommand(command: string, args: string[]) {
       }
 
       resolve()
+    })
+
+    proc.on('error', (err) => {
+      reject(err)
+    })
+  })
+}
+
+async function captureCommand(command: string, args: string[]) {
+  return await new Promise<string>((resolve, reject) => {
+    let stdout = ''
+    let stderr = ''
+    const proc = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    proc.stdout.on('data', (chunk) => {
+      stdout += chunk.toString()
+    })
+
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(
+          new Error(
+            `${command} ${args.join(' ')} exited with code ${code}: ${stderr.trim()}`
+          )
+        )
+        return
+      }
+
+      resolve(stdout)
     })
 
     proc.on('error', (err) => {

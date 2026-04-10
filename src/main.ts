@@ -177,27 +177,9 @@ async function startPostgres() {
     dockerArgs.push('-c', 'max_connections=200')
   }
 
-  const proc = spawn('docker', dockerArgs, {
-    stdio: 'inherit'
-  })
-  console.log(`Started Postgres: ${proc.pid}`)
+  await runCommand('docker', dockerArgs)
+  console.log('Started Postgres container')
   await waitForPostgresReady()
-  proc.on('close', (code) => {
-    if (code !== 0) {
-      core.setFailed(`Failed to start Postgres: ${code}`)
-    }
-  })
-  proc.on('error', (err) => {
-    core.setFailed(`Failed to start Postgres: ${err}`)
-  })
-  proc.on('exit', (code) => {
-    if (code !== 0) {
-      core.setFailed(`Failed to start Postgres: ${code}`)
-    }
-  })
-  proc.on('message', (msg) => {
-    console.log(`Postgres: ${msg}`)
-  })
 }
 
 async function waitForPostgresReady() {
@@ -216,7 +198,7 @@ async function waitForPostgresReady() {
         ]
       : ['exec', 'postgres', 'pg_isready', '-U', 'myuser', '-h', '127.0.0.1', '-p', '5432']
 
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     const result = await new Promise<number>((resolve) => {
       const proc = spawn('docker', readyCommand, { stdio: 'ignore' })
       proc.on('close', (code) => resolve(code ?? 1))
@@ -232,7 +214,7 @@ async function waitForPostgresReady() {
     })
   }
 
-  throw new Error('Postgres did not become ready after 60 seconds')
+  throw new Error('Postgres did not become ready after 180 seconds')
 }
 
 function stopPostgres() {
@@ -243,5 +225,26 @@ function stopPostgres() {
     if (code !== 0) {
       core.warning(`Failed to stop Postgres: ${code}`)
     }
+  })
+}
+
+async function runCommand(command: string, args: string[]) {
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(command, args, {
+      stdio: 'inherit'
+    })
+
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`${command} ${args.join(' ')} exited with code ${code}`))
+        return
+      }
+
+      resolve()
+    })
+
+    proc.on('error', (err) => {
+      reject(err)
+    })
   })
 }

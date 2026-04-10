@@ -16,6 +16,7 @@ from enum import Enum
 import shlex
 import re
 import io
+import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
@@ -543,6 +544,17 @@ def _escape_markdown(text: str) -> str:
     return text
 
 
+def _summarize_error_message_for_table(text: str, max_length: int = 160) -> str:
+    """Convert multi-line markdown/error text into a single-line table cell."""
+    text = text.replace("<br>", " ")
+    text = text.replace("```", " ")
+    text = text.replace("\r", " ").replace("\n", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > max_length:
+        return text[:max_length - 3].rstrip() + "..."
+    return text
+
+
 def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
     def _make_link(line_num: str) -> str:
@@ -621,7 +633,10 @@ def _build_summary_header(test_results: List[TestResult]) -> str:
         if result.failed_assertions:
             error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
         elif result.error_message:
-            error = result.error_message
+            error = (
+                f"{_summarize_error_message_for_table(result.error_message)} "
+                f"(see details below)"
+            )
         else:
             error = "-"
         error = _escape_markdown(error)
@@ -664,6 +679,41 @@ def _build_details_block(result: TestResult, include_snippets: bool, max_asserti
     return buf.getvalue()
 
 
+def _build_error_details_block(result: TestResult) -> str:
+    """Build a single <details> block for one failed test with a raw error message."""
+    buf = io.StringIO()
+    details = html.escape(result.error_message or "No additional details available.")
+    buf.write("<details>\n")
+    buf.write(f"<summary>{result.test_dir} - error details</summary>\n\n")
+    buf.write("<pre>\n")
+    buf.write(details)
+    if not details.endswith("\n"):
+        buf.write("\n")
+    buf.write("</pre>\n\n")
+    buf.write("</details>\n\n")
+    return buf.getvalue()
+
+
+def _build_details_sections(
+    test_results: List[TestResult],
+    include_snippets: bool,
+    max_assertions: Optional[int] = None,
+) -> str:
+    blocks = []
+    for result in test_results:
+        if result.failed_assertions:
+            blocks.append(
+                _build_details_block(
+                    result,
+                    include_snippets=include_snippets,
+                    max_assertions=max_assertions,
+                )
+            )
+        elif result.error_message:
+            blocks.append(_build_error_details_block(result))
+    return "".join(blocks)
+
+
 # GitHub step summary limit is 1024 KB; use 1020 KB as safe threshold
 _SUMMARY_SIZE_LIMIT = 1020 * 1024
 
@@ -677,7 +727,9 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     header = _build_summary_header(test_results)
 
     failed_with_details = [
-        r for r in test_results if r.failed_assertions]
+        r for r in test_results
+        if r.status == TestStatus.FAILED and (r.failed_assertions or r.error_message)
+    ]
 
     if not failed_with_details:
         # No details section needed – just write the header
@@ -685,12 +737,14 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
             f.write(header)
         return
 
-    details_heading = "\n### Failed Assertions Details\n\n"
+    details_heading = "\n### Failure Details\n\n"
 
     # Strategy 1: full details with snippets
-    details_blocks = [_build_details_block(
-        r, include_snippets=True) for r in failed_with_details]
-    full_content = header + details_heading + "".join(details_blocks)
+    details_blocks = _build_details_sections(
+        failed_with_details,
+        include_snippets=True,
+    )
+    full_content = header + details_heading + details_blocks
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
         with open(summary_path, 'a', encoding='utf-8') as f:
@@ -702,9 +756,11 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f"exceeds {_SUMMARY_SIZE_LIMIT // 1024}KB limit – removing source snippets")
 
     # Strategy 2: details without snippets
-    details_blocks = [_build_details_block(
-        r, include_snippets=False) for r in failed_with_details]
-    full_content = header + details_heading + "".join(details_blocks)
+    details_blocks = _build_details_sections(
+        failed_with_details,
+        include_snippets=False,
+    )
+    full_content = header + details_heading + details_blocks
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
         with open(summary_path, 'a', encoding='utf-8') as f:
@@ -717,9 +773,12 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 
     # Strategy 3: no snippets + cap assertions per test, progressively reduce
     for cap in [20, 10, 5]:
-        details_blocks = [_build_details_block(
-            r, include_snippets=False, max_assertions=cap) for r in failed_with_details]
-        full_content = header + details_heading + "".join(details_blocks)
+        details_blocks = _build_details_sections(
+            failed_with_details,
+            include_snippets=False,
+            max_assertions=cap,
+        )
+        full_content = header + details_heading + details_blocks
         if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
             with open(summary_path, 'a', encoding='utf-8') as f:
                 f.write(full_content)
@@ -729,7 +788,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     logger.warning(
         "Summary still too large – writing header only with truncation notice")
     truncation_notice = (
-        "\n### Failed Assertions Details\n\n"
+        "\n### Failure Details\n\n"
         "> Detailed assertion failures were omitted because the summary exceeded "
         "GitHub's 1024KB size limit. Check the test logs for full details.\n\n"
     )

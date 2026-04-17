@@ -28,6 +28,16 @@ def get_raw_connection(port):
     return _raw_connections[port]
 
 
+def wrap_raw_response(raw_response, port, route):
+    response = requests.Response()
+    response.status_code = raw_response.status
+    response.headers = requests.structures.CaseInsensitiveDict(raw_response.getheaders())
+    response._content = raw_response.read()
+    response.url = f"http://localhost:{port}{route}"
+    response.read = lambda: response.content
+    return response
+
+
 def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET"):
     global benchmarks, s
 
@@ -39,11 +49,7 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
                 conn = get_raw_connection(port)
                 conn.request(method, route, headers=headers)
                 raw_response = conn.getresponse()
-                r = requests.Response()
-                r.status_code = raw_response.status
-                r.headers = requests.structures.CaseInsensitiveDict(raw_response.getheaders())
-                r._content = raw_response.read()
-                r.url = f"http://localhost:{port}{route}"
+                r = wrap_raw_response(raw_response, port, route)
             else:
                 r = get_session(port).get(f"http://localhost:{port}{route}", headers=headers)
             break  # Success, exit retry loop

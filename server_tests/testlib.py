@@ -12,6 +12,21 @@ import os
 import http.client
 import re
 
+_sessions = {}
+_raw_connections = {}
+
+
+def get_session(port):
+    if port not in _sessions:
+        _sessions[port] = requests.Session()
+    return _sessions[port]
+
+
+def get_raw_connection(port):
+    if port not in _raw_connections:
+        _raw_connections[port] = http.client.HTTPConnection("localhost", port)
+    return _raw_connections[port]
+
 
 def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET"):
     global benchmarks, s
@@ -21,15 +36,23 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     for attempt in range(3):
         try:
             if raw:
-                conn = http.client.HTTPConnection("localhost", port)
+                conn = get_raw_connection(port)
                 conn.request(method, route, headers=headers)
-                r = conn.getresponse()
+                raw_response = conn.getresponse()
+                r = requests.Response()
+                r.status_code = raw_response.status
+                r.headers = requests.structures.CaseInsensitiveDict(raw_response.getheaders())
+                r._content = raw_response.read()
+                r.url = f"http://localhost:{port}{route}"
             else:
-                r = requests.get(
-                    f"http://localhost:{port}{route}", headers=headers)
+                r = get_session(port).get(f"http://localhost:{port}{route}", headers=headers)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
+            if raw:
+                conn = _raw_connections.pop(port, None)
+                if conn is not None:
+                    conn.close()
             if attempt == 2:  # Last attempt
                 return None
             time.sleep(0.1)  # Brief delay before retry

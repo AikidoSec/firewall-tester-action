@@ -16,22 +16,180 @@ from enum import Enum
 import shlex
 import re
 import io
+import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 
 
-def get_docker_host_ip() -> str:
+def get_default_docker_host_ip() -> str:
+    docker_host_ip = os.environ.get("DOCKER_HOST_IP")
+    if docker_host_ip:
+        return docker_host_ip
+    if not sys.platform.startswith("linux"):
+        # Docker Desktop on macOS/Windows provides host.docker.internal.
+        return "host.docker.internal"
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
-    # Docker Desktop on macOS/Windows provides host.docker.internal
-    if os.uname().sysname != "Linux":
-        return "host.docker.internal"
-    return os.environ.get("DOCKER_HOST_IP", "172.18.0.1")
+    return "172.18.0.1"
 
 
-DOCKER_HOST_IP = get_docker_host_ip()
+def get_windows_nat_gateway_ip() -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["docker", "network", "inspect", "nat"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=15,
+        )
+        networks = json.loads(result.stdout)
+        if not networks:
+            return None
 
+        ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
+        if not ipam_configs:
+            return None
+
+        return ipam_configs[0].get("Gateway")
+    except Exception:
+        return None
+
+
+def get_windows_host_candidates() -> List[str]:
+    candidates: List[str] = []
+    for host in (
+        "host.docker.internal",
+        "gateway.docker.internal",
+        get_windows_nat_gateway_ip(),
+    ):
+        if host and host not in candidates:
+            candidates.append(host)
+    return candidates
+
+
+def can_connect_from_windows_postgres_container(host: str, port: int) -> bool:
+    host_literal = host.replace("'", "''")
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        f"$hostName = '{host_literal}'; "
+        f"$port = {port}; "
+        "$client = [System.Net.Sockets.TcpClient]::new(); "
+        "try { "
+        "$asyncResult = $client.BeginConnect($hostName, $port, $null, $null); "
+        "if (-not $asyncResult.AsyncWaitHandle.WaitOne(3000)) { exit 1 } "
+        "$client.EndConnect($asyncResult) | Out-Null; "
+        "exit 0 "
+        "} catch { "
+        "exit 1 "
+        "} finally { "
+        "$client.Dispose(); "
+        "}"
+    )
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "postgres",
+                "pwsh",
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                script,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def resolve_docker_host_for_service(service_name: str, port: int, env_vars: List[str]) -> str:
+    for env_var in env_vars:
+        host = os.environ.get(env_var)
+        if host:
+            logger.info(
+                f"Using {service_name} Docker host from {env_var}: {host}:{port}"
+            )
+            return host
+
+    default_host = get_default_docker_host_ip()
+    if not sys.platform.startswith("win32"):
+        logger.info(f"Using default {service_name} Docker host: {default_host}:{port}")
+        return default_host
+
+    for candidate in get_windows_host_candidates():
+        reachable = can_connect_from_windows_postgres_container(candidate, port)
+        logger.info(
+            f"Probing Windows Docker host for {service_name}: {candidate}:{port} -> "
+            f"{'reachable' if reachable else 'unreachable'}"
+        )
+        if reachable:
+            return candidate
+
+    logger.warning(
+        f"Unable to verify a Windows Docker host for {service_name} on port {port}; "
+        f"falling back to {default_host}"
+    )
+    return default_host
+
+
+def quote_postgres_identifier(identifier: str) -> str:
+    # PostgreSQL identifiers are escaped by doubling quotes.
+    return identifier.replace('"', '""')
+
+
+def create_test_database(test_dir: str) -> str:
+    escaped_db_name = quote_postgres_identifier(test_dir)
+    create_db_commands_windows = [
+        [
+            "docker",
+            "exec",
+            "postgres",
+            "C:\\pgsql\\bin\\createdb.exe",
+            "-U",
+            "myuser",
+            test_dir,
+        ],
+        [
+            "docker",
+            "exec",
+            "postgres",
+            "C:\\pgsql\\bin\\psql.exe",
+            "-U",
+            "myuser",
+            "-d",
+            "postgres",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-c",
+            f'CREATE DATABASE "{escaped_db_name}"',
+        ],
+    ]
+    create_db_commands_linux = [
+        ["docker", "exec", "postgres", "createdb", "-U", "myuser", test_dir],
+        ["docker", "exec", "postgres", "psql", "-U", "myuser", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
+    ]
+    last_error: Optional[subprocess.CalledProcessError] = None
+    
+    create_db_commands = create_db_commands_windows if sys.platform.startswith("win32") else create_db_commands_linux
+    for command in create_db_commands:
+        try:
+            subprocess.run(command, check=True)
+            return test_dir
+        except subprocess.CalledProcessError as error:
+            last_error = error
+            logger.warning(f"Database create command failed: {' '.join(command)}")
+
+    if last_error:
+        logger.warning(
+            "Falling back to shared 'postgres' database because test database creation failed"
+        )
+        return "postgres"
+    raise RuntimeError("Unable to create database; no command was executed")
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -63,6 +221,12 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 
 
 logger = get_logger()
+DOCKER_CORE_HOST = resolve_docker_host_for_service(
+    "core", 3000, ["DOCKER_CORE_HOST", "DOCKER_HOST_IP"]
+)
+DOCKER_POSTGRES_HOST = resolve_docker_host_for_service(
+    "postgres", 5432, ["DOCKER_POSTGRES_HOST", "DOCKER_HOST_IP"]
+)
 
 
 class TestStatus(Enum):
@@ -162,18 +326,17 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
-        subprocess.run(create_database_command, shell=True, check=True)
+        database_name = create_test_database(test_dir)
         time.sleep(1)
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_POSTGRES_HOST}:5432/{database_name}?sslmode=disable",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_CORE_HOST}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_CORE_HOST}:3000",
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
@@ -218,16 +381,31 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 5. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        command = [
+            sys.executable,
+            os.path.join(server_tests_dir, test_dir, "test.py"),
+            "--test_name",
+            test_dir,
+            "--server_port",
+            str(start_port),
+            "--token",
+            token,
+            "--config_update_delay",
+            str(config_update_delay),
+            "--core_port",
+            "3000",
+        ]
         if control_port:
-            command += f" --control_server_port {control_port}"
+            command += ["--control_server_port", str(control_port)]
+        test_env = os.environ.copy()
+        test_env["PYTHONPATH"] = server_tests_dir
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
         try:
             process = subprocess.run(
                 command,
-                shell=True,
+                env=test_env,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -366,6 +544,17 @@ def _escape_markdown(text: str) -> str:
     return text
 
 
+def _summarize_error_message_for_table(text: str, max_length: int = 160) -> str:
+    """Convert multi-line markdown/error text into a single-line table cell."""
+    text = text.replace("<br>", " ")
+    text = text.replace("```", " ")
+    text = text.replace("\r", " ").replace("\n", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > max_length:
+        return text[:max_length - 3].rstrip() + "..."
+    return text
+
+
 def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
     def _make_link(line_num: str) -> str:
@@ -433,18 +622,21 @@ def _build_summary_header(test_results: List[TestResult]) -> str:
     buf.write("|------|--------|----------|---------------|\n")
 
     for result in test_results:
-        status_emoji = {
-            TestStatus.PASSED: "✅ PASS",
-            TestStatus.FAILED: "❌ FAIL",
-            TestStatus.SKIPPED: "⏭️ SKIP",
-            TestStatus.TIMEOUT: "⏰ TIMEOUT"
+        status_label = {
+            TestStatus.PASSED: "PASS",
+            TestStatus.FAILED: "FAIL",
+            TestStatus.SKIPPED: "SKIP",
+            TestStatus.TIMEOUT: "TIMEOUT"
         }
-        status = status_emoji[result.status]
+        status = status_label[result.status]
         duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
         if result.failed_assertions:
             error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
         elif result.error_message:
-            error = result.error_message
+            error = (
+                f"{_summarize_error_message_for_table(result.error_message)} "
+                f"(see details below)"
+            )
         else:
             error = "-"
         error = _escape_markdown(error)
@@ -487,6 +679,41 @@ def _build_details_block(result: TestResult, include_snippets: bool, max_asserti
     return buf.getvalue()
 
 
+def _build_error_details_block(result: TestResult) -> str:
+    """Build a single <details> block for one failed test with a raw error message."""
+    buf = io.StringIO()
+    details = html.escape(result.error_message or "No additional details available.")
+    buf.write("<details>\n")
+    buf.write(f"<summary>{result.test_dir} - error details</summary>\n\n")
+    buf.write("<pre>\n")
+    buf.write(details)
+    if not details.endswith("\n"):
+        buf.write("\n")
+    buf.write("</pre>\n\n")
+    buf.write("</details>\n\n")
+    return buf.getvalue()
+
+
+def _build_details_sections(
+    test_results: List[TestResult],
+    include_snippets: bool,
+    max_assertions: Optional[int] = None,
+) -> str:
+    blocks = []
+    for result in test_results:
+        if result.failed_assertions:
+            blocks.append(
+                _build_details_block(
+                    result,
+                    include_snippets=include_snippets,
+                    max_assertions=max_assertions,
+                )
+            )
+        elif result.error_message:
+            blocks.append(_build_error_details_block(result))
+    return "".join(blocks)
+
+
 # GitHub step summary limit is 1024 KB; use 1020 KB as safe threshold
 _SUMMARY_SIZE_LIMIT = 1020 * 1024
 
@@ -500,23 +727,27 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     header = _build_summary_header(test_results)
 
     failed_with_details = [
-        r for r in test_results if r.failed_assertions]
+        r for r in test_results
+        if r.status == TestStatus.FAILED and (r.failed_assertions or r.error_message)
+    ]
 
     if not failed_with_details:
         # No details section needed – just write the header
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(header)
         return
 
-    details_heading = "\n### Failed Assertions Details\n\n"
+    details_heading = "\n### Failure Details\n\n"
 
     # Strategy 1: full details with snippets
-    details_blocks = [_build_details_block(
-        r, include_snippets=True) for r in failed_with_details]
-    full_content = header + details_heading + "".join(details_blocks)
+    details_blocks = _build_details_sections(
+        failed_with_details,
+        include_snippets=True,
+    )
+    full_content = header + details_heading + details_blocks
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 
@@ -525,12 +756,14 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f"exceeds {_SUMMARY_SIZE_LIMIT // 1024}KB limit – removing source snippets")
 
     # Strategy 2: details without snippets
-    details_blocks = [_build_details_block(
-        r, include_snippets=False) for r in failed_with_details]
-    full_content = header + details_heading + "".join(details_blocks)
+    details_blocks = _build_details_sections(
+        failed_with_details,
+        include_snippets=False,
+    )
+    full_content = header + details_heading + details_blocks
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 
@@ -540,11 +773,14 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 
     # Strategy 3: no snippets + cap assertions per test, progressively reduce
     for cap in [20, 10, 5]:
-        details_blocks = [_build_details_block(
-            r, include_snippets=False, max_assertions=cap) for r in failed_with_details]
-        full_content = header + details_heading + "".join(details_blocks)
+        details_blocks = _build_details_sections(
+            failed_with_details,
+            include_snippets=False,
+            max_assertions=cap,
+        )
+        full_content = header + details_heading + details_blocks
         if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-            with open(summary_path, 'a') as f:
+            with open(summary_path, 'a', encoding='utf-8') as f:
                 f.write(full_content)
             return
 
@@ -552,11 +788,11 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     logger.warning(
         "Summary still too large – writing header only with truncation notice")
     truncation_notice = (
-        "\n### Failed Assertions Details\n\n"
-        "> ⚠️ Detailed assertion failures were omitted because the summary exceeded "
+        "\n### Failure Details\n\n"
+        "> Detailed assertion failures were omitted because the summary exceeded "
         "GitHub's 1024KB size limit. Check the test logs for full details.\n\n"
     )
-    with open(summary_path, 'a') as f:
+    with open(summary_path, 'a', encoding='utf-8') as f:
         f.write(header + truncation_notice)
 
 
@@ -595,7 +831,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                                     start_time=datetime.now())
                 result.complete(TestStatus.SKIPPED, "Skipped")
                 test_results.append(result)
-                logger.info(f"Test {test_dir} ⏭️ SKIPPED")
+                logger.info(f"Test {test_dir} SKIPPED")
                 continue
 
             token = CoreApi.get_app_token(CORE_URL)
@@ -622,14 +858,14 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
             try:
                 result = future.result()
                 test_results.append(result)
-                status_emoji = {
-                    TestStatus.PASSED: "✅ PASSED",
-                    TestStatus.FAILED: "❌ FAILED",
-                    TestStatus.SKIPPED: "⏭️ SKIPPED",
-                    TestStatus.TIMEOUT: "⏰ TIMED OUT"
+                status_label = {
+                    TestStatus.PASSED: "PASSED",
+                    TestStatus.FAILED: "FAILED",
+                    TestStatus.SKIPPED: "SKIPPED",
+                    TestStatus.TIMEOUT: "TIMED OUT"
                 }
                 logger.info(
-                    f"Test {test_dir} {status_emoji[result.status]} in {result.duration:.2f} seconds")
+                    f"Test {test_dir} {status_label[result.status]} in {result.duration:.2f} seconds")
                 if result.status == TestStatus.FAILED:
                     logger.error(
                         f"Error in test {test_dir}: {result.error_message}")

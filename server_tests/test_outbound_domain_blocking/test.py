@@ -1,6 +1,7 @@
 from testlib import *
 from core_api import CoreApi
 import socket
+
 '''
 Tests the outbound domain blocking feature:
 
@@ -24,27 +25,150 @@ Tests the outbound domain blocking feature:
 '''
 
 
-def start_mock_servers(target_container_name: str):
-    path = os.path.join(os.path.dirname(__file__), "mock-server.sh")
+WINDOWS_MOCK_SERVER_COMMAND = """
+$listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, 80);
+$listener.Start();
+try {
+    while ($true) {
+        $client = $listener.AcceptTcpClient();
+        try {
+            $stream = $client.GetStream();
+            $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::ASCII, $false, 1024, $true);
+            while ($true) {
+                $line = $reader.ReadLine();
+                if ($null -eq $line -or $line -eq "") {
+                    break;
+                }
+            }
+            $body = [System.Text.Encoding]::UTF8.GetBytes('{"status":"ok"}');
+            $header = [System.Text.Encoding]::ASCII.GetBytes(
+                "HTTP/1.1 200 OK`r`n" +
+                "Content-Type: application/json`r`n" +
+                "Content-Length: $($body.Length)`r`n" +
+                "Connection: close`r`n`r`n"
+            );
+            $stream.Write($header, 0, $header.Length);
+            $stream.Write($body, 0, $body.Length);
+            $stream.Flush();
+        } finally {
+            $client.Dispose();
+        }
+    }
+} finally {
+    $listener.Stop();
+}
+"""
 
+
+def is_windows():
+    return os.name == "nt"
+
+
+def get_mock_server_name(target_container_name: str):
+    return f"mock-server-{target_container_name}"
+
+
+def wait_for_running_container(container_name: str, timeout_seconds: int = 20):
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                "{{.State.Running}}",
+                container_name,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip().lower() == "true":
+            return
+        time.sleep(1)
+
+    raise Exception(f"Container {container_name} did not start after {timeout_seconds} seconds")
+
+
+def get_container_ip(container_name: str):
+    result = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            "-f",
+            "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            container_name,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    ip = result.stdout.strip()
+    if not ip:
+        raise Exception(f"Could not determine IP address for container {container_name}")
+    return ip
+
+
+def start_mock_servers(target_container_name: str):
+    container_name = get_mock_server_name(target_container_name)
+
+    if is_windows():
+        subprocess.run(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                container_name,
+                "mcr.microsoft.com/windows/servercore:ltsc2022",
+                "powershell",
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                WINDOWS_MOCK_SERVER_COMMAND,
+            ],
+            check=True,
+        )
+        wait_for_running_container(container_name)
+        return get_container_ip(container_name)
+
+    path = os.path.join(os.path.dirname(__file__), "mock-server.sh")
     subprocess.run(
-        f"docker run -d --name mock-server-{target_container_name} -v {path}:/mock-server.sh:ro --network container:{target_container_name} --cap-add=NET_ADMIN python:3.12-alpine sh /mock-server.sh", shell=True)
-    i = 0
-    while True:
-        time.sleep(1)
-        if subprocess.run(
-                f"docker ps | grep mock-server-{target_container_name} | grep Up", shell=True).returncode == 0:
-            break
-        time.sleep(1)
-        i += 1
-        if i > 20:
-            raise Exception(
-                f"Mock server did not start after {i} seconds")
+        f"docker run -d --name {container_name} -v {path}:/mock-server.sh:ro --network container:{target_container_name} --cap-add=NET_ADMIN python:3.12-alpine sh /mock-server.sh",
+        shell=True,
+        check=True,
+    )
+    wait_for_running_container(container_name)
+    return "11.22.33.44"
 
 
 def set_etc_hosts(target_container_name: str, ip: str, hostname: str):
+    if is_windows():
+        entry = f"{ip} {hostname}".replace("'", "''")
+        command = (
+            "$hostsPath = Join-Path $env:SystemRoot 'System32\\drivers\\etc\\hosts'; "
+            f"Add-Content -Path $hostsPath -Value '{entry}'"
+        )
+        subprocess.run(
+            [
+                "docker",
+                "exec",
+                target_container_name,
+                "powershell",
+                "-NoLogo",
+                "-NoProfile",
+                "-Command",
+                command,
+            ],
+            check=True,
+        )
+        return
+
     subprocess.run(
-        f"docker exec  -u 0 {target_container_name} sh -c 'echo {ip} {hostname} >> /etc/hosts'", shell=True)
+        f"docker exec -u 0 {target_container_name} sh -c 'echo {ip} {hostname} >> /etc/hosts'",
+        shell=True,
+        check=True,
+    )
 
 
 def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
@@ -237,13 +361,13 @@ if __name__ == "__main__":
         "xn--mnchen-3ya.example.com",
         "xn--mnchen-allowed-gsb.example.com"
     ]
-    ip = "11.22.33.44"
+    mock_server_name = get_mock_server_name(target_container_name)
     try:
-        start_mock_servers(target_container_name)
+        ip = start_mock_servers(target_container_name)
         for domain_name in domain_names:
             set_etc_hosts(target_container_name, ip, domain_name)
         time.sleep(5)
         run_test(s, c)
     finally:
         subprocess.run(
-            f"docker rm -f mock-server-{target_container_name}", shell=True)
+            f"docker rm -f {mock_server_name}", shell=True)

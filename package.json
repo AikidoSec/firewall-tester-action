@@ -36,6 +36,7 @@
     "local-action-nodejs": "node scripts/run-local-action.js .env.example.nodejs",
     "local-action-java": "node scripts/run-local-action.js .env.example.java",
     "local-action-dotnet": "node scripts/run-local-action.js .env.example.dotnet",
+    "local-action-dotnet-framework": "node scripts/run-local-action.js .env.example.dotnet-framework",
     "local-action-ruby": "node scripts/run-local-action.js .env.example.ruby",
     "local-action-go": "node scripts/run-local-action.js .env.example.go",
     "package": "npx rollup --config rollup.config.ts --configPlugin @rollup/plugin-typescript",

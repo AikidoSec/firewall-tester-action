@@ -152,35 +152,19 @@ def check_wave_attack(collector, get_method_path, ip, user_id, len_samples):
         f"Expected ipAddress {ip}, got {new_events[0]['request']['ipAddress']}")
 
     collector.soft_assert(
-        isinstance(new_events[0].get("attack"), dict),
-        f"Expected attack to be an object, got {new_events[0].get('attack')}")
-    if not isinstance(new_events[0].get("attack"), dict):
-        return
-
-    attack = new_events[0]["attack"]
+        "user" in new_events[0]["attack"],
+        f"Expected user in attack, got {new_events[0]['attack']}")
     collector.soft_assert(
-        "user" in attack,
-        f"Expected user in attack, got {attack}")
-    user = attack.get("user")
+        "id" in new_events[0]["attack"]["user"],
+        f"Expected id in user, got {new_events[0]['attack']['user']}")
     collector.soft_assert(
-        isinstance(user, dict),
-        f"Expected attack.user to be an object, got {user}")
-    if isinstance(user, dict):
-        collector.soft_assert(
-            "id" in user,
-            f"Expected id in user, got {user}")
-        if "id" in user:
-            collector.soft_assert(
-                user["id"] == user_id,
-                f"Expected user id {user_id}, got {user['id']}")
+        new_events[0]["attack"]["user"]["id"] == user_id,
+        f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}")
 
     collector.soft_assert(
-        isinstance(attack.get("metadata"), dict),
-        f"Expected attack.metadata to be an object, got {attack.get('metadata')}")
-    if not isinstance(attack.get("metadata"), dict):
-        return
-
-    metadata = attack["metadata"]
+        "samples" in new_events[0]["attack"]["metadata"],
+        "Samples not found in metadata")
+    metadata = new_events[0]["attack"]["metadata"]
     collector.soft_assert(
         "samples" in metadata,
         "Samples not found in metadata")

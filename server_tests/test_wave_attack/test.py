@@ -154,27 +154,25 @@ def check_wave_attack(collector, get_method_path, ip, user_id, len_samples):
     collector.soft_assert(
         "user" in new_events[0]["attack"],
         f"Expected user in attack, got {new_events[0]['attack']}")
-    collector.soft_assert(
-        "id" in new_events[0]["attack"]["user"],
-        f"Expected id in user, got {new_events[0]['attack']['user']}")
-    collector.soft_assert(
-        new_events[0]["attack"]["user"]["id"] == user_id,
-        f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}")
+    if "user" in new_events[0]["attack"]:
+        collector.soft_assert(
+            "id" in new_events[0]["attack"]["user"],
+            f"Expected id in user, got {new_events[0]['attack']['user']}")
+        if "id" in new_events[0]["attack"]["user"]:
+            collector.soft_assert(
+                new_events[0]["attack"]["user"]["id"] == user_id,
+                f"Expected user id {user_id}, got {new_events[0]['attack']['user']['id']}")
 
     collector.soft_assert(
         "samples" in new_events[0]["attack"]["metadata"],
         "Samples not found in metadata")
-    metadata = new_events[0]["attack"]["metadata"]
-    collector.soft_assert(
-        "samples" in metadata,
-        "Samples not found in metadata")
-    if "samples" not in metadata:
+    if "samples" not in new_events[0]["attack"]["metadata"]:
         return
 
     collector.soft_assert(
-        isinstance(metadata["samples"], str),
+        isinstance(new_events[0]["attack"]["metadata"]["samples"], str),
         "Samples is not a string")
-    samples = metadata["samples"]
+    samples = new_events[0]["attack"]["metadata"]["samples"]
     try:
         samples = json.loads(samples)
     except json.JSONDecodeError:

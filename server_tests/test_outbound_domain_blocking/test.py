@@ -22,6 +22,16 @@ Tests the outbound domain blocking feature:
 11. Tests that detection mode (block: false) doesn't block
 '''
 
+MOCK_SERVER_IP = "11.22.33.44"
+MOCK_SERVER_CONTAINER = "mock-server-outbound-domain-blocking"
+MOCK_SERVER_NETWORK = "mock-network-outbound-domain-blocking"
+DOCKER_OSTYPE = subprocess.run(
+    ["docker", "info", "--format", "{{.OSType}}"],
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.strip().lower()
+
 
 def wait_for_running_container(container_name: str, timeout_seconds: int = 20):
     deadline = time.time() + timeout_seconds
@@ -34,25 +44,29 @@ def wait_for_running_container(container_name: str, timeout_seconds: int = 20):
 
 
 def start_mock_server(target_container_name: str):
-    container_name = f"mock-server-{target_container_name}"
     path = os.path.dirname(__file__)
 
-    if os.name == "nt":
-        command = f'docker run -d --name {container_name} -v "{path}:C:\\test:ro" mcr.microsoft.com/windows-cssc/python:3.13-nanoserver-ltsc2022 python C:\\test\\mock-server.py'
+    driver = "nat" if DOCKER_OSTYPE == "windows" else "bridge"
+    subprocess.run(f'docker network create --driver {driver} --subnet 11.22.33.0/24 {MOCK_SERVER_NETWORK}', shell=True, check=True)
+    subprocess.run(f'docker network connect {MOCK_SERVER_NETWORK} {target_container_name}', shell=True, check=True)
+
+    if DOCKER_OSTYPE == "windows":
+        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:C:\\test:ro" mcr.microsoft.com/windows-cssc/python:3.13-nanoserver-ltsc2022 python C:\\test\\mock-server.py'
     else:
-        command = f'docker run -d --name {container_name} -v "{path}:/test:ro" python:3.13-alpine python /test/mock-server.py'
+        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:/test:ro" python:3.13-alpine python /test/mock-server.py'
 
     subprocess.run(command, shell=True, check=True)
-    wait_for_running_container(container_name)
-    result = subprocess.run(f'docker inspect -f "{{{{range.NetworkSettings.Networks}}}}{{{{.IPAddress}}}}{{{{end}}}}" {container_name}', shell=True, capture_output=True, text=True, check=True)
-    ip = result.stdout.strip()
-    if ip:
-        return ip
-    raise Exception(f"Could not determine IP address for container {container_name}")
+    wait_for_running_container(MOCK_SERVER_CONTAINER)
+
+
+def stop_mock_server(target_container_name: str):
+    subprocess.run(f'docker rm -f {MOCK_SERVER_CONTAINER}', shell=True, check=False, capture_output=True)
+    subprocess.run(f'docker network disconnect {MOCK_SERVER_NETWORK} {target_container_name}', shell=True, check=False, capture_output=True)
+    subprocess.run(f'docker network rm {MOCK_SERVER_NETWORK}', shell=True, check=False, capture_output=True)
 
 
 def set_etc_hosts(target_container_name: str, ip: str, hostname: str):
-    if os.name == "nt":
+    if DOCKER_OSTYPE == "windows":
         command = f'docker exec {target_container_name} cmd /c "echo {ip} {hostname} >> %SystemRoot%\\System32\\drivers\\etc\\hosts"'
     else:
         command = f'docker exec -u 0 {target_container_name} sh -c "echo {ip} {hostname} >> /etc/hosts"'
@@ -250,12 +264,12 @@ if __name__ == "__main__":
         "xn--mnchen-3ya.example.com",
         "xn--mnchen-allowed-gsb.example.com"
     ]
+    stop_mock_server(target_container_name)
     try:
-        ip = start_mock_server(target_container_name)
+        start_mock_server(target_container_name)
         for domain_name in domain_names:
-            set_etc_hosts(target_container_name, ip, domain_name)
+            set_etc_hosts(target_container_name, MOCK_SERVER_IP, domain_name)
         time.sleep(5)
         run_test(s, c)
     finally:
-        subprocess.run(
-            f'docker rm -f mock-server-{target_container_name}', shell=True)
+        stop_mock_server(target_container_name)

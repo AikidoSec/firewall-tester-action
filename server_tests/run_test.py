@@ -32,6 +32,8 @@ DOCKER_OSTYPE = subprocess.run(
     check=True,
     timeout=15,
 ).stdout.strip().lower()
+POSTGRES_USER = WINDOWS_POSTGRES_USER if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_USER
+POSTGRES_PASSWORD = WINDOWS_POSTGRES_PASSWORD if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_PASSWORD
 
 
 def get_default_docker_host_ip() -> str:
@@ -92,7 +94,7 @@ def wait_for_postgres_ready(timeout_seconds: int = 180) -> None:
         "postgres",
         "pg_isready",
         "-U",
-        WINDOWS_POSTGRES_USER if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_USER,
+        POSTGRES_USER,
         "-h",
         "127.0.0.1",
         "-p",
@@ -172,17 +174,12 @@ def quote_postgres_identifier(identifier: str) -> str:
 
 def create_test_database(test_dir: str) -> str:
     escaped_db_name = quote_postgres_identifier(test_dir)
-    create_db_commands_windows = [
-        ["docker", "exec", "-e", f"PGPASSWORD={WINDOWS_POSTGRES_PASSWORD}", "postgres", "C:\\pgsql\\bin\\createdb.exe", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", WINDOWS_POSTGRES_USER, test_dir],
-        ["docker", "exec", "-e", f"PGPASSWORD={WINDOWS_POSTGRES_PASSWORD}", "postgres", "C:\\pgsql\\bin\\psql.exe", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", WINDOWS_POSTGRES_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
-    ]
-    create_db_commands_linux = [
-        ["docker", "exec", "postgres", "createdb", "-U", "myuser", test_dir],
-        ["docker", "exec", "postgres", "psql", "-U", "myuser", "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
+    create_db_commands = [
+        ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir],
+        ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "psql", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
     ]
     last_error: Optional[subprocess.CalledProcessError] = None
-    
-    create_db_commands = create_db_commands_windows if DOCKER_OSTYPE == "windows" else create_db_commands_linux
+
     for command in create_db_commands:
         try:
             subprocess.run(command, check=True)
@@ -329,21 +326,11 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 2. run the Docker container
         database_name = create_test_database(test_dir)
         time.sleep(1)
-        postgres_user = (
-            WINDOWS_POSTGRES_USER
-            if DOCKER_OSTYPE == "windows"
-            else LINUX_POSTGRES_USER
-        )
-        postgres_password = (
-            WINDOWS_POSTGRES_PASSWORD
-            if DOCKER_OSTYPE == "windows"
-            else LINUX_POSTGRES_PASSWORD
-        )
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://{postgres_user}:{postgres_password}@{docker_postgres_host}:5432/{database_name}?sslmode=disable",
+            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{database_name}?sslmode=disable",
             "AIKIDO_ENDPOINT": f"http://{docker_core_host}:3000",
             "AIKIDO_REALTIME_ENDPOINT": f"http://{docker_core_host}:3000",
             "AIKIDO_URL": f"http://{docker_core_host}:3000",

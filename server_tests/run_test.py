@@ -157,6 +157,7 @@ class GitHubActionsFormatter(logging.Formatter):
 
 
 def get_logger(name: str = "github_actions_logger") -> logging.Logger:
+    sys.stdout.reconfigure(encoding='utf-8')
     logger = logging.getLogger(name)
     if not logger.hasHandlers():
         handler = logging.StreamHandler(sys.stdout)
@@ -624,7 +625,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     full_content = header + details_heading + "".join(details_blocks)
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 

@@ -64,6 +64,9 @@ def get_docker_host_ip() -> str:
     return "172.18.0.1"
 
 
+DOCKER_HOST_IP = get_docker_host_ip()
+
+
 def start_postgres() -> None:
     postgres_image = WINDOWS_POSTGRES_IMAGE if DOCKER_OSTYPE == "windows" else "postgres"
     docker_args = [
@@ -272,7 +275,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_core_host: str, docker_postgres_host: str) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_postgres_host: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
@@ -308,10 +311,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
             "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{docker_core_host}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{docker_core_host}:3000",
-            "AIKIDO_URL": f"http://{docker_core_host}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{docker_core_host}:3000",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
@@ -774,7 +777,6 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    docker_core_host = get_docker_host_ip()
     docker_postgres_host = get_running_container_ip("postgres")
     logger.info(f"Using postgres container IP: {docker_postgres_host}:5432")
     build_docker_image(dockerfile_path, extra_build_args)
@@ -825,7 +827,6 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 app_port,
                 sleep_before_test,
                 None if test_type == "server" else control_start_port,
-                docker_core_host,
                 docker_postgres_host,
             )
             future_to_test[future] = test_dir

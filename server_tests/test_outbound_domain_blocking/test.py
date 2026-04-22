@@ -73,11 +73,11 @@ def stop_mock_server():
     subprocess.run(f'docker network rm {MOCK_SERVER_NETWORK}', shell=True, check=False, capture_output=True)
 
 
-def set_etc_hosts(ip: str, hostname: str):
+def set_etc_hosts(hostname: str):
     if DOCKER_OSTYPE == "windows":
-        command = f'docker exec {TARGET_CONTAINER_NAME} cmd /c "echo {ip} {hostname} >> %SystemRoot%\\System32\\drivers\\etc\\hosts"'
+        command = f'docker exec {TARGET_CONTAINER_NAME} cmd /c "echo {MOCK_SERVER_IP} {hostname} >> %SystemRoot%\\System32\\drivers\\etc\\hosts"'
     else:
-        command = f'docker exec -u 0 {TARGET_CONTAINER_NAME} sh -c "echo {ip} {hostname} >> /etc/hosts"'
+        command = f'docker exec -u 0 {TARGET_CONTAINER_NAME} sh -c "echo {MOCK_SERVER_IP} {hostname} >> /etc/hosts"'
 
     subprocess.run(command, shell=True, check=True)
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     try:
         start_mock_server()
         for domain_name in domain_names:
-            set_etc_hosts(MOCK_SERVER_IP, domain_name)
+            set_etc_hosts(domain_name)
         time.sleep(5)
         run_test(s, c)
     finally:

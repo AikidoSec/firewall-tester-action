@@ -1,6 +1,5 @@
 from testlib import *
 from core_api import CoreApi
-import socket
 '''
 Tests the outbound domain blocking feature:
 
@@ -23,28 +22,64 @@ Tests the outbound domain blocking feature:
 11. Tests that detection mode (block: false) doesn't block
 '''
 
+# The demo app container under test.
+TARGET_CONTAINER_NAME = "test_outbound_domain_blocking"
+# The fixed public-looking IP used by the mock server.
+MOCK_SERVER_IP = "11.22.33.44"
+# The dedicated subnet that reserves the mock server's public-looking IP.
+MOCK_SERVER_SUBNET = "11.22.33.0/24"
+# The helper container that pretends to be the outbound destination.
+MOCK_SERVER_CONTAINER = "mock-server-outbound-domain-blocking"
+# The temporary network that connects the demo app to the mock server.
+MOCK_SERVER_NETWORK = "mock-network-outbound-domain-blocking"
+# The active Docker engine type, used to choose Linux vs Windows container commands.
+DOCKER_OSTYPE = subprocess.run(
+    ["docker", "info", "--format", "{{.OSType}}"],
+    capture_output=True,
+    text=True,
+    check=True,
+).stdout.strip().lower()
 
-def start_mock_servers(target_container_name: str):
-    path = os.path.join(os.path.dirname(__file__), "mock-server.sh")
 
-    subprocess.run(
-        f"docker run -d --name mock-server-{target_container_name} -v {path}:/mock-server.sh:ro --network container:{target_container_name} --cap-add=NET_ADMIN python:3.12-alpine sh /mock-server.sh", shell=True)
-    i = 0
-    while True:
+def wait_for_running_container(container_name: str, timeout_seconds: int = 20):
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(f'docker inspect -f "{{{{.State.Running}}}}" {container_name}', shell=True, capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip().lower() == "true":
+            return
         time.sleep(1)
-        if subprocess.run(
-                f"docker ps | grep mock-server-{target_container_name} | grep Up", shell=True).returncode == 0:
-            break
-        time.sleep(1)
-        i += 1
-        if i > 20:
-            raise Exception(
-                f"Mock server did not start after {i} seconds")
+    raise Exception(f"Container {container_name} did not start after {timeout_seconds} seconds")
 
 
-def set_etc_hosts(target_container_name: str, ip: str, hostname: str):
-    subprocess.run(
-        f"docker exec  -u 0 {target_container_name} sh -c 'echo {ip} {hostname} >> /etc/hosts'", shell=True)
+def start_mock_server():
+    path = os.path.dirname(__file__)
+
+    driver = "nat" if DOCKER_OSTYPE == "windows" else "bridge"
+    subprocess.run(f'docker network create --driver {driver} --subnet {MOCK_SERVER_SUBNET} {MOCK_SERVER_NETWORK}', shell=True, check=True)
+    subprocess.run(f'docker network connect {MOCK_SERVER_NETWORK} {TARGET_CONTAINER_NAME}', shell=True, check=True)
+
+    if DOCKER_OSTYPE == "windows":
+        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:C:\\test:ro" mcr.microsoft.com/windows-cssc/python:3.13-nanoserver-ltsc2022 python C:\\test\\mock-server.py'
+    else:
+        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:/test:ro" python:3.13-alpine python /test/mock-server.py'
+
+    subprocess.run(command, shell=True, check=True)
+    wait_for_running_container(MOCK_SERVER_CONTAINER)
+
+
+def stop_mock_server():
+    subprocess.run(f'docker rm -f {MOCK_SERVER_CONTAINER}', shell=True, check=False, capture_output=True)
+    subprocess.run(f'docker network disconnect {MOCK_SERVER_NETWORK} {TARGET_CONTAINER_NAME}', shell=True, check=False, capture_output=True)
+    subprocess.run(f'docker network rm {MOCK_SERVER_NETWORK}', shell=True, check=False, capture_output=True)
+
+
+def set_etc_hosts(hostname: str):
+    if DOCKER_OSTYPE == "windows":
+        command = f'docker exec {TARGET_CONTAINER_NAME} cmd /c "echo {MOCK_SERVER_IP} {hostname} >> %SystemRoot%\\System32\\drivers\\etc\\hosts"'
+    else:
+        command = f'docker exec -u 0 {TARGET_CONTAINER_NAME} sh -c "echo {MOCK_SERVER_IP} {hostname} >> /etc/hosts"'
+
+    subprocess.run(command, shell=True, check=True)
 
 
 def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
@@ -225,7 +260,6 @@ def run_test(s: TestServer, c: CoreApi):
 
 if __name__ == "__main__":
     args, s, c = init_server_and_core()
-    target_container_name = "test_outbound_domain_blocking"
     domain_names = [
         "evil.example.com",
         "domain1.example.com",
@@ -237,13 +271,12 @@ if __name__ == "__main__":
         "xn--mnchen-3ya.example.com",
         "xn--mnchen-allowed-gsb.example.com"
     ]
-    ip = "11.22.33.44"
+    stop_mock_server()
     try:
-        start_mock_servers(target_container_name)
+        start_mock_server()
         for domain_name in domain_names:
-            set_etc_hosts(target_container_name, ip, domain_name)
+            set_etc_hosts(domain_name)
         time.sleep(5)
         run_test(s, c)
     finally:
-        subprocess.run(
-            f"docker rm -f mock-server-{target_container_name}", shell=True)
+        stop_mock_server()

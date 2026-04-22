@@ -36,7 +36,7 @@ POSTGRES_USER = WINDOWS_POSTGRES_USER if DOCKER_OSTYPE == "windows" else LINUX_P
 POSTGRES_PASSWORD = WINDOWS_POSTGRES_PASSWORD if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_PASSWORD
 
 
-def get_default_docker_host_ip() -> str:
+def get_docker_host_ip() -> str:
     if DOCKER_OSTYPE == "windows":
         try:
             result = subprocess.run(
@@ -62,6 +62,8 @@ def get_default_docker_host_ip() -> str:
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
     return "172.18.0.1"
+
+
 def start_postgres() -> None:
     postgres_image = WINDOWS_POSTGRES_IMAGE if DOCKER_OSTYPE == "windows" else "postgres"
     docker_args = [
@@ -797,7 +799,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    docker_core_host = get_default_docker_host_ip()
+    docker_core_host = get_docker_host_ip()
     docker_postgres_host = get_running_container_ip("postgres")
     logger.info(f"Using postgres container IP: {docker_postgres_host}:5432")
     build_docker_image(dockerfile_path, extra_build_args)

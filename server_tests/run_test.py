@@ -20,121 +20,155 @@ import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+WINDOWS_POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15"
+WINDOWS_POSTGRES_USER = "postgres"
+WINDOWS_POSTGRES_PASSWORD = "postgres"
+LINUX_POSTGRES_USER = "myuser"
+LINUX_POSTGRES_PASSWORD = "mysecretpassword"
+DOCKER_OSTYPE = subprocess.run(
+    ["docker", "info", "--format", "{{.OSType}}"],
+    capture_output=True,
+    text=True,
+    check=True,
+    timeout=15,
+).stdout.strip().lower()
+DOCKER_CORE_HOST = "host.docker.internal"
 
 
 def get_default_docker_host_ip() -> str:
-    docker_host_ip = os.environ.get("DOCKER_HOST_IP")
-    if docker_host_ip:
-        return docker_host_ip
-    if not sys.platform.startswith("linux"):
+    if DOCKER_OSTYPE == "windows":
+        try:
+            result = subprocess.run(
+                ["docker", "network", "inspect", "nat"],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=15,
+            )
+            networks = json.loads(result.stdout)
+            if networks:
+                ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
+                if ipam_configs:
+                    gateway = ipam_configs[0].get("Gateway")
+                    if gateway:
+                        return gateway
+        except Exception:
+            pass
         # Docker Desktop on macOS/Windows provides host.docker.internal.
+        return "host.docker.internal"
+    if not sys.platform.startswith("linux") and os.name != "nt":
         return "host.docker.internal"
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
     return "172.18.0.1"
 
 
-def get_windows_nat_gateway_ip() -> Optional[str]:
-    try:
+DOCKER_CORE_HOST = get_default_docker_host_ip()
+
+
+def start_postgres() -> None:
+    postgres_image = WINDOWS_POSTGRES_IMAGE if DOCKER_OSTYPE == "windows" else "postgres"
+    docker_args = [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "postgres",
+        "-e",
+        f"POSTGRES_PASSWORD={LINUX_POSTGRES_PASSWORD}",
+        "-e",
+        f"POSTGRES_USER={LINUX_POSTGRES_USER}",
+        "-e",
+        "POSTGRES_DB=mydb",
+        "-p",
+        "5432:5432",
+        "-d",
+        postgres_image,
+    ]
+
+    subprocess.run(docker_args, check=True)
+    logger.info("Started Postgres container")
+    wait_for_postgres_ready()
+
+
+def wait_for_postgres_ready(timeout_seconds: int = 180) -> None:
+    ready_command = [
+        "docker",
+        "exec",
+        "postgres",
+        "pg_isready",
+        "-U",
+        WINDOWS_POSTGRES_USER if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_USER,
+        "-h",
+        "127.0.0.1",
+        "-p",
+        "5432",
+    ]
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
         result = subprocess.run(
-            ["docker", "network", "inspect", "nat"],
+            ready_command,
             capture_output=True,
             text=True,
-            check=True,
-            timeout=15,
         )
-        networks = json.loads(result.stdout)
-        if not networks:
-            return None
+        if result.returncode == 0:
+            return
+        time.sleep(1)
 
-        ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
-        if not ipam_configs:
-            return None
-
-        return ipam_configs[0].get("Gateway")
-    except Exception:
-        return None
-
-
-def get_windows_host_candidates() -> List[str]:
-    candidates: List[str] = []
-    for host in (
-        "host.docker.internal",
-        "gateway.docker.internal",
-        get_windows_nat_gateway_ip(),
-    ):
-        if host and host not in candidates:
-            candidates.append(host)
-    return candidates
-
-
-def can_connect_from_windows_postgres_container(host: str, port: int) -> bool:
-    host_literal = host.replace("'", "''")
-    script = (
-        "$ErrorActionPreference = 'Stop'; "
-        f"$hostName = '{host_literal}'; "
-        f"$port = {port}; "
-        "$client = [System.Net.Sockets.TcpClient]::new(); "
-        "try { "
-        "$asyncResult = $client.BeginConnect($hostName, $port, $null, $null); "
-        "if (-not $asyncResult.AsyncWaitHandle.WaitOne(3000)) { exit 1 } "
-        "$client.EndConnect($asyncResult) | Out-Null; "
-        "exit 0 "
-        "} catch { "
-        "exit 1 "
-        "} finally { "
-        "$client.Dispose(); "
-        "}"
+    raise RuntimeError(
+        f"Postgres did not become ready after {timeout_seconds} seconds"
     )
-    try:
+
+
+def stop_postgres() -> None:
+    subprocess.run(
+        ["docker", "stop", "postgres"],
+        check=False,
+        capture_output=False,
+    )
+
+
+def wait_for_running_container(container_name: str, timeout_seconds: int = 20) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip().lower() == "true":
+            return
+        time.sleep(1)
+    raise RuntimeError(
+        f"Container {container_name} did not start after {timeout_seconds} seconds"
+    )
+
+
+def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> str:
+    wait_for_running_container(container_name, timeout_seconds=timeout_seconds)
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
         result = subprocess.run(
             [
                 "docker",
-                "exec",
-                "postgres",
-                "pwsh",
-                "-NoLogo",
-                "-NoProfile",
-                "-Command",
-                script,
+                "inspect",
+                "-f",
+                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+                container_name,
             ],
             capture_output=True,
             text=True,
-            timeout=15,
         )
-        return result.returncode == 0
-    except Exception:
-        return False
+        ip_address = result.stdout.strip()
+        if result.returncode == 0 and ip_address:
+            return ip_address
+        time.sleep(1)
 
-
-def resolve_docker_host_for_service(service_name: str, port: int, env_vars: List[str]) -> str:
-    for env_var in env_vars:
-        host = os.environ.get(env_var)
-        if host:
-            logger.info(
-                f"Using {service_name} Docker host from {env_var}: {host}:{port}"
-            )
-            return host
-
-    default_host = get_default_docker_host_ip()
-    if not sys.platform.startswith("win32"):
-        logger.info(f"Using default {service_name} Docker host: {default_host}:{port}")
-        return default_host
-
-    for candidate in get_windows_host_candidates():
-        reachable = can_connect_from_windows_postgres_container(candidate, port)
-        logger.info(
-            f"Probing Windows Docker host for {service_name}: {candidate}:{port} -> "
-            f"{'reachable' if reachable else 'unreachable'}"
-        )
-        if reachable:
-            return candidate
-
-    logger.warning(
-        f"Unable to verify a Windows Docker host for {service_name} on port {port}; "
-        f"falling back to {default_host}"
+    raise RuntimeError(
+        f"Could not determine IP address for container {container_name}"
     )
-    return default_host
 
 
 def quote_postgres_identifier(identifier: str) -> str:
@@ -145,29 +179,8 @@ def quote_postgres_identifier(identifier: str) -> str:
 def create_test_database(test_dir: str) -> str:
     escaped_db_name = quote_postgres_identifier(test_dir)
     create_db_commands_windows = [
-        [
-            "docker",
-            "exec",
-            "postgres",
-            "C:\\pgsql\\bin\\createdb.exe",
-            "-U",
-            "myuser",
-            test_dir,
-        ],
-        [
-            "docker",
-            "exec",
-            "postgres",
-            "C:\\pgsql\\bin\\psql.exe",
-            "-U",
-            "myuser",
-            "-d",
-            "postgres",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-c",
-            f'CREATE DATABASE "{escaped_db_name}"',
-        ],
+        ["docker", "exec", "-e", f"PGPASSWORD={WINDOWS_POSTGRES_PASSWORD}", "postgres", "C:\\pgsql\\bin\\createdb.exe", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", WINDOWS_POSTGRES_USER, test_dir],
+        ["docker", "exec", "-e", f"PGPASSWORD={WINDOWS_POSTGRES_PASSWORD}", "postgres", "C:\\pgsql\\bin\\psql.exe", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", WINDOWS_POSTGRES_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
     ]
     create_db_commands_linux = [
         ["docker", "exec", "postgres", "createdb", "-U", "myuser", test_dir],
@@ -175,7 +188,7 @@ def create_test_database(test_dir: str) -> str:
     ]
     last_error: Optional[subprocess.CalledProcessError] = None
     
-    create_db_commands = create_db_commands_windows if sys.platform.startswith("win32") else create_db_commands_linux
+    create_db_commands = create_db_commands_windows if DOCKER_OSTYPE == "windows" else create_db_commands_linux
     for command in create_db_commands:
         try:
             subprocess.run(command, check=True)
@@ -221,12 +234,6 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 
 
 logger = get_logger()
-DOCKER_CORE_HOST = resolve_docker_host_for_service(
-    "core", 3000, ["DOCKER_CORE_HOST", "DOCKER_HOST_IP"]
-)
-DOCKER_POSTGRES_HOST = resolve_docker_host_for_service(
-    "postgres", 5432, ["DOCKER_POSTGRES_HOST", "DOCKER_HOST_IP"]
-)
 
 
 class TestStatus(Enum):
@@ -297,7 +304,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_postgres_host: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
@@ -328,11 +335,21 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # 2. run the Docker container
         database_name = create_test_database(test_dir)
         time.sleep(1)
+        postgres_user = (
+            WINDOWS_POSTGRES_USER
+            if DOCKER_OSTYPE == "windows"
+            else LINUX_POSTGRES_USER
+        )
+        postgres_password = (
+            WINDOWS_POSTGRES_PASSWORD
+            if DOCKER_OSTYPE == "windows"
+            else LINUX_POSTGRES_PASSWORD
+        )
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_POSTGRES_HOST}:5432/{database_name}?sslmode=disable",
+            "DATABASE_URL": f"postgres://{postgres_user}:{postgres_password}@{docker_postgres_host}:5432/{database_name}?sslmode=disable",
             "AIKIDO_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
             "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_CORE_HOST}:3000",
             "AIKIDO_URL": f"http://{DOCKER_CORE_HOST}:3000",
@@ -799,6 +816,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
+    docker_postgres_host = get_running_container_ip("postgres")
+    logger.info(f"Using postgres container IP: {docker_postgres_host}:5432")
     build_docker_image(dockerfile_path, extra_build_args)
     if test_type == "control":
         dir_start = "control_"
@@ -846,8 +865,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 extra_args,
                 app_port,
                 sleep_before_test,
-                None if test_type == "server" else control_start_port
-
+                None if test_type == "server" else control_start_port,
+                docker_postgres_host,
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -932,5 +951,9 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
-    run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    start_postgres()
+    try:
+        run_tests(args.dockerfile_path, args.max_parallel_tests,
+                  args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    finally:
+        stop_postgres()

@@ -732,14 +732,14 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
             try:
                 result = future.result()
                 test_results.append(result)
-                status_label = {
-                    TestStatus.PASSED: "PASSED",
-                    TestStatus.FAILED: "FAILED",
-                    TestStatus.SKIPPED: "SKIPPED",
-                    TestStatus.TIMEOUT: "TIMED OUT"
+                status_emoji = {
+                    TestStatus.PASSED: "✅ PASSED",
+                    TestStatus.FAILED: "❌ FAILED",
+                    TestStatus.SKIPPED: "⏭️ SKIPPED",
+                    TestStatus.TIMEOUT: "⏰ TIMED OUT"
                 }
                 logger.info(
-                    f"Test {test_dir} {status_label[result.status]} in {result.duration:.2f} seconds")
+                    f"Test {test_dir} {status_emoji[result.status]} in {result.duration:.2f} seconds")
                 if result.status == TestStatus.FAILED:
                     logger.error(
                         f"Error in test {test_dir}: {result.error_message}")

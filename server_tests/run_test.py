@@ -39,7 +39,10 @@ else:
     POSTGRES_PASSWORD = "postgres"
 
 def get_docker_host_ip() -> str:
-    # Covers all scenarios (linux, macos, github, windows)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return "172.17.0.1"
+
+    # Covers all local scenarios (linux, macos, windows)
     network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 
     result = subprocess.run(
@@ -60,23 +63,9 @@ DOCKER_HOST_IP = get_docker_host_ip()
 
 
 def start_postgres() -> None:
-    docker_args = [
-        "docker",
-        "run",
-        "--rm",
-        "--name",
-        "postgres",
-        "-e",
-        f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
-        "-e",
-        f"POSTGRES_USER={POSTGRES_USER}",
-        "-e",
-        "POSTGRES_DB=mydb",
-        "-p",
-        "5432:5432",
-        "-d",
-        POSTGRES_IMAGE,
-    ]
+    docker_args = ["docker", "run", "--rm", "--name", "postgres",
+                   "-e", f"POSTGRES_USER={POSTGRES_USER}", "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
+                   "-e", "POSTGRES_DB=mydb", "-p", "5432:5432", "-d", POSTGRES_IMAGE]
 
     subprocess.run(docker_args, check=True)
     logger.info("Started Postgres container")
@@ -84,18 +73,7 @@ def start_postgres() -> None:
 
 
 def wait_for_postgres_ready(timeout_seconds: int = 180) -> None:
-    ready_command = [
-        "docker",
-        "exec",
-        "postgres",
-        "pg_isready",
-        "-U",
-        POSTGRES_USER,
-        "-h",
-        "127.0.0.1",
-        "-p",
-        "5432",
-    ]
+    ready_command = ["docker", "exec", "postgres", "pg_isready", "-U", POSTGRES_USER, "-h", "127.0.0.1", "-p", "5432"]
 
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -143,13 +121,7 @@ def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> 
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         result = subprocess.run(
-            [
-                "docker",
-                "inspect",
-                "-f",
-                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-                container_name,
-            ],
+            ["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_name],
             capture_output=True,
             text=True,
         )
@@ -163,7 +135,8 @@ def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> 
     )
 
 def create_test_database(test_dir: str) -> None:
-    create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
+    create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb",
+                               "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
     subprocess.run(create_database_command, check=True)
 
 class GitHubActionsFormatter(logging.Formatter):

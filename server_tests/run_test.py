@@ -20,7 +20,7 @@ import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
-WINDOWS_POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15"
+WINDOWS_POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
 WINDOWS_POSTGRES_USER = "postgres"
 WINDOWS_POSTGRES_PASSWORD = "postgres"
 LINUX_POSTGRES_USER = "myuser"

@@ -20,11 +20,7 @@ import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
-WINDOWS_POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
-WINDOWS_POSTGRES_USER = "postgres"
-WINDOWS_POSTGRES_PASSWORD = "postgres"
-LINUX_POSTGRES_USER = "myuser"
-LINUX_POSTGRES_PASSWORD = "mysecretpassword"
+
 DOCKER_OSTYPE = subprocess.run(
     ["docker", "info", "--format", "{{.OSType}}"],
     capture_output=True,
@@ -32,43 +28,38 @@ DOCKER_OSTYPE = subprocess.run(
     check=True,
     timeout=15,
 ).stdout.strip().lower()
-POSTGRES_USER = WINDOWS_POSTGRES_USER if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_USER
-POSTGRES_PASSWORD = WINDOWS_POSTGRES_PASSWORD if DOCKER_OSTYPE == "windows" else LINUX_POSTGRES_PASSWORD
 
+if DOCKER_OSTYPE == "linux":
+    POSTGRES_IMAGE = "postgres"
+    POSTGRES_USER = "myuser"
+    POSTGRES_PASSWORD = "mysecretpassword"
+else:
+    POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
+    POSTGRES_USER = "postgres"
+    POSTGRES_PASSWORD = "postgres"
 
 def get_docker_host_ip() -> str:
-    if DOCKER_OSTYPE == "windows":
-        try:
-            result = subprocess.run(
-                ["docker", "network", "inspect", "nat"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=15,
-            )
-            networks = json.loads(result.stdout)
-            if networks:
-                ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
-                if ipam_configs:
-                    gateway = ipam_configs[0].get("Gateway")
-                    if gateway:
-                        return gateway
-        except Exception:
-            pass
-        # Docker Desktop on macOS/Windows provides host.docker.internal.
-        return "host.docker.internal"
-    if not sys.platform.startswith("linux") and os.name != "nt":
-        return "host.docker.internal"
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        return "172.17.0.1"
-    return "172.18.0.1"
+    # Covers all scenarios (linux, macos, github, windows)
+    network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 
+    result = subprocess.run(
+        ["docker", "network", "inspect", network_name],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=15,
+    )
+
+    networks = json.loads(result.stdout)
+    ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
+    gateway = ipam_configs[0].get("Gateway")
+    
+    return gateway
 
 DOCKER_HOST_IP = get_docker_host_ip()
 
 
 def start_postgres() -> None:
-    postgres_image = WINDOWS_POSTGRES_IMAGE if DOCKER_OSTYPE == "windows" else "postgres"
     docker_args = [
         "docker",
         "run",
@@ -76,15 +67,15 @@ def start_postgres() -> None:
         "--name",
         "postgres",
         "-e",
-        f"POSTGRES_PASSWORD={LINUX_POSTGRES_PASSWORD}",
+        f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
         "-e",
-        f"POSTGRES_USER={LINUX_POSTGRES_USER}",
+        f"POSTGRES_USER={POSTGRES_USER}",
         "-e",
         "POSTGRES_DB=mydb",
         "-p",
         "5432:5432",
         "-d",
-        postgres_image,
+        POSTGRES_IMAGE,
     ]
 
     subprocess.run(docker_args, check=True)
@@ -522,16 +513,6 @@ def _escape_markdown(text: str) -> str:
     return text
 
 
-def _summarize_error_message_for_table(text: str, max_length: int = 160) -> str:
-    """Convert multi-line markdown/error text into a single-line table cell."""
-    text = text.replace("<br>", " ")
-    text = text.replace("```", " ")
-    text = text.replace("\r", " ").replace("\n", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    if len(text) > max_length:
-        return text[:max_length - 3].rstrip() + "..."
-    return text
-
 
 def _linkify_line_ref(text: str, test_dir: str) -> str:
     """Replace [line X → line Y → ...] prefix with clickable GitHub links."""
@@ -600,13 +581,13 @@ def _build_summary_header(test_results: List[TestResult]) -> str:
     buf.write("|------|--------|----------|---------------|\n")
 
     for result in test_results:
-        status_label = {
-            TestStatus.PASSED: "PASS",
-            TestStatus.FAILED: "FAIL",
-            TestStatus.SKIPPED: "SKIP",
-            TestStatus.TIMEOUT: "TIMEOUT"
+        status_emoji = {
+            TestStatus.PASSED: "✅ PASS",
+            TestStatus.FAILED: "❌ FAIL",
+            TestStatus.SKIPPED: "⏭️ SKIP",
+            TestStatus.TIMEOUT: "⏰ TIMEOUT"
         }
-        status = status_label[result.status]
+        status = status_emoji[result.status]
         duration = f"{result.duration:.2f}s" if result.duration is not None else "N/A"
         if result.failed_assertions:
             error = f"{len(result.failed_assertions)} assertion(s) failed (see details below)"
@@ -657,40 +638,6 @@ def _build_details_block(result: TestResult, include_snippets: bool, max_asserti
     return buf.getvalue()
 
 
-def _build_error_details_block(result: TestResult) -> str:
-    """Build a single <details> block for one failed test with a raw error message."""
-    buf = io.StringIO()
-    details = html.escape(result.error_message or "No additional details available.")
-    buf.write("<details>\n")
-    buf.write(f"<summary>{result.test_dir} - error details</summary>\n\n")
-    buf.write("<pre>\n")
-    buf.write(details)
-    if not details.endswith("\n"):
-        buf.write("\n")
-    buf.write("</pre>\n\n")
-    buf.write("</details>\n\n")
-    return buf.getvalue()
-
-
-def _build_details_sections(
-    test_results: List[TestResult],
-    include_snippets: bool,
-    max_assertions: Optional[int] = None,
-) -> str:
-    blocks = []
-    for result in test_results:
-        if result.failed_assertions:
-            blocks.append(
-                _build_details_block(
-                    result,
-                    include_snippets=include_snippets,
-                    max_assertions=max_assertions,
-                )
-            )
-        elif result.error_message:
-            blocks.append(_build_error_details_block(result))
-    return "".join(blocks)
-
 
 # GitHub step summary limit is 1024 KB; use 1020 KB as safe threshold
 _SUMMARY_SIZE_LIMIT = 1020 * 1024
@@ -705,27 +652,23 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     header = _build_summary_header(test_results)
 
     failed_with_details = [
-        r for r in test_results
-        if r.status == TestStatus.FAILED and (r.failed_assertions or r.error_message)
-    ]
+        r for r in test_results if r.failed_assertions]
 
     if not failed_with_details:
         # No details section needed – just write the header
-        with open(summary_path, 'a', encoding='utf-8') as f:
+        with open(summary_path, 'a') as f:
             f.write(header)
         return
 
-    details_heading = "\n### Failure Details\n\n"
+    details_heading = "\n### Failed Assertions Details\n\n"
 
     # Strategy 1: full details with snippets
-    details_blocks = _build_details_sections(
-        failed_with_details,
-        include_snippets=True,
-    )
-    full_content = header + details_heading + details_blocks
+    details_blocks = [_build_details_block(
+        r, include_snippets=True) for r in failed_with_details]
+    full_content = header + details_heading + "".join(details_blocks)
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a', encoding='utf-8') as f:
+        with open(summary_path, 'a') as f:
             f.write(full_content)
         return
 

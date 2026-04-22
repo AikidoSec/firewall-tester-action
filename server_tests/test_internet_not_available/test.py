@@ -12,9 +12,20 @@ from core_api import CoreApi
 
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
-    time.sleep(30)
-    response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(response, 500, response.text)
+    deadline = time.monotonic() + 90
+    response = None
+
+    while time.monotonic() < deadline:
+        response = s.post("/api/execute", {"userCommand": "whoami"})
+        if get_response_status_code(response) == 500:
+            break
+        time.sleep(2)
+
+    collector.soft_assert_response_code_is(
+        response,
+        500,
+        f"Agent did not start blocking before timeout. Last response: {response.text if response else 'no response'}",
+    )
     collector.raise_if_failures()
 
 

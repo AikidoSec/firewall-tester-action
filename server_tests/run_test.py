@@ -168,34 +168,9 @@ def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> 
         f"Could not determine IP address for container {container_name}"
     )
 
-
-def quote_postgres_identifier(identifier: str) -> str:
-    # PostgreSQL identifiers are escaped by doubling quotes.
-    return identifier.replace('"', '""')
-
-
-def create_test_database(test_dir: str) -> str:
-    escaped_db_name = quote_postgres_identifier(test_dir)
-    create_db_commands = [
-        ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir],
-        ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "psql", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, "-d", "postgres", "-v", "ON_ERROR_STOP=1", "-c", f'CREATE DATABASE "{escaped_db_name}"'],
-    ]
-    last_error: Optional[subprocess.CalledProcessError] = None
-
-    for command in create_db_commands:
-        try:
-            subprocess.run(command, check=True)
-            return test_dir
-        except subprocess.CalledProcessError as error:
-            last_error = error
-            logger.warning(f"Database create command failed: {' '.join(command)}")
-
-    if last_error:
-        logger.warning(
-            "Falling back to shared 'postgres' database because test database creation failed"
-        )
-        return "postgres"
-    raise RuntimeError("Unable to create database; no command was executed")
+def create_test_database(test_dir: str) -> None:
+    create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb", "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
+    subprocess.run(create_database_command, check=True)
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -326,13 +301,13 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        database_name = create_test_database(test_dir)
+        create_test_database(test_dir)
         time.sleep(1)
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{database_name}?sslmode=disable",
+            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
             "AIKIDO_ENDPOINT": f"http://{docker_core_host}:3000",
             "AIKIDO_REALTIME_ENDPOINT": f"http://{docker_core_host}:3000",
             "AIKIDO_URL": f"http://{docker_core_host}:3000",

@@ -2,26 +2,24 @@ import * as core from '@actions/core'
 import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
 import path from 'path'
+import { fileURLToPath } from 'url'
 
 // Handle process termination signals
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. Cleaning up...')
   stopServer()
-  stopPostgres()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
   console.log('\nReceived SIGTERM. Cleaning up...')
   stopServer()
-  stopPostgres()
   process.exit(0)
 })
 
 export async function run(): Promise<void> {
   try {
     // Start the Express server
-    await startPostgres()
     startServer()
     const dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
@@ -62,12 +60,18 @@ export async function run(): Promise<void> {
     core.debug(`Ignore failures: ${ignore_failures}`)
     core.debug(`Test type: ${test_type}`)
     // Spawn the Python process
-    const this_file_dir = path.dirname(new URL(import.meta.url).pathname)
+    const this_file_dir = path.dirname(fileURLToPath(import.meta.url))
+    const run_test_path = path.resolve(
+      this_file_dir,
+      '..',
+      'server_tests',
+      'run_test.py'
+    )
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
         [
-          `${this_file_dir}/../server_tests/run_test.py`,
+          run_test_path,
           '--dockerfile_path',
           dockerfile_path,
           '--max_parallel_tests',
@@ -114,65 +118,5 @@ export async function run(): Promise<void> {
     if (error instanceof Error) core.setFailed(error.message)
   } finally {
     stopServer()
-    stopPostgres()
   }
-}
-
-async function startPostgres() {
-  const proc = spawn(
-    'docker',
-    [
-      'run',
-      '--rm',
-      '--name',
-      'postgres',
-      '-e',
-      'POSTGRES_PASSWORD=mysecretpassword',
-      '-e',
-      'POSTGRES_USER=myuser',
-      '-e',
-      'POSTGRES_DB=mydb',
-      '-p',
-      '5432:5432',
-      '-d',
-      'postgres',
-      '-c',
-      'max_connections=200'
-    ],
-    {
-      stdio: 'inherit'
-    }
-  )
-  console.log(`Started Postgres: ${proc.pid}`)
-  // wait for postgres to be ready
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10000)
-  })
-  proc.on('close', (code) => {
-    if (code !== 0) {
-      core.setFailed(`Failed to start Postgres: ${code}`)
-    }
-  })
-  proc.on('error', (err) => {
-    core.setFailed(`Failed to start Postgres: ${err}`)
-  })
-  proc.on('exit', (code) => {
-    if (code !== 0) {
-      core.setFailed(`Failed to start Postgres: ${code}`)
-    }
-  })
-  proc.on('message', (msg) => {
-    console.log(`Postgres: ${msg}`)
-  })
-}
-
-function stopPostgres() {
-  const proc = spawn('docker', ['stop', 'postgres'], {
-    stdio: 'inherit'
-  })
-  proc.on('close', (code) => {
-    if (code !== 0) {
-      core.warning(`Failed to stop Postgres: ${code}`)
-    }
-  })
 }

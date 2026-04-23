@@ -16,22 +16,128 @@ from enum import Enum
 import shlex
 import re
 import io
+import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 
+DOCKER_OSTYPE = subprocess.run(
+    ["docker", "info", "--format", "{{.OSType}}"],
+    capture_output=True,
+    text=True,
+    check=True,
+    timeout=15,
+).stdout.strip().lower()
+
+if DOCKER_OSTYPE == "linux":
+    POSTGRES_IMAGE = "postgres"
+    POSTGRES_USER = "myuser"
+    POSTGRES_PASSWORD = "mysecretpassword"
+else:
+    POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
+    POSTGRES_USER = "postgres"
+    POSTGRES_PASSWORD = "postgres"
 
 def get_docker_host_ip() -> str:
     if os.environ.get("GITHUB_ACTIONS") == "true":
         return "172.17.0.1"
-    # Docker Desktop on macOS/Windows provides host.docker.internal
-    if os.uname().sysname != "Linux":
-        return "host.docker.internal"
-    return os.environ.get("DOCKER_HOST_IP", "172.18.0.1")
 
+    # Covers all local scenarios (linux, macos, windows)
+    network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
+
+    result = subprocess.run(
+        ["docker", "network", "inspect", network_name],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=15,
+    )
+
+    networks = json.loads(result.stdout)
+    ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
+    gateway = ipam_configs[0].get("Gateway")
+    
+    return gateway
 
 DOCKER_HOST_IP = get_docker_host_ip()
 
+
+def start_postgres() -> None:
+    docker_args = ["docker", "run", "--rm", "--name", "postgres",
+                   "-e", f"POSTGRES_USER={POSTGRES_USER}", "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
+                   "-e", "POSTGRES_DB=mydb", "-p", "5432:5432", "-d", POSTGRES_IMAGE]
+
+    subprocess.run(docker_args, check=True)
+    logger.info("Started Postgres container")
+    wait_for_postgres_ready()
+
+
+def wait_for_postgres_ready(timeout_seconds: int = 180) -> None:
+    ready_command = ["docker", "exec", "postgres", "pg_isready", "-U", POSTGRES_USER, "-h", "127.0.0.1", "-p", "5432"]
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(
+            ready_command,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return
+        time.sleep(1)
+
+    raise RuntimeError(
+        f"Postgres did not become ready after {timeout_seconds} seconds"
+    )
+
+
+def stop_postgres() -> None:
+    subprocess.run(
+        ["docker", "stop", "postgres"],
+        check=False,
+        capture_output=False,
+    )
+
+
+def wait_for_running_container(container_name: str, timeout_seconds: int = 20) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip().lower() == "true":
+            return
+        time.sleep(1)
+    raise RuntimeError(
+        f"Container {container_name} did not start after {timeout_seconds} seconds"
+    )
+
+
+def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> str:
+    wait_for_running_container(container_name, timeout_seconds=timeout_seconds)
+
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_name],
+            capture_output=True,
+            text=True,
+        )
+        ip_address = result.stdout.strip()
+        if result.returncode == 0 and ip_address:
+            return ip_address
+        time.sleep(1)
+
+    raise RuntimeError(
+        f"Could not determine IP address for container {container_name}"
+    )
+
+def create_test_database(test_dir: str) -> None:
+    create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb",
+                               "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
+    subprocess.run(create_database_command, check=True)
 
 class GitHubActionsFormatter(logging.Formatter):
     def format(self, record):
@@ -51,6 +157,7 @@ class GitHubActionsFormatter(logging.Formatter):
 
 
 def get_logger(name: str = "github_actions_logger") -> logging.Logger:
+    sys.stdout.reconfigure(encoding='utf-8')
     logger = logging.getLogger(name)
     if not logger.hasHandlers():
         handler = logging.StreamHandler(sys.stdout)
@@ -133,7 +240,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
+def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_postgres_host: str) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
@@ -162,14 +269,13 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_firewall.json: {e} \n{traceback.format_exc()}")
 
         # 2. run the Docker container
-        create_database_command = f"docker exec postgres createdb -U myuser {test_dir}"
-        subprocess.run(create_database_command, shell=True, check=True)
+        create_test_database(test_dir)
         time.sleep(1)
 
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://myuser:mysecretpassword@{DOCKER_HOST_IP}:5432/{test_dir}?sslmode=disable",
+            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
             "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
             "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
             "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
@@ -218,9 +324,11 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         server_tests_dir = os.path.dirname(os.path.abspath(__file__))
         # 5. run the test
-        command = f"PYTHONPATH={server_tests_dir} python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
+        command = f"python {os.path.join(server_tests_dir, test_dir, 'test.py')} --test_name {test_dir} --server_port {start_port} --token {token} --config_update_delay {config_update_delay} --core_port 3000"
         if control_port:
             command += f" --control_server_port {control_port}"
+        test_env = os.environ.copy()
+        test_env["PYTHONPATH"] = server_tests_dir
         logger.debug(f"Running test: {command}")
 
         # Run the test with timeout
@@ -228,6 +336,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             process = subprocess.run(
                 command,
                 shell=True,
+                env=test_env,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -516,7 +625,7 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
     full_content = header + details_heading + "".join(details_blocks)
 
     if len(full_content.encode('utf-8')) <= _SUMMARY_SIZE_LIMIT:
-        with open(summary_path, 'a') as f:
+        with open(summary_path, 'a', encoding='utf-8') as f:
             f.write(full_content)
         return
 
@@ -563,6 +672,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
+    docker_postgres_host = get_running_container_ip("postgres")
+    logger.info(f"Using postgres container IP: {docker_postgres_host}:5432")
     build_docker_image(dockerfile_path, extra_build_args)
     if test_type == "control":
         dir_start = "control_"
@@ -610,8 +721,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 extra_args,
                 app_port,
                 sleep_before_test,
-                None if test_type == "server" else control_start_port
-
+                None if test_type == "server" else control_start_port,
+                docker_postgres_host,
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -696,5 +807,9 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
-    run_tests(args.dockerfile_path, args.max_parallel_tests,
-              args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    start_postgres()
+    try:
+        run_tests(args.dockerfile_path, args.max_parallel_tests,
+                  args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    finally:
+        stop_postgres()

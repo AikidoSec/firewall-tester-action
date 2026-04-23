@@ -32,7 +32,7 @@ import require$$2$3, { spawn } from 'child_process';
 import require$$6$2 from 'timers';
 import require$$1$9 from 'tty';
 import require$$0$b from 'buffer';
-import require$$0$c from 'url';
+import require$$0$c, { fileURLToPath } from 'url';
 import require$$7$2 from 'node:path';
 import require$$2$4 from 'node:fs';
 import require$$6$3 from 'querystring';
@@ -744,14 +744,22 @@ function requireErrors () {
 	if (hasRequiredErrors) return errors;
 	hasRequiredErrors = 1;
 
+	const kUndiciError = Symbol.for('undici.error.UND_ERR');
 	class UndiciError extends Error {
 	  constructor (message) {
 	    super(message);
 	    this.name = 'UndiciError';
 	    this.code = 'UND_ERR';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kUndiciError] === true
+	  }
+
+	  [kUndiciError] = true
 	}
 
+	const kConnectTimeoutError = Symbol.for('undici.error.UND_ERR_CONNECT_TIMEOUT');
 	class ConnectTimeoutError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -759,8 +767,15 @@ function requireErrors () {
 	    this.message = message || 'Connect Timeout Error';
 	    this.code = 'UND_ERR_CONNECT_TIMEOUT';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kConnectTimeoutError] === true
+	  }
+
+	  [kConnectTimeoutError] = true
 	}
 
+	const kHeadersTimeoutError = Symbol.for('undici.error.UND_ERR_HEADERS_TIMEOUT');
 	class HeadersTimeoutError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -768,8 +783,15 @@ function requireErrors () {
 	    this.message = message || 'Headers Timeout Error';
 	    this.code = 'UND_ERR_HEADERS_TIMEOUT';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kHeadersTimeoutError] === true
+	  }
+
+	  [kHeadersTimeoutError] = true
 	}
 
+	const kHeadersOverflowError = Symbol.for('undici.error.UND_ERR_HEADERS_OVERFLOW');
 	class HeadersOverflowError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -777,8 +799,15 @@ function requireErrors () {
 	    this.message = message || 'Headers Overflow Error';
 	    this.code = 'UND_ERR_HEADERS_OVERFLOW';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kHeadersOverflowError] === true
+	  }
+
+	  [kHeadersOverflowError] = true
 	}
 
+	const kBodyTimeoutError = Symbol.for('undici.error.UND_ERR_BODY_TIMEOUT');
 	class BodyTimeoutError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -786,8 +815,15 @@ function requireErrors () {
 	    this.message = message || 'Body Timeout Error';
 	    this.code = 'UND_ERR_BODY_TIMEOUT';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kBodyTimeoutError] === true
+	  }
+
+	  [kBodyTimeoutError] = true
 	}
 
+	const kResponseStatusCodeError = Symbol.for('undici.error.UND_ERR_RESPONSE_STATUS_CODE');
 	class ResponseStatusCodeError extends UndiciError {
 	  constructor (message, statusCode, headers, body) {
 	    super(message);
@@ -799,8 +835,15 @@ function requireErrors () {
 	    this.statusCode = statusCode;
 	    this.headers = headers;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kResponseStatusCodeError] === true
+	  }
+
+	  [kResponseStatusCodeError] = true
 	}
 
+	const kInvalidArgumentError = Symbol.for('undici.error.UND_ERR_INVALID_ARG');
 	class InvalidArgumentError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -808,8 +851,15 @@ function requireErrors () {
 	    this.message = message || 'Invalid Argument Error';
 	    this.code = 'UND_ERR_INVALID_ARG';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kInvalidArgumentError] === true
+	  }
+
+	  [kInvalidArgumentError] = true
 	}
 
+	const kInvalidReturnValueError = Symbol.for('undici.error.UND_ERR_INVALID_RETURN_VALUE');
 	class InvalidReturnValueError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -817,16 +867,31 @@ function requireErrors () {
 	    this.message = message || 'Invalid Return Value Error';
 	    this.code = 'UND_ERR_INVALID_RETURN_VALUE';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kInvalidReturnValueError] === true
+	  }
+
+	  [kInvalidReturnValueError] = true
 	}
 
+	const kAbortError = Symbol.for('undici.error.UND_ERR_ABORT');
 	class AbortError extends UndiciError {
 	  constructor (message) {
 	    super(message);
 	    this.name = 'AbortError';
 	    this.message = message || 'The operation was aborted';
+	    this.code = 'UND_ERR_ABORT';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kAbortError] === true
+	  }
+
+	  [kAbortError] = true
 	}
 
+	const kRequestAbortedError = Symbol.for('undici.error.UND_ERR_ABORTED');
 	class RequestAbortedError extends AbortError {
 	  constructor (message) {
 	    super(message);
@@ -834,8 +899,15 @@ function requireErrors () {
 	    this.message = message || 'Request aborted';
 	    this.code = 'UND_ERR_ABORTED';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kRequestAbortedError] === true
+	  }
+
+	  [kRequestAbortedError] = true
 	}
 
+	const kInformationalError = Symbol.for('undici.error.UND_ERR_INFO');
 	class InformationalError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -843,8 +915,15 @@ function requireErrors () {
 	    this.message = message || 'Request information';
 	    this.code = 'UND_ERR_INFO';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kInformationalError] === true
+	  }
+
+	  [kInformationalError] = true
 	}
 
+	const kRequestContentLengthMismatchError = Symbol.for('undici.error.UND_ERR_REQ_CONTENT_LENGTH_MISMATCH');
 	class RequestContentLengthMismatchError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -852,8 +931,15 @@ function requireErrors () {
 	    this.message = message || 'Request body length does not match content-length header';
 	    this.code = 'UND_ERR_REQ_CONTENT_LENGTH_MISMATCH';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kRequestContentLengthMismatchError] === true
+	  }
+
+	  [kRequestContentLengthMismatchError] = true
 	}
 
+	const kResponseContentLengthMismatchError = Symbol.for('undici.error.UND_ERR_RES_CONTENT_LENGTH_MISMATCH');
 	class ResponseContentLengthMismatchError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -861,8 +947,15 @@ function requireErrors () {
 	    this.message = message || 'Response body length does not match content-length header';
 	    this.code = 'UND_ERR_RES_CONTENT_LENGTH_MISMATCH';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kResponseContentLengthMismatchError] === true
+	  }
+
+	  [kResponseContentLengthMismatchError] = true
 	}
 
+	const kClientDestroyedError = Symbol.for('undici.error.UND_ERR_DESTROYED');
 	class ClientDestroyedError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -870,8 +963,15 @@ function requireErrors () {
 	    this.message = message || 'The client is destroyed';
 	    this.code = 'UND_ERR_DESTROYED';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kClientDestroyedError] === true
+	  }
+
+	  [kClientDestroyedError] = true
 	}
 
+	const kClientClosedError = Symbol.for('undici.error.UND_ERR_CLOSED');
 	class ClientClosedError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -879,8 +979,15 @@ function requireErrors () {
 	    this.message = message || 'The client is closed';
 	    this.code = 'UND_ERR_CLOSED';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kClientClosedError] === true
+	  }
+
+	  [kClientClosedError] = true
 	}
 
+	const kSocketError = Symbol.for('undici.error.UND_ERR_SOCKET');
 	class SocketError extends UndiciError {
 	  constructor (message, socket) {
 	    super(message);
@@ -889,8 +996,15 @@ function requireErrors () {
 	    this.code = 'UND_ERR_SOCKET';
 	    this.socket = socket;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kSocketError] === true
+	  }
+
+	  [kSocketError] = true
 	}
 
+	const kNotSupportedError = Symbol.for('undici.error.UND_ERR_NOT_SUPPORTED');
 	class NotSupportedError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -898,8 +1012,15 @@ function requireErrors () {
 	    this.message = message || 'Not supported error';
 	    this.code = 'UND_ERR_NOT_SUPPORTED';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kNotSupportedError] === true
+	  }
+
+	  [kNotSupportedError] = true
 	}
 
+	const kBalancedPoolMissingUpstreamError = Symbol.for('undici.error.UND_ERR_BPL_MISSING_UPSTREAM');
 	class BalancedPoolMissingUpstreamError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -907,8 +1028,15 @@ function requireErrors () {
 	    this.message = message || 'No upstream has been added to the BalancedPool';
 	    this.code = 'UND_ERR_BPL_MISSING_UPSTREAM';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kBalancedPoolMissingUpstreamError] === true
+	  }
+
+	  [kBalancedPoolMissingUpstreamError] = true
 	}
 
+	const kHTTPParserError = Symbol.for('undici.error.UND_ERR_HTTP_PARSER');
 	class HTTPParserError extends Error {
 	  constructor (message, code, data) {
 	    super(message);
@@ -916,8 +1044,15 @@ function requireErrors () {
 	    this.code = code ? `HPE_${code}` : undefined;
 	    this.data = data ? data.toString() : undefined;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kHTTPParserError] === true
+	  }
+
+	  [kHTTPParserError] = true
 	}
 
+	const kResponseExceededMaxSizeError = Symbol.for('undici.error.UND_ERR_RES_EXCEEDED_MAX_SIZE');
 	class ResponseExceededMaxSizeError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -925,8 +1060,15 @@ function requireErrors () {
 	    this.message = message || 'Response content exceeded max size';
 	    this.code = 'UND_ERR_RES_EXCEEDED_MAX_SIZE';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kResponseExceededMaxSizeError] === true
+	  }
+
+	  [kResponseExceededMaxSizeError] = true
 	}
 
+	const kRequestRetryError = Symbol.for('undici.error.UND_ERR_REQ_RETRY');
 	class RequestRetryError extends UndiciError {
 	  constructor (message, code, { headers, data }) {
 	    super(message);
@@ -937,8 +1079,15 @@ function requireErrors () {
 	    this.data = data;
 	    this.headers = headers;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kRequestRetryError] === true
+	  }
+
+	  [kRequestRetryError] = true
 	}
 
+	const kResponseError = Symbol.for('undici.error.UND_ERR_RESPONSE');
 	class ResponseError extends UndiciError {
 	  constructor (message, code, { headers, data }) {
 	    super(message);
@@ -949,8 +1098,15 @@ function requireErrors () {
 	    this.data = data;
 	    this.headers = headers;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kResponseError] === true
+	  }
+
+	  [kResponseError] = true
 	}
 
+	const kSecureProxyConnectionError = Symbol.for('undici.error.UND_ERR_PRX_TLS');
 	class SecureProxyConnectionError extends UndiciError {
 	  constructor (cause, message, options) {
 	    super(message, { cause, ...(options ?? {}) });
@@ -959,6 +1115,12 @@ function requireErrors () {
 	    this.code = 'UND_ERR_PRX_TLS';
 	    this.cause = cause;
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kSecureProxyConnectionError] === true
+	  }
+
+	  [kSecureProxyConnectionError] = true
 	}
 
 	errors = {
@@ -3596,9 +3758,9 @@ var hasRequiredConstants$3;
 function requireConstants$3 () {
 	if (hasRequiredConstants$3) return constants$3;
 	hasRequiredConstants$3 = 1;
-	(function (exports) {
-		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.SPECIAL_HEADERS = exports.HEADER_STATE = exports.MINOR = exports.MAJOR = exports.CONNECTION_TOKEN_CHARS = exports.HEADER_CHARS = exports.TOKEN = exports.STRICT_TOKEN = exports.HEX = exports.URL_CHAR = exports.STRICT_URL_CHAR = exports.USERINFO_CHARS = exports.MARK = exports.ALPHANUM = exports.NUM = exports.HEX_MAP = exports.NUM_MAP = exports.ALPHA = exports.FINISH = exports.H_METHOD_MAP = exports.METHOD_MAP = exports.METHODS_RTSP = exports.METHODS_ICE = exports.METHODS_HTTP = exports.METHODS = exports.LENIENT_FLAGS = exports.FLAGS = exports.TYPE = exports.ERROR = void 0;
+	(function (exports$1) {
+		Object.defineProperty(exports$1, "__esModule", { value: true });
+		exports$1.SPECIAL_HEADERS = exports$1.HEADER_STATE = exports$1.MINOR = exports$1.MAJOR = exports$1.CONNECTION_TOKEN_CHARS = exports$1.HEADER_CHARS = exports$1.TOKEN = exports$1.STRICT_TOKEN = exports$1.HEX = exports$1.URL_CHAR = exports$1.STRICT_URL_CHAR = exports$1.USERINFO_CHARS = exports$1.MARK = exports$1.ALPHANUM = exports$1.NUM = exports$1.HEX_MAP = exports$1.NUM_MAP = exports$1.ALPHA = exports$1.FINISH = exports$1.H_METHOD_MAP = exports$1.METHOD_MAP = exports$1.METHODS_RTSP = exports$1.METHODS_ICE = exports$1.METHODS_HTTP = exports$1.METHODS = exports$1.LENIENT_FLAGS = exports$1.FLAGS = exports$1.TYPE = exports$1.ERROR = void 0;
 		const utils_1 = requireUtils$3();
 		(function (ERROR) {
 		    ERROR[ERROR["OK"] = 0] = "OK";
@@ -3626,12 +3788,12 @@ function requireConstants$3 () {
 		    ERROR[ERROR["PAUSED_UPGRADE"] = 22] = "PAUSED_UPGRADE";
 		    ERROR[ERROR["PAUSED_H2_UPGRADE"] = 23] = "PAUSED_H2_UPGRADE";
 		    ERROR[ERROR["USER"] = 24] = "USER";
-		})(exports.ERROR || (exports.ERROR = {}));
+		})(exports$1.ERROR || (exports$1.ERROR = {}));
 		(function (TYPE) {
 		    TYPE[TYPE["BOTH"] = 0] = "BOTH";
 		    TYPE[TYPE["REQUEST"] = 1] = "REQUEST";
 		    TYPE[TYPE["RESPONSE"] = 2] = "RESPONSE";
-		})(exports.TYPE || (exports.TYPE = {}));
+		})(exports$1.TYPE || (exports$1.TYPE = {}));
 		(function (FLAGS) {
 		    FLAGS[FLAGS["CONNECTION_KEEP_ALIVE"] = 1] = "CONNECTION_KEEP_ALIVE";
 		    FLAGS[FLAGS["CONNECTION_CLOSE"] = 2] = "CONNECTION_CLOSE";
@@ -3643,12 +3805,12 @@ function requireConstants$3 () {
 		    FLAGS[FLAGS["TRAILING"] = 128] = "TRAILING";
 		    // 1 << 8 is unused
 		    FLAGS[FLAGS["TRANSFER_ENCODING"] = 512] = "TRANSFER_ENCODING";
-		})(exports.FLAGS || (exports.FLAGS = {}));
+		})(exports$1.FLAGS || (exports$1.FLAGS = {}));
 		(function (LENIENT_FLAGS) {
 		    LENIENT_FLAGS[LENIENT_FLAGS["HEADERS"] = 1] = "HEADERS";
 		    LENIENT_FLAGS[LENIENT_FLAGS["CHUNKED_LENGTH"] = 2] = "CHUNKED_LENGTH";
 		    LENIENT_FLAGS[LENIENT_FLAGS["KEEP_ALIVE"] = 4] = "KEEP_ALIVE";
-		})(exports.LENIENT_FLAGS || (exports.LENIENT_FLAGS = {}));
+		})(exports$1.LENIENT_FLAGS || (exports$1.LENIENT_FLAGS = {}));
 		var METHODS;
 		(function (METHODS) {
 		    METHODS[METHODS["DELETE"] = 0] = "DELETE";
@@ -3708,8 +3870,8 @@ function requireConstants$3 () {
 		    METHODS[METHODS["RECORD"] = 44] = "RECORD";
 		    /* RAOP */
 		    METHODS[METHODS["FLUSH"] = 45] = "FLUSH";
-		})(METHODS = exports.METHODS || (exports.METHODS = {}));
-		exports.METHODS_HTTP = [
+		})(METHODS = exports$1.METHODS || (exports$1.METHODS = {}));
+		exports$1.METHODS_HTTP = [
 		    METHODS.DELETE,
 		    METHODS.GET,
 		    METHODS.HEAD,
@@ -3747,10 +3909,10 @@ function requireConstants$3 () {
 		    // TODO(indutny): should we allow it with HTTP?
 		    METHODS.SOURCE,
 		];
-		exports.METHODS_ICE = [
+		exports$1.METHODS_ICE = [
 		    METHODS.SOURCE,
 		];
-		exports.METHODS_RTSP = [
+		exports$1.METHODS_RTSP = [
 		    METHODS.OPTIONS,
 		    METHODS.DESCRIBE,
 		    METHODS.ANNOUNCE,
@@ -3767,59 +3929,59 @@ function requireConstants$3 () {
 		    METHODS.GET,
 		    METHODS.POST,
 		];
-		exports.METHOD_MAP = utils_1.enumToMap(METHODS);
-		exports.H_METHOD_MAP = {};
-		Object.keys(exports.METHOD_MAP).forEach((key) => {
+		exports$1.METHOD_MAP = utils_1.enumToMap(METHODS);
+		exports$1.H_METHOD_MAP = {};
+		Object.keys(exports$1.METHOD_MAP).forEach((key) => {
 		    if (/^H/.test(key)) {
-		        exports.H_METHOD_MAP[key] = exports.METHOD_MAP[key];
+		        exports$1.H_METHOD_MAP[key] = exports$1.METHOD_MAP[key];
 		    }
 		});
 		(function (FINISH) {
 		    FINISH[FINISH["SAFE"] = 0] = "SAFE";
 		    FINISH[FINISH["SAFE_WITH_CB"] = 1] = "SAFE_WITH_CB";
 		    FINISH[FINISH["UNSAFE"] = 2] = "UNSAFE";
-		})(exports.FINISH || (exports.FINISH = {}));
-		exports.ALPHA = [];
+		})(exports$1.FINISH || (exports$1.FINISH = {}));
+		exports$1.ALPHA = [];
 		for (let i = 'A'.charCodeAt(0); i <= 'Z'.charCodeAt(0); i++) {
 		    // Upper case
-		    exports.ALPHA.push(String.fromCharCode(i));
+		    exports$1.ALPHA.push(String.fromCharCode(i));
 		    // Lower case
-		    exports.ALPHA.push(String.fromCharCode(i + 0x20));
+		    exports$1.ALPHA.push(String.fromCharCode(i + 0x20));
 		}
-		exports.NUM_MAP = {
+		exports$1.NUM_MAP = {
 		    0: 0, 1: 1, 2: 2, 3: 3, 4: 4,
 		    5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
 		};
-		exports.HEX_MAP = {
+		exports$1.HEX_MAP = {
 		    0: 0, 1: 1, 2: 2, 3: 3, 4: 4,
 		    5: 5, 6: 6, 7: 7, 8: 8, 9: 9,
 		    A: 0XA, B: 0XB, C: 0XC, D: 0XD, E: 0XE, F: 0XF,
 		    a: 0xa, b: 0xb, c: 0xc, d: 0xd, e: 0xe, f: 0xf,
 		};
-		exports.NUM = [
+		exports$1.NUM = [
 		    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 		];
-		exports.ALPHANUM = exports.ALPHA.concat(exports.NUM);
-		exports.MARK = ['-', '_', '.', '!', '~', '*', '\'', '(', ')'];
-		exports.USERINFO_CHARS = exports.ALPHANUM
-		    .concat(exports.MARK)
+		exports$1.ALPHANUM = exports$1.ALPHA.concat(exports$1.NUM);
+		exports$1.MARK = ['-', '_', '.', '!', '~', '*', '\'', '(', ')'];
+		exports$1.USERINFO_CHARS = exports$1.ALPHANUM
+		    .concat(exports$1.MARK)
 		    .concat(['%', ';', ':', '&', '=', '+', '$', ',']);
 		// TODO(indutny): use RFC
-		exports.STRICT_URL_CHAR = [
+		exports$1.STRICT_URL_CHAR = [
 		    '!', '"', '$', '%', '&', '\'',
 		    '(', ')', '*', '+', ',', '-', '.', '/',
 		    ':', ';', '<', '=', '>',
 		    '@', '[', '\\', ']', '^', '_',
 		    '`',
 		    '{', '|', '}', '~',
-		].concat(exports.ALPHANUM);
-		exports.URL_CHAR = exports.STRICT_URL_CHAR
+		].concat(exports$1.ALPHANUM);
+		exports$1.URL_CHAR = exports$1.STRICT_URL_CHAR
 		    .concat(['\t', '\f']);
 		// All characters with 0x80 bit set to 1
 		for (let i = 0x80; i <= 0xff; i++) {
-		    exports.URL_CHAR.push(i);
+		    exports$1.URL_CHAR.push(i);
 		}
-		exports.HEX = exports.NUM.concat(['a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F']);
+		exports$1.HEX = exports$1.NUM.concat(['a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F']);
 		/* Tokens as defined by rfc 2616. Also lowercases them.
 		 *        token       = 1*<any CHAR except CTLs or separators>
 		 *     separators     = "(" | ")" | "<" | ">" | "@"
@@ -3827,27 +3989,27 @@ function requireConstants$3 () {
 		 *                    | "/" | "[" | "]" | "?" | "="
 		 *                    | "{" | "}" | SP | HT
 		 */
-		exports.STRICT_TOKEN = [
+		exports$1.STRICT_TOKEN = [
 		    '!', '#', '$', '%', '&', '\'',
 		    '*', '+', '-', '.',
 		    '^', '_', '`',
 		    '|', '~',
-		].concat(exports.ALPHANUM);
-		exports.TOKEN = exports.STRICT_TOKEN.concat([' ']);
+		].concat(exports$1.ALPHANUM);
+		exports$1.TOKEN = exports$1.STRICT_TOKEN.concat([' ']);
 		/*
 		 * Verify that a char is a valid visible (printable) US-ASCII
 		 * character or %x80-FF
 		 */
-		exports.HEADER_CHARS = ['\t'];
+		exports$1.HEADER_CHARS = ['\t'];
 		for (let i = 32; i <= 255; i++) {
 		    if (i !== 127) {
-		        exports.HEADER_CHARS.push(i);
+		        exports$1.HEADER_CHARS.push(i);
 		    }
 		}
 		// ',' = \x44
-		exports.CONNECTION_TOKEN_CHARS = exports.HEADER_CHARS.filter((c) => c !== 44);
-		exports.MAJOR = exports.NUM_MAP;
-		exports.MINOR = exports.MAJOR;
+		exports$1.CONNECTION_TOKEN_CHARS = exports$1.HEADER_CHARS.filter((c) => c !== 44);
+		exports$1.MAJOR = exports$1.NUM_MAP;
+		exports$1.MINOR = exports$1.MAJOR;
 		var HEADER_STATE;
 		(function (HEADER_STATE) {
 		    HEADER_STATE[HEADER_STATE["GENERAL"] = 0] = "GENERAL";
@@ -3859,8 +4021,8 @@ function requireConstants$3 () {
 		    HEADER_STATE[HEADER_STATE["CONNECTION_CLOSE"] = 6] = "CONNECTION_CLOSE";
 		    HEADER_STATE[HEADER_STATE["CONNECTION_UPGRADE"] = 7] = "CONNECTION_UPGRADE";
 		    HEADER_STATE[HEADER_STATE["TRANSFER_ENCODING_CHUNKED"] = 8] = "TRANSFER_ENCODING_CHUNKED";
-		})(HEADER_STATE = exports.HEADER_STATE || (exports.HEADER_STATE = {}));
-		exports.SPECIAL_HEADERS = {
+		})(HEADER_STATE = exports$1.HEADER_STATE || (exports$1.HEADER_STATE = {}));
+		exports$1.SPECIAL_HEADERS = {
 		    'connection': HEADER_STATE.CONNECTION,
 		    'content-length': HEADER_STATE.CONTENT_LENGTH,
 		    'proxy-connection': HEADER_STATE.CONNECTION,
@@ -8232,7 +8394,10 @@ function requireBody () {
 	      }
 	    }
 
-	    const chunk = textEncoder.encode(`--${boundary}--`);
+	    // CRLF is appended to the body to function with legacy servers and match other implementations.
+	    // https://github.com/curl/curl/blob/3434c6b46e682452973972e8313613dfa58cd690/lib/mime.c#L1029-L1030
+	    // https://github.com/form-data/form-data/issues/63
+	    const chunk = textEncoder.encode(`--${boundary}--\r\n`);
 	    blobParts.push(chunk);
 	    length += chunk.byteLength;
 	    if (hasUnknownSizeValue) {
@@ -8362,10 +8527,6 @@ function requireBody () {
 
 	  // 1. Let « out1, out2 » be the result of teeing body’s stream.
 	  const [out1, out2] = body.stream.tee();
-
-	  if (hasFinalizationRegistry) {
-	    streamRegistry.register(instance, new WeakRef(out1));
-	  }
 
 	  // 2. Set body’s stream to out1.
 	  body.stream = out1;
@@ -8752,10 +8913,10 @@ function requireClientH1 () {
 	const TIMEOUT_KEEP_ALIVE = 8 | USE_NATIVE_TIMER;
 
 	class Parser {
-	  constructor (client, socket, { exports }) {
+	  constructor (client, socket, { exports: exports$1 }) {
 	    assert(Number.isFinite(client[kMaxHeadersSize]) && client[kMaxHeadersSize] > 0);
 
-	    this.llhttp = exports;
+	    this.llhttp = exports$1;
 	    this.ptr = this.llhttp.llhttp_alloc(constants.TYPE.RESPONSE);
 	    this.client = client;
 	    this.socket = socket;
@@ -12454,13 +12615,14 @@ function requireProxyAgent () {
 	if (hasRequiredProxyAgent) return proxyAgent;
 	hasRequiredProxyAgent = 1;
 
-	const { kProxy, kClose, kDestroy, kInterceptors } = requireSymbols$4();
+	const { kProxy, kClose, kDestroy, kDispatch, kInterceptors } = requireSymbols$4();
 	const { URL } = require$$1$5;
 	const Agent = requireAgent();
 	const Pool = requirePool();
 	const DispatcherBase = requireDispatcherBase();
 	const { InvalidArgumentError, RequestAbortedError, SecureProxyConnectionError } = requireErrors();
 	const buildConnector = requireConnect();
+	const Client = requireClient();
 
 	const kAgent = Symbol('proxy agent');
 	const kClient = Symbol('proxy client');
@@ -12468,6 +12630,7 @@ function requireProxyAgent () {
 	const kRequestTls = Symbol('request tls settings');
 	const kProxyTls = Symbol('proxy tls settings');
 	const kConnectEndpoint = Symbol('connect endpoint function');
+	const kTunnelProxy = Symbol('tunnel proxy');
 
 	function defaultProtocolPort (protocol) {
 	  return protocol === 'https:' ? 443 : 80
@@ -12478,6 +12641,69 @@ function requireProxyAgent () {
 	}
 
 	const noop = () => {};
+
+	function defaultAgentFactory (origin, opts) {
+	  if (opts.connections === 1) {
+	    return new Client(origin, opts)
+	  }
+	  return new Pool(origin, opts)
+	}
+
+	class Http1ProxyWrapper extends DispatcherBase {
+	  #client
+
+	  constructor (proxyUrl, { headers = {}, connect, factory }) {
+	    super();
+	    if (!proxyUrl) {
+	      throw new InvalidArgumentError('Proxy URL is mandatory')
+	    }
+
+	    this[kProxyHeaders] = headers;
+	    if (factory) {
+	      this.#client = factory(proxyUrl, { connect });
+	    } else {
+	      this.#client = new Client(proxyUrl, { connect });
+	    }
+	  }
+
+	  [kDispatch] (opts, handler) {
+	    const onHeaders = handler.onHeaders;
+	    handler.onHeaders = function (statusCode, data, resume) {
+	      if (statusCode === 407) {
+	        if (typeof handler.onError === 'function') {
+	          handler.onError(new InvalidArgumentError('Proxy Authentication Required (407)'));
+	        }
+	        return
+	      }
+	      if (onHeaders) onHeaders.call(this, statusCode, data, resume);
+	    };
+
+	    // Rewrite request as an HTTP1 Proxy request, without tunneling.
+	    const {
+	      origin,
+	      path = '/',
+	      headers = {}
+	    } = opts;
+
+	    opts.path = origin + path;
+
+	    if (!('host' in headers) && !('Host' in headers)) {
+	      const { host } = new URL(origin);
+	      headers.host = host;
+	    }
+	    opts.headers = { ...this[kProxyHeaders], ...headers };
+
+	    return this.#client[kDispatch](opts, handler)
+	  }
+
+	  async [kClose] () {
+	    return this.#client.close()
+	  }
+
+	  async [kDestroy] (err) {
+	    return this.#client.destroy(err)
+	  }
+	}
 
 	class ProxyAgent extends DispatcherBase {
 	  constructor (opts) {
@@ -12492,6 +12718,8 @@ function requireProxyAgent () {
 	      throw new InvalidArgumentError('Proxy opts.clientFactory must be a function.')
 	    }
 
+	    const { proxyTunnel = true } = opts;
+
 	    const url = this.#getUrl(opts);
 	    const { href, origin, port, protocol, username, password, hostname: proxyHostname } = url;
 
@@ -12502,6 +12730,7 @@ function requireProxyAgent () {
 	    this[kRequestTls] = opts.requestTls;
 	    this[kProxyTls] = opts.proxyTls;
 	    this[kProxyHeaders] = opts.headers || {};
+	    this[kTunnelProxy] = proxyTunnel;
 
 	    if (opts.auth && opts.token) {
 	      throw new InvalidArgumentError('opts.auth cannot be used in combination with opts.token')
@@ -12516,9 +12745,23 @@ function requireProxyAgent () {
 
 	    const connect = buildConnector({ ...opts.proxyTls });
 	    this[kConnectEndpoint] = buildConnector({ ...opts.requestTls });
+
+	    const agentFactory = opts.factory || defaultAgentFactory;
+	    const factory = (origin, options) => {
+	      const { protocol } = new URL(origin);
+	      if (!this[kTunnelProxy] && protocol === 'http:' && this[kProxy].protocol === 'http:') {
+	        return new Http1ProxyWrapper(this[kProxy].uri, {
+	          headers: this[kProxyHeaders],
+	          connect,
+	          factory: agentFactory
+	        })
+	      }
+	      return agentFactory(origin, options)
+	    };
 	    this[kClient] = clientFactory(url, { connect });
 	    this[kAgent] = new Agent({
 	      ...opts,
+	      factory,
 	      connect: async (opts, callback) => {
 	        let requestedPath = opts.host;
 	        if (!opts.port) {
@@ -14766,6 +15009,11 @@ function requireMockErrors () {
 
 	const { UndiciError } = requireErrors();
 
+	const kMockNotMatchedError = Symbol.for('undici.error.UND_MOCK_ERR_MOCK_NOT_MATCHED');
+
+	/**
+	 * The request does not match any registered mock dispatches.
+	 */
 	class MockNotMatchedError extends UndiciError {
 	  constructor (message) {
 	    super(message);
@@ -14774,6 +15022,12 @@ function requireMockErrors () {
 	    this.message = message || 'The request does not match any registered mock dispatches';
 	    this.code = 'UND_MOCK_ERR_MOCK_NOT_MATCHED';
 	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kMockNotMatchedError] === true
+	  }
+
+	  [kMockNotMatchedError] = true
 	}
 
 	mockErrors = {
@@ -17398,6 +17652,11 @@ function requireResponse$1 () {
 
 	    // 2. Let clonedResponse be the result of cloning this’s response.
 	    const clonedResponse = cloneResponse(this[kState]);
+
+	    // Note: To re-register because of a new stream.
+	    if (hasFinalizationRegistry && this[kState].body?.stream) {
+	      streamRegistry.register(this, new WeakRef(this[kState].body.stream));
+	    }
 
 	    // 3. Return the result of creating a Response object, given
 	    // clonedResponse, this’s headers’s guard, and this’s relevant Realm.
@@ -20906,20 +21165,12 @@ function requireFetch () {
 	            return
 	          }
 
-	          /** @type {string[]} */
-	          let codings = [];
 	          let location = '';
 
 	          const headersList = new HeadersList();
 
 	          for (let i = 0; i < rawHeaders.length; i += 2) {
 	            headersList.append(bufferToLowerCasedHeaderName(rawHeaders[i]), rawHeaders[i + 1].toString('latin1'), true);
-	          }
-	          const contentEncoding = headersList.get('content-encoding', true);
-	          if (contentEncoding) {
-	            // https://www.rfc-editor.org/rfc/rfc7231#section-3.1.2.1
-	            // "All content-coding values are case-insensitive..."
-	            codings = contentEncoding.toLowerCase().split(',').map((x) => x.trim());
 	          }
 	          location = headersList.get('location', true);
 
@@ -20931,9 +21182,23 @@ function requireFetch () {
 	            redirectStatusSet.has(status);
 
 	          // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Encoding
-	          if (codings.length !== 0 && request.method !== 'HEAD' && request.method !== 'CONNECT' && !nullBodyStatus.includes(status) && !willFollow) {
+	          if (request.method !== 'HEAD' && request.method !== 'CONNECT' && !nullBodyStatus.includes(status) && !willFollow) {
+	            // https://www.rfc-editor.org/rfc/rfc7231#section-3.1.2.1
+	            const contentEncoding = headersList.get('content-encoding', true);
+	            // "All content-coding values are case-insensitive..."
+	            /** @type {string[]} */
+	            const codings = contentEncoding ? contentEncoding.toLowerCase().split(',') : [];
+
+	            // Limit the number of content-encodings to prevent resource exhaustion.
+	            // CVE fix similar to urllib3 (GHSA-gm62-xv2j-4w53) and curl (CVE-2022-32206).
+	            const maxContentEncodings = 5;
+	            if (codings.length > maxContentEncodings) {
+	              reject(new Error(`too many content-encodings in response: ${codings.length}, maximum allowed is ${maxContentEncodings}`));
+	              return true
+	            }
+
 	            for (let i = codings.length - 1; i >= 0; --i) {
-	              const coding = codings[i];
+	              const coding = codings[i].trim();
 	              // https://www.rfc-editor.org/rfc/rfc9112.html#section-7.2
 	              if (coding === 'x-gzip' || coding === 'gzip') {
 	                decoders.push(zlib.createGunzip({
@@ -28541,7 +28806,7 @@ var hasRequiredSummary;
 function requireSummary () {
 	if (hasRequiredSummary) return summary;
 	hasRequiredSummary = 1;
-	(function (exports) {
+	(function (exports$1) {
 		var __awaiter = (summary && summary.__awaiter) || function (thisArg, _arguments, P, generator) {
 		    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
 		    return new (P || (P = Promise))(function (resolve, reject) {
@@ -28551,13 +28816,13 @@ function requireSummary () {
 		        step((generator = generator.apply(thisArg, _arguments || [])).next());
 		    });
 		};
-		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.summary = exports.markdownSummary = exports.SUMMARY_DOCS_URL = exports.SUMMARY_ENV_VAR = void 0;
+		Object.defineProperty(exports$1, "__esModule", { value: true });
+		exports$1.summary = exports$1.markdownSummary = exports$1.SUMMARY_DOCS_URL = exports$1.SUMMARY_ENV_VAR = void 0;
 		const os_1 = require$$0$3;
 		const fs_1 = require$$1$1;
 		const { access, appendFile, writeFile } = fs_1.promises;
-		exports.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
-		exports.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
+		exports$1.SUMMARY_ENV_VAR = 'GITHUB_STEP_SUMMARY';
+		exports$1.SUMMARY_DOCS_URL = 'https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary';
 		class Summary {
 		    constructor() {
 		        this._buffer = '';
@@ -28573,9 +28838,9 @@ function requireSummary () {
 		            if (this._filePath) {
 		                return this._filePath;
 		            }
-		            const pathFromEnv = process.env[exports.SUMMARY_ENV_VAR];
+		            const pathFromEnv = process.env[exports$1.SUMMARY_ENV_VAR];
 		            if (!pathFromEnv) {
-		                throw new Error(`Unable to find environment variable for $${exports.SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
+		                throw new Error(`Unable to find environment variable for $${exports$1.SUMMARY_ENV_VAR}. Check if your runtime environment supports job summaries.`);
 		            }
 		            try {
 		                yield access(pathFromEnv, fs_1.constants.R_OK | fs_1.constants.W_OK);
@@ -28821,8 +29086,8 @@ function requireSummary () {
 		/**
 		 * @deprecated use `core.summary`
 		 */
-		exports.markdownSummary = _summary;
-		exports.summary = _summary;
+		exports$1.markdownSummary = _summary;
+		exports$1.summary = _summary;
 		
 	} (summary));
 	return summary;
@@ -28914,7 +29179,7 @@ var hasRequiredIoUtil;
 function requireIoUtil () {
 	if (hasRequiredIoUtil) return ioUtil;
 	hasRequiredIoUtil = 1;
-	(function (exports) {
+	(function (exports$1) {
 		var __createBinding = (ioUtil && ioUtil.__createBinding) || (Object.create ? (function(o, m, k, k2) {
 		    if (k2 === undefined) k2 = k;
 		    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
@@ -28944,22 +29209,22 @@ function requireIoUtil () {
 		    });
 		};
 		var _a;
-		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
+		Object.defineProperty(exports$1, "__esModule", { value: true });
+		exports$1.getCmdPath = exports$1.tryGetExecutablePath = exports$1.isRooted = exports$1.isDirectory = exports$1.exists = exports$1.READONLY = exports$1.UV_FS_O_EXLOCK = exports$1.IS_WINDOWS = exports$1.unlink = exports$1.symlink = exports$1.stat = exports$1.rmdir = exports$1.rm = exports$1.rename = exports$1.readlink = exports$1.readdir = exports$1.open = exports$1.mkdir = exports$1.lstat = exports$1.copyFile = exports$1.chmod = void 0;
 		const fs = __importStar(require$$1$1);
 		const path = __importStar(require$$1$8);
 		_a = fs.promises
 		// export const {open} = 'fs'
-		, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.open = _a.open, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rm = _a.rm, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
+		, exports$1.chmod = _a.chmod, exports$1.copyFile = _a.copyFile, exports$1.lstat = _a.lstat, exports$1.mkdir = _a.mkdir, exports$1.open = _a.open, exports$1.readdir = _a.readdir, exports$1.readlink = _a.readlink, exports$1.rename = _a.rename, exports$1.rm = _a.rm, exports$1.rmdir = _a.rmdir, exports$1.stat = _a.stat, exports$1.symlink = _a.symlink, exports$1.unlink = _a.unlink;
 		// export const {open} = 'fs'
-		exports.IS_WINDOWS = process.platform === 'win32';
+		exports$1.IS_WINDOWS = process.platform === 'win32';
 		// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
-		exports.UV_FS_O_EXLOCK = 0x10000000;
-		exports.READONLY = fs.constants.O_RDONLY;
+		exports$1.UV_FS_O_EXLOCK = 0x10000000;
+		exports$1.READONLY = fs.constants.O_RDONLY;
 		function exists(fsPath) {
 		    return __awaiter(this, void 0, void 0, function* () {
 		        try {
-		            yield exports.stat(fsPath);
+		            yield exports$1.stat(fsPath);
 		        }
 		        catch (err) {
 		            if (err.code === 'ENOENT') {
@@ -28970,14 +29235,14 @@ function requireIoUtil () {
 		        return true;
 		    });
 		}
-		exports.exists = exists;
+		exports$1.exists = exists;
 		function isDirectory(fsPath, useStat = false) {
 		    return __awaiter(this, void 0, void 0, function* () {
-		        const stats = useStat ? yield exports.stat(fsPath) : yield exports.lstat(fsPath);
+		        const stats = useStat ? yield exports$1.stat(fsPath) : yield exports$1.lstat(fsPath);
 		        return stats.isDirectory();
 		    });
 		}
-		exports.isDirectory = isDirectory;
+		exports$1.isDirectory = isDirectory;
 		/**
 		 * On OSX/Linux, true if path starts with '/'. On Windows, true for paths like:
 		 * \, \hello, \\hello\share, C:, and C:\hello (and corresponding alternate separator cases).
@@ -28987,13 +29252,13 @@ function requireIoUtil () {
 		    if (!p) {
 		        throw new Error('isRooted() parameter "p" cannot be empty');
 		    }
-		    if (exports.IS_WINDOWS) {
+		    if (exports$1.IS_WINDOWS) {
 		        return (p.startsWith('\\') || /^[A-Z]:/i.test(p) // e.g. \ or \hello or \\hello
 		        ); // e.g. C: or C:\hello
 		    }
 		    return p.startsWith('/');
 		}
-		exports.isRooted = isRooted;
+		exports$1.isRooted = isRooted;
 		/**
 		 * Best effort attempt to determine whether a file exists and is executable.
 		 * @param filePath    file path to check
@@ -29005,7 +29270,7 @@ function requireIoUtil () {
 		        let stats = undefined;
 		        try {
 		            // test file exists
-		            stats = yield exports.stat(filePath);
+		            stats = yield exports$1.stat(filePath);
 		        }
 		        catch (err) {
 		            if (err.code !== 'ENOENT') {
@@ -29014,7 +29279,7 @@ function requireIoUtil () {
 		            }
 		        }
 		        if (stats && stats.isFile()) {
-		            if (exports.IS_WINDOWS) {
+		            if (exports$1.IS_WINDOWS) {
 		                // on Windows, test for valid extension
 		                const upperExt = path.extname(filePath).toUpperCase();
 		                if (extensions.some(validExt => validExt.toUpperCase() === upperExt)) {
@@ -29033,7 +29298,7 @@ function requireIoUtil () {
 		            filePath = originalFilePath + extension;
 		            stats = undefined;
 		            try {
-		                stats = yield exports.stat(filePath);
+		                stats = yield exports$1.stat(filePath);
 		            }
 		            catch (err) {
 		                if (err.code !== 'ENOENT') {
@@ -29042,12 +29307,12 @@ function requireIoUtil () {
 		                }
 		            }
 		            if (stats && stats.isFile()) {
-		                if (exports.IS_WINDOWS) {
+		                if (exports$1.IS_WINDOWS) {
 		                    // preserve the case of the actual file (since an extension was appended)
 		                    try {
 		                        const directory = path.dirname(filePath);
 		                        const upperName = path.basename(filePath).toUpperCase();
-		                        for (const actualName of yield exports.readdir(directory)) {
+		                        for (const actualName of yield exports$1.readdir(directory)) {
 		                            if (upperName === actualName.toUpperCase()) {
 		                                filePath = path.join(directory, actualName);
 		                                break;
@@ -29070,10 +29335,10 @@ function requireIoUtil () {
 		        return '';
 		    });
 		}
-		exports.tryGetExecutablePath = tryGetExecutablePath;
+		exports$1.tryGetExecutablePath = tryGetExecutablePath;
 		function normalizeSeparators(p) {
 		    p = p || '';
-		    if (exports.IS_WINDOWS) {
+		    if (exports$1.IS_WINDOWS) {
 		        // convert slashes on Windows
 		        p = p.replace(/\//g, '\\');
 		        // remove redundant slashes
@@ -29095,7 +29360,7 @@ function requireIoUtil () {
 		    var _a;
 		    return (_a = process.env['COMSPEC']) !== null && _a !== void 0 ? _a : `cmd.exe`;
 		}
-		exports.getCmdPath = getCmdPath;
+		exports$1.getCmdPath = getCmdPath;
 		
 	} (ioUtil));
 	return ioUtil;
@@ -30147,7 +30412,7 @@ var hasRequiredPlatform;
 function requirePlatform () {
 	if (hasRequiredPlatform) return platform;
 	hasRequiredPlatform = 1;
-	(function (exports) {
+	(function (exports$1) {
 		var __createBinding = (platform && platform.__createBinding) || (Object.create ? (function(o, m, k, k2) {
 		    if (k2 === undefined) k2 = k;
 		    var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -30183,8 +30448,8 @@ function requirePlatform () {
 		var __importDefault = (platform && platform.__importDefault) || function (mod) {
 		    return (mod && mod.__esModule) ? mod : { "default": mod };
 		};
-		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.getDetails = exports.isLinux = exports.isMacOS = exports.isWindows = exports.arch = exports.platform = void 0;
+		Object.defineProperty(exports$1, "__esModule", { value: true });
+		exports$1.getDetails = exports$1.isLinux = exports$1.isMacOS = exports$1.isWindows = exports$1.arch = exports$1.platform = void 0;
 		const os_1 = __importDefault(require$$0$3);
 		const exec = __importStar(requireExec());
 		const getWindowsInfo = () => __awaiter(void 0, void 0, void 0, function* () {
@@ -30221,25 +30486,25 @@ function requirePlatform () {
 		        version
 		    };
 		});
-		exports.platform = os_1.default.platform();
-		exports.arch = os_1.default.arch();
-		exports.isWindows = exports.platform === 'win32';
-		exports.isMacOS = exports.platform === 'darwin';
-		exports.isLinux = exports.platform === 'linux';
+		exports$1.platform = os_1.default.platform();
+		exports$1.arch = os_1.default.arch();
+		exports$1.isWindows = exports$1.platform === 'win32';
+		exports$1.isMacOS = exports$1.platform === 'darwin';
+		exports$1.isLinux = exports$1.platform === 'linux';
 		function getDetails() {
 		    return __awaiter(this, void 0, void 0, function* () {
-		        return Object.assign(Object.assign({}, (yield (exports.isWindows
+		        return Object.assign(Object.assign({}, (yield (exports$1.isWindows
 		            ? getWindowsInfo()
-		            : exports.isMacOS
+		            : exports$1.isMacOS
 		                ? getMacOsInfo()
-		                : getLinuxInfo()))), { platform: exports.platform,
-		            arch: exports.arch,
-		            isWindows: exports.isWindows,
-		            isMacOS: exports.isMacOS,
-		            isLinux: exports.isLinux });
+		                : getLinuxInfo()))), { platform: exports$1.platform,
+		            arch: exports$1.arch,
+		            isWindows: exports$1.isWindows,
+		            isMacOS: exports$1.isMacOS,
+		            isLinux: exports$1.isLinux });
 		    });
 		}
-		exports.getDetails = getDetails;
+		exports$1.getDetails = getDetails;
 		
 	} (platform));
 	return platform;
@@ -30250,7 +30515,7 @@ var hasRequiredCore;
 function requireCore () {
 	if (hasRequiredCore) return core;
 	hasRequiredCore = 1;
-	(function (exports) {
+	(function (exports$1) {
 		var __createBinding = (core && core.__createBinding) || (Object.create ? (function(o, m, k, k2) {
 		    if (k2 === undefined) k2 = k;
 		    var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -30283,8 +30548,8 @@ function requireCore () {
 		        step((generator = generator.apply(thisArg, _arguments || [])).next());
 		    });
 		};
-		Object.defineProperty(exports, "__esModule", { value: true });
-		exports.platform = exports.toPlatformPath = exports.toWin32Path = exports.toPosixPath = exports.markdownSummary = exports.summary = exports.getIDToken = exports.getState = exports.saveState = exports.group = exports.endGroup = exports.startGroup = exports.info = exports.notice = exports.warning = exports.error = exports.debug = exports.isDebug = exports.setFailed = exports.setCommandEcho = exports.setOutput = exports.getBooleanInput = exports.getMultilineInput = exports.getInput = exports.addPath = exports.setSecret = exports.exportVariable = exports.ExitCode = void 0;
+		Object.defineProperty(exports$1, "__esModule", { value: true });
+		exports$1.platform = exports$1.toPlatformPath = exports$1.toWin32Path = exports$1.toPosixPath = exports$1.markdownSummary = exports$1.summary = exports$1.getIDToken = exports$1.getState = exports$1.saveState = exports$1.group = exports$1.endGroup = exports$1.startGroup = exports$1.info = exports$1.notice = exports$1.warning = exports$1.error = exports$1.debug = exports$1.isDebug = exports$1.setFailed = exports$1.setCommandEcho = exports$1.setOutput = exports$1.getBooleanInput = exports$1.getMultilineInput = exports$1.getInput = exports$1.addPath = exports$1.setSecret = exports$1.exportVariable = exports$1.ExitCode = void 0;
 		const command_1 = requireCommand();
 		const file_command_1 = requireFileCommand();
 		const utils_1 = requireUtils$4();
@@ -30304,7 +30569,7 @@ function requireCore () {
 		     * A code indicating that the action was a failure
 		     */
 		    ExitCode[ExitCode["Failure"] = 1] = "Failure";
-		})(ExitCode || (exports.ExitCode = ExitCode = {}));
+		})(ExitCode || (exports$1.ExitCode = ExitCode = {}));
 		//-----------------------------------------------------------------------
 		// Variables
 		//-----------------------------------------------------------------------
@@ -30323,7 +30588,7 @@ function requireCore () {
 		    }
 		    (0, command_1.issueCommand)('set-env', { name }, convertedVal);
 		}
-		exports.exportVariable = exportVariable;
+		exports$1.exportVariable = exportVariable;
 		/**
 		 * Registers a secret which will get masked from logs
 		 * @param secret value of the secret
@@ -30331,7 +30596,7 @@ function requireCore () {
 		function setSecret(secret) {
 		    (0, command_1.issueCommand)('add-mask', {}, secret);
 		}
-		exports.setSecret = setSecret;
+		exports$1.setSecret = setSecret;
 		/**
 		 * Prepends inputPath to the PATH (for this action and future actions)
 		 * @param inputPath
@@ -30346,7 +30611,7 @@ function requireCore () {
 		    }
 		    process.env['PATH'] = `${inputPath}${path.delimiter}${process.env['PATH']}`;
 		}
-		exports.addPath = addPath;
+		exports$1.addPath = addPath;
 		/**
 		 * Gets the value of an input.
 		 * Unless trimWhitespace is set to false in InputOptions, the value is also trimmed.
@@ -30366,7 +30631,7 @@ function requireCore () {
 		    }
 		    return val.trim();
 		}
-		exports.getInput = getInput;
+		exports$1.getInput = getInput;
 		/**
 		 * Gets the values of an multiline input.  Each value is also trimmed.
 		 *
@@ -30384,7 +30649,7 @@ function requireCore () {
 		    }
 		    return inputs.map(input => input.trim());
 		}
-		exports.getMultilineInput = getMultilineInput;
+		exports$1.getMultilineInput = getMultilineInput;
 		/**
 		 * Gets the input value of the boolean type in the YAML 1.2 "core schema" specification.
 		 * Support boolean input list: `true | True | TRUE | false | False | FALSE` .
@@ -30406,7 +30671,7 @@ function requireCore () {
 		    throw new TypeError(`Input does not meet YAML 1.2 "Core Schema" specification: ${name}\n` +
 		        `Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
 		}
-		exports.getBooleanInput = getBooleanInput;
+		exports$1.getBooleanInput = getBooleanInput;
 		/**
 		 * Sets the value of an output.
 		 *
@@ -30422,7 +30687,7 @@ function requireCore () {
 		    process.stdout.write(os.EOL);
 		    (0, command_1.issueCommand)('set-output', { name }, (0, utils_1.toCommandValue)(value));
 		}
-		exports.setOutput = setOutput;
+		exports$1.setOutput = setOutput;
 		/**
 		 * Enables or disables the echoing of commands into stdout for the rest of the step.
 		 * Echoing is disabled by default if ACTIONS_STEP_DEBUG is not set.
@@ -30431,7 +30696,7 @@ function requireCore () {
 		function setCommandEcho(enabled) {
 		    (0, command_1.issue)('echo', enabled ? 'on' : 'off');
 		}
-		exports.setCommandEcho = setCommandEcho;
+		exports$1.setCommandEcho = setCommandEcho;
 		//-----------------------------------------------------------------------
 		// Results
 		//-----------------------------------------------------------------------
@@ -30444,7 +30709,7 @@ function requireCore () {
 		    process.exitCode = ExitCode.Failure;
 		    error(message);
 		}
-		exports.setFailed = setFailed;
+		exports$1.setFailed = setFailed;
 		//-----------------------------------------------------------------------
 		// Logging Commands
 		//-----------------------------------------------------------------------
@@ -30454,7 +30719,7 @@ function requireCore () {
 		function isDebug() {
 		    return process.env['RUNNER_DEBUG'] === '1';
 		}
-		exports.isDebug = isDebug;
+		exports$1.isDebug = isDebug;
 		/**
 		 * Writes debug message to user log
 		 * @param message debug message
@@ -30462,7 +30727,7 @@ function requireCore () {
 		function debug(message) {
 		    (0, command_1.issueCommand)('debug', {}, message);
 		}
-		exports.debug = debug;
+		exports$1.debug = debug;
 		/**
 		 * Adds an error issue
 		 * @param message error issue message. Errors will be converted to string via toString()
@@ -30471,7 +30736,7 @@ function requireCore () {
 		function error(message, properties = {}) {
 		    (0, command_1.issueCommand)('error', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 		}
-		exports.error = error;
+		exports$1.error = error;
 		/**
 		 * Adds a warning issue
 		 * @param message warning issue message. Errors will be converted to string via toString()
@@ -30480,7 +30745,7 @@ function requireCore () {
 		function warning(message, properties = {}) {
 		    (0, command_1.issueCommand)('warning', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 		}
-		exports.warning = warning;
+		exports$1.warning = warning;
 		/**
 		 * Adds a notice issue
 		 * @param message notice issue message. Errors will be converted to string via toString()
@@ -30489,7 +30754,7 @@ function requireCore () {
 		function notice(message, properties = {}) {
 		    (0, command_1.issueCommand)('notice', (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
 		}
-		exports.notice = notice;
+		exports$1.notice = notice;
 		/**
 		 * Writes info to log with console.log.
 		 * @param message info message
@@ -30497,7 +30762,7 @@ function requireCore () {
 		function info(message) {
 		    process.stdout.write(message + os.EOL);
 		}
-		exports.info = info;
+		exports$1.info = info;
 		/**
 		 * Begin an output group.
 		 *
@@ -30508,14 +30773,14 @@ function requireCore () {
 		function startGroup(name) {
 		    (0, command_1.issue)('group', name);
 		}
-		exports.startGroup = startGroup;
+		exports$1.startGroup = startGroup;
 		/**
 		 * End an output group.
 		 */
 		function endGroup() {
 		    (0, command_1.issue)('endgroup');
 		}
-		exports.endGroup = endGroup;
+		exports$1.endGroup = endGroup;
 		/**
 		 * Wrap an asynchronous function call in a group.
 		 *
@@ -30537,7 +30802,7 @@ function requireCore () {
 		        return result;
 		    });
 		}
-		exports.group = group;
+		exports$1.group = group;
 		//-----------------------------------------------------------------------
 		// Wrapper action state
 		//-----------------------------------------------------------------------
@@ -30555,7 +30820,7 @@ function requireCore () {
 		    }
 		    (0, command_1.issueCommand)('save-state', { name }, (0, utils_1.toCommandValue)(value));
 		}
-		exports.saveState = saveState;
+		exports$1.saveState = saveState;
 		/**
 		 * Gets the value of an state set by this action's main execution.
 		 *
@@ -30565,34 +30830,34 @@ function requireCore () {
 		function getState(name) {
 		    return process.env[`STATE_${name}`] || '';
 		}
-		exports.getState = getState;
+		exports$1.getState = getState;
 		function getIDToken(aud) {
 		    return __awaiter(this, void 0, void 0, function* () {
 		        return yield oidc_utils_1.OidcClient.getIDToken(aud);
 		    });
 		}
-		exports.getIDToken = getIDToken;
+		exports$1.getIDToken = getIDToken;
 		/**
 		 * Summary exports
 		 */
 		var summary_1 = requireSummary();
-		Object.defineProperty(exports, "summary", { enumerable: true, get: function () { return summary_1.summary; } });
+		Object.defineProperty(exports$1, "summary", { enumerable: true, get: function () { return summary_1.summary; } });
 		/**
 		 * @deprecated use core.summary
 		 */
 		var summary_2 = requireSummary();
-		Object.defineProperty(exports, "markdownSummary", { enumerable: true, get: function () { return summary_2.markdownSummary; } });
+		Object.defineProperty(exports$1, "markdownSummary", { enumerable: true, get: function () { return summary_2.markdownSummary; } });
 		/**
 		 * Path exports
 		 */
 		var path_utils_1 = requirePathUtils();
-		Object.defineProperty(exports, "toPosixPath", { enumerable: true, get: function () { return path_utils_1.toPosixPath; } });
-		Object.defineProperty(exports, "toWin32Path", { enumerable: true, get: function () { return path_utils_1.toWin32Path; } });
-		Object.defineProperty(exports, "toPlatformPath", { enumerable: true, get: function () { return path_utils_1.toPlatformPath; } });
+		Object.defineProperty(exports$1, "toPosixPath", { enumerable: true, get: function () { return path_utils_1.toPosixPath; } });
+		Object.defineProperty(exports$1, "toWin32Path", { enumerable: true, get: function () { return path_utils_1.toWin32Path; } });
+		Object.defineProperty(exports$1, "toPlatformPath", { enumerable: true, get: function () { return path_utils_1.toPlatformPath; } });
 		/**
 		 * Platform utilities exports
 		 */
-		exports.platform = __importStar(requirePlatform());
+		exports$1.platform = __importStar(requirePlatform());
 		
 	} (core));
 	return core;
@@ -31086,17 +31351,17 @@ var hasRequiredBrowser;
 function requireBrowser () {
 	if (hasRequiredBrowser) return browser.exports;
 	hasRequiredBrowser = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 		/**
 		 * This is the web browser implementation of `debug()`.
 		 */
 
-		exports.formatArgs = formatArgs;
-		exports.save = save;
-		exports.load = load;
-		exports.useColors = useColors;
-		exports.storage = localstorage();
-		exports.destroy = (() => {
+		exports$1.formatArgs = formatArgs;
+		exports$1.save = save;
+		exports$1.load = load;
+		exports$1.useColors = useColors;
+		exports$1.storage = localstorage();
+		exports$1.destroy = (() => {
 			let warned = false;
 
 			return () => {
@@ -31111,7 +31376,7 @@ function requireBrowser () {
 		 * Colors.
 		 */
 
-		exports.colors = [
+		exports$1.colors = [
 			'#0000CC',
 			'#0000FF',
 			'#0033CC',
@@ -31276,7 +31541,7 @@ function requireBrowser () {
 		 *
 		 * @api public
 		 */
-		exports.log = console.debug || console.log || (() => {});
+		exports$1.log = console.debug || console.log || (() => {});
 
 		/**
 		 * Save `namespaces`.
@@ -31287,9 +31552,9 @@ function requireBrowser () {
 		function save(namespaces) {
 			try {
 				if (namespaces) {
-					exports.storage.setItem('debug', namespaces);
+					exports$1.storage.setItem('debug', namespaces);
 				} else {
-					exports.storage.removeItem('debug');
+					exports$1.storage.removeItem('debug');
 				}
 			} catch (error) {
 				// Swallow
@@ -31306,7 +31571,7 @@ function requireBrowser () {
 		function load() {
 			let r;
 			try {
-				r = exports.storage.getItem('debug') || exports.storage.getItem('DEBUG') ;
+				r = exports$1.storage.getItem('debug') || exports$1.storage.getItem('DEBUG') ;
 			} catch (error) {
 				// Swallow
 				// XXX (@Qix-) should we be logging these?
@@ -31342,7 +31607,7 @@ function requireBrowser () {
 			}
 		}
 
-		module.exports = requireCommon()(exports);
+		module.exports = requireCommon()(exports$1);
 
 		const {formatters} = module.exports;
 
@@ -31531,7 +31796,7 @@ var hasRequiredNode;
 function requireNode () {
 	if (hasRequiredNode) return node.exports;
 	hasRequiredNode = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 		const tty = require$$1$9;
 		const util = require$$6$1;
 
@@ -31539,13 +31804,13 @@ function requireNode () {
 		 * This is the Node.js implementation of `debug()`.
 		 */
 
-		exports.init = init;
-		exports.log = log;
-		exports.formatArgs = formatArgs;
-		exports.save = save;
-		exports.load = load;
-		exports.useColors = useColors;
-		exports.destroy = util.deprecate(
+		exports$1.init = init;
+		exports$1.log = log;
+		exports$1.formatArgs = formatArgs;
+		exports$1.save = save;
+		exports$1.load = load;
+		exports$1.useColors = useColors;
+		exports$1.destroy = util.deprecate(
 			() => {},
 			'Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.'
 		);
@@ -31554,7 +31819,7 @@ function requireNode () {
 		 * Colors.
 		 */
 
-		exports.colors = [6, 2, 3, 4, 5, 1];
+		exports$1.colors = [6, 2, 3, 4, 5, 1];
 
 		try {
 			// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
@@ -31562,7 +31827,7 @@ function requireNode () {
 			const supportsColor = requireSupportsColor();
 
 			if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
-				exports.colors = [
+				exports$1.colors = [
 					20,
 					21,
 					26,
@@ -31651,7 +31916,7 @@ function requireNode () {
 		 *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
 		 */
 
-		exports.inspectOpts = Object.keys(process.env).filter(key => {
+		exports$1.inspectOpts = Object.keys(process.env).filter(key => {
 			return /^debug_/i.test(key);
 		}).reduce((obj, key) => {
 			// Camel-case
@@ -31683,8 +31948,8 @@ function requireNode () {
 		 */
 
 		function useColors() {
-			return 'colors' in exports.inspectOpts ?
-				Boolean(exports.inspectOpts.colors) :
+			return 'colors' in exports$1.inspectOpts ?
+				Boolean(exports$1.inspectOpts.colors) :
 				tty.isatty(process.stderr.fd);
 		}
 
@@ -31710,7 +31975,7 @@ function requireNode () {
 		}
 
 		function getDate() {
-			if (exports.inspectOpts.hideDate) {
+			if (exports$1.inspectOpts.hideDate) {
 				return '';
 			}
 			return new Date().toISOString() + ' ';
@@ -31721,7 +31986,7 @@ function requireNode () {
 		 */
 
 		function log(...args) {
-			return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + '\n');
+			return process.stderr.write(util.formatWithOptions(exports$1.inspectOpts, ...args) + '\n');
 		}
 
 		/**
@@ -31761,13 +32026,13 @@ function requireNode () {
 		function init(debug) {
 			debug.inspectOpts = {};
 
-			const keys = Object.keys(exports.inspectOpts);
+			const keys = Object.keys(exports$1.inspectOpts);
 			for (let i = 0; i < keys.length; i++) {
-				debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+				debug.inspectOpts[keys[i]] = exports$1.inspectOpts[keys[i]];
 			}
 		}
 
-		module.exports = requireCommon()(exports);
+		module.exports = requireCommon()(exports$1);
 
 		const {formatters} = module.exports;
 
@@ -32965,7 +33230,7 @@ function requireHttpErrors () {
 		 * @private
 		 */
 
-		function populateConstructorExports (exports, codes, HttpError) {
+		function populateConstructorExports (exports$1, codes, HttpError) {
 		  codes.forEach(function forEachCode (code) {
 		    var CodeError;
 		    var name = toIdentifier(statuses.message[code]);
@@ -32981,8 +33246,8 @@ function requireHttpErrors () {
 
 		    if (CodeError) {
 		      // export the constructor
-		      exports[code] = CodeError;
-		      exports[name] = CodeError;
+		      exports$1[code] = CodeError;
+		      exports$1[name] = CodeError;
 		    }
 		  });
 		}
@@ -44120,7 +44385,7 @@ var hasRequiredEncodings;
 function requireEncodings () {
 	if (hasRequiredEncodings) return encodings;
 	hasRequiredEncodings = 1;
-	(function (exports) {
+	(function (exports$1) {
 
 		var mergeModules = requireMergeExports();
 
@@ -44141,7 +44406,7 @@ function requireEncodings () {
 		// Put all encoding/alias/codec definitions to single object and export it.
 		for (var i = 0; i < modules.length; i++) {
 		  var module = modules[i];
-		  mergeModules(exports, module);
+		  mergeModules(exports$1, module);
 		} 
 	} (encodings));
 	return encodings;
@@ -44260,6 +44525,8 @@ function requireStreams () {
 	return streams;
 }
 
+lib$1.exports;
+
 var hasRequiredLib$1;
 
 function requireLib$1 () {
@@ -44271,22 +44538,21 @@ function requireLib$1 () {
 
 		var bomHandling = requireBomHandling();
 		var mergeModules = requireMergeExports();
-		var iconv = module.exports;
 
 		// All codecs and aliases are kept here, keyed by encoding name/alias.
 		// They are lazy loaded in `iconv.getCodec` from `encodings/index.js`.
 		// Cannot initialize with { __proto__: null } because Boolean({ __proto__: null }) === true
-		iconv.encodings = null;
+		module.exports.encodings = null;
 
 		// Characters emitted in case of error.
-		iconv.defaultCharUnicode = "�";
-		iconv.defaultCharSingleByte = "?";
+		module.exports.defaultCharUnicode = "�";
+		module.exports.defaultCharSingleByte = "?";
 
 		// Public API.
-		iconv.encode = function encode (str, encoding, options) {
+		module.exports.encode = function encode (str, encoding, options) {
 		  str = "" + (str || ""); // Ensure string.
 
-		  var encoder = iconv.getEncoder(encoding, options);
+		  var encoder = module.exports.getEncoder(encoding, options);
 
 		  var res = encoder.write(str);
 		  var trail = encoder.end();
@@ -44294,17 +44560,17 @@ function requireLib$1 () {
 		  return (trail && trail.length > 0) ? Buffer.concat([res, trail]) : res
 		};
 
-		iconv.decode = function decode (buf, encoding, options) {
+		module.exports.decode = function decode (buf, encoding, options) {
 		  if (typeof buf === "string") {
-		    if (!iconv.skipDecodeWarning) {
+		    if (!module.exports.skipDecodeWarning) {
 		      console.error("Iconv-lite warning: decode()-ing strings is deprecated. Refer to https://github.com/ashtuchkin/iconv-lite/wiki/Use-Buffers-when-decoding");
-		      iconv.skipDecodeWarning = true;
+		      module.exports.skipDecodeWarning = true;
 		    }
 
 		    buf = Buffer.from("" + (buf || ""), "binary"); // Ensure buffer.
 		  }
 
-		  var decoder = iconv.getDecoder(encoding, options);
+		  var decoder = module.exports.getDecoder(encoding, options);
 
 		  var res = decoder.write(buf);
 		  var trail = decoder.end();
@@ -44312,9 +44578,9 @@ function requireLib$1 () {
 		  return trail ? (res + trail) : res
 		};
 
-		iconv.encodingExists = function encodingExists (enc) {
+		module.exports.encodingExists = function encodingExists (enc) {
 		  try {
-		    iconv.getCodec(enc);
+		    module.exports.getCodec(enc);
 		    return true
 		  } catch (e) {
 		    return false
@@ -44322,31 +44588,31 @@ function requireLib$1 () {
 		};
 
 		// Legacy aliases to convert functions
-		iconv.toEncoding = iconv.encode;
-		iconv.fromEncoding = iconv.decode;
+		module.exports.toEncoding = module.exports.encode;
+		module.exports.fromEncoding = module.exports.decode;
 
 		// Search for a codec in iconv.encodings. Cache codec data in iconv._codecDataCache.
-		iconv._codecDataCache = { __proto__: null };
+		module.exports._codecDataCache = { __proto__: null };
 
-		iconv.getCodec = function getCodec (encoding) {
-		  if (!iconv.encodings) {
+		module.exports.getCodec = function getCodec (encoding) {
+		  if (!module.exports.encodings) {
 		    var raw = requireEncodings();
 		    // TODO: In future versions when old nodejs support is removed can use object.assign
-		    iconv.encodings = { __proto__: null }; // Initialize as empty object.
-		    mergeModules(iconv.encodings, raw);
+		    module.exports.encodings = { __proto__: null }; // Initialize as empty object.
+		    mergeModules(module.exports.encodings, raw);
 		  }
 
 		  // Canonicalize encoding name: strip all non-alphanumeric chars and appended year.
-		  var enc = iconv._canonicalizeEncoding(encoding);
+		  var enc = module.exports._canonicalizeEncoding(encoding);
 
 		  // Traverse iconv.encodings to find actual codec.
 		  var codecOptions = {};
 		  while (true) {
-		    var codec = iconv._codecDataCache[enc];
+		    var codec = module.exports._codecDataCache[enc];
 
 		    if (codec) { return codec }
 
-		    var codecDef = iconv.encodings[enc];
+		    var codecDef = module.exports.encodings[enc];
 
 		    switch (typeof codecDef) {
 		      case "string": // Direct alias to other encoding.
@@ -44367,9 +44633,9 @@ function requireLib$1 () {
 		        // The codec function must load all tables and return object with .encoder and .decoder methods.
 		        // It'll be called only once (for each different options object).
 		        //
-		        codec = new codecDef(codecOptions, iconv);
+		        codec = new codecDef(codecOptions, module.exports);
 
-		        iconv._codecDataCache[codecOptions.encodingName] = codec; // Save it to be reused later.
+		        module.exports._codecDataCache[codecOptions.encodingName] = codec; // Save it to be reused later.
 		        return codec
 
 		      default:
@@ -44378,13 +44644,13 @@ function requireLib$1 () {
 		  }
 		};
 
-		iconv._canonicalizeEncoding = function (encoding) {
+		module.exports._canonicalizeEncoding = function (encoding) {
 		  // Canonicalize encoding name: strip all non-alphanumeric chars and appended year.
 		  return ("" + encoding).toLowerCase().replace(/:\d{4}$|[^0-9a-z]/g, "")
 		};
 
-		iconv.getEncoder = function getEncoder (encoding, options) {
-		  var codec = iconv.getCodec(encoding);
+		module.exports.getEncoder = function getEncoder (encoding, options) {
+		  var codec = module.exports.getCodec(encoding);
 		  var encoder = new codec.encoder(options, codec);
 
 		  if (codec.bomAware && options && options.addBOM) { encoder = new bomHandling.PrependBOM(encoder, options); }
@@ -44392,8 +44658,8 @@ function requireLib$1 () {
 		  return encoder
 		};
 
-		iconv.getDecoder = function getDecoder (encoding, options) {
-		  var codec = iconv.getCodec(encoding);
+		module.exports.getDecoder = function getDecoder (encoding, options) {
+		  var codec = module.exports.getCodec(encoding);
 		  var decoder = new codec.decoder(options, codec);
 
 		  if (codec.bomAware && !(options && options.stripBOM === false)) { decoder = new bomHandling.StripBOM(decoder, options); }
@@ -44406,26 +44672,26 @@ function requireLib$1 () {
 		// up to 100Kb to the output bundle. To avoid unnecessary code bloat, we don't enable Streaming API in browser by default.
 		// If you would like to enable it explicitly, please add the following code to your app:
 		// > iconv.enableStreamingAPI(require('stream'));
-		iconv.enableStreamingAPI = function enableStreamingAPI (streamModule) {
-		  if (iconv.supportsStreams) { return }
+		module.exports.enableStreamingAPI = function enableStreamingAPI (streamModule) {
+		  if (module.exports.supportsStreams) { return }
 
 		  // Dependency-inject stream module to create IconvLite stream classes.
 		  var streams = requireStreams()(streamModule);
 
 		  // Not public API yet, but expose the stream classes.
-		  iconv.IconvLiteEncoderStream = streams.IconvLiteEncoderStream;
-		  iconv.IconvLiteDecoderStream = streams.IconvLiteDecoderStream;
+		  module.exports.IconvLiteEncoderStream = streams.IconvLiteEncoderStream;
+		  module.exports.IconvLiteDecoderStream = streams.IconvLiteDecoderStream;
 
 		  // Streaming API.
-		  iconv.encodeStream = function encodeStream (encoding, options) {
-		    return new iconv.IconvLiteEncoderStream(iconv.getEncoder(encoding, options), options)
+		  module.exports.encodeStream = function encodeStream (encoding, options) {
+		    return new module.exports.IconvLiteEncoderStream(module.exports.getEncoder(encoding, options), options)
 		  };
 
-		  iconv.decodeStream = function decodeStream (encoding, options) {
-		    return new iconv.IconvLiteDecoderStream(iconv.getDecoder(encoding, options), options)
+		  module.exports.decodeStream = function decodeStream (encoding, options) {
+		    return new module.exports.IconvLiteDecoderStream(module.exports.getDecoder(encoding, options), options)
 		  };
 
-		  iconv.supportsStreams = true;
+		  module.exports.supportsStreams = true;
 		};
 
 		// Enable Streaming API automatically if 'stream' module is available and non-empty (the majority of environments).
@@ -44435,10 +44701,10 @@ function requireLib$1 () {
 		} catch (e) {}
 
 		if (streamModule && streamModule.Transform) {
-		  iconv.enableStreamingAPI(streamModule);
+		  module.exports.enableStreamingAPI(streamModule);
 		} else {
 		  // In rare cases where 'stream' module is not available by default, throw a helpful exception.
-		  iconv.encodeStream = iconv.decodeStream = function () {
+		  module.exports.encodeStream = module.exports.decodeStream = function () {
 		    throw new Error("iconv-lite Streaming API is not enabled. Use iconv.enableStreamingAPI(require('stream')); to enable it.")
 		  };
 		}
@@ -57200,7 +57466,7 @@ var hasRequiredMimeTypes;
 function requireMimeTypes () {
 	if (hasRequiredMimeTypes) return mimeTypes;
 	hasRequiredMimeTypes = 1;
-	(function (exports) {
+	(function (exports$1) {
 
 		/**
 		 * Module dependencies.
@@ -57224,17 +57490,17 @@ function requireMimeTypes () {
 		 * @public
 		 */
 
-		exports.charset = charset;
-		exports.charsets = { lookup: charset };
-		exports.contentType = contentType;
-		exports.extension = extension;
-		exports.extensions = Object.create(null);
-		exports.lookup = lookup;
-		exports.types = Object.create(null);
-		exports._extensionConflicts = [];
+		exports$1.charset = charset;
+		exports$1.charsets = { lookup: charset };
+		exports$1.contentType = contentType;
+		exports$1.extension = extension;
+		exports$1.extensions = Object.create(null);
+		exports$1.lookup = lookup;
+		exports$1.types = Object.create(null);
+		exports$1._extensionConflicts = [];
 
 		// Populate the extensions/types maps
-		populateMaps(exports.extensions, exports.types);
+		populateMaps(exports$1.extensions, exports$1.types);
 
 		/**
 		 * Get the default charset for a MIME type.
@@ -57277,7 +57543,7 @@ function requireMimeTypes () {
 		    return false
 		  }
 
-		  var mime = str.indexOf('/') === -1 ? exports.lookup(str) : str;
+		  var mime = str.indexOf('/') === -1 ? exports$1.lookup(str) : str;
 
 		  if (!mime) {
 		    return false
@@ -57285,7 +57551,7 @@ function requireMimeTypes () {
 
 		  // TODO: use content-type or other module
 		  if (mime.indexOf('charset') === -1) {
-		    var charset = exports.charset(mime);
+		    var charset = exports$1.charset(mime);
 		    if (charset) mime += '; charset=' + charset.toLowerCase();
 		  }
 
@@ -57308,7 +57574,7 @@ function requireMimeTypes () {
 		  var match = EXTRACT_TYPE_REGEXP.exec(type);
 
 		  // get extensions
-		  var exts = match && exports.extensions[match[1].toLowerCase()];
+		  var exts = match && exports$1.extensions[match[1].toLowerCase()];
 
 		  if (!exts || !exts.length) {
 		    return false
@@ -57338,7 +57604,7 @@ function requireMimeTypes () {
 		    return false
 		  }
 
-		  return exports.types[extension] || false
+		  return exports$1.types[extension] || false
 		}
 
 		/**
@@ -57372,7 +57638,7 @@ function requireMimeTypes () {
 		        type
 		      );
 		      if (legacyType !== types[extension]) {
-		        exports._extensionConflicts.push([extension, legacyType, types[extension]]);
+		        exports$1._extensionConflicts.push([extension, legacyType, types[extension]]);
 		      }
 		    }
 		  });
@@ -57394,10 +57660,10 @@ function requireMimeTypes () {
 		  var score1 = type1 ? SOURCE_RANK.indexOf(db[type1].source) : 0;
 
 		  if (
-		    exports.types[extension] !== 'application/octet-stream' &&
+		    exports$1.types[extension] !== 'application/octet-stream' &&
 		    (score0 > score1 ||
 		      (score0 === score1 &&
-		        exports.types[extension]?.slice(0, 12) === 'application/'))
+		        exports$1.types[extension]?.slice(0, 12) === 'application/'))
 		  ) {
 		    return type0
 		  }
@@ -57844,10 +58110,10 @@ function requireUtils$2 () {
 	/**
 	 * Get the charset of a request.
 	 *
-	 * @param {object} req
-	 * @api private
+	 * @param {Object} req
+	 * @returns {string | undefined}
+	 * @private
 	 */
-
 	function getCharset (req) {
 	  try {
 	    return (contentType.parse(req).parameters.charset || '').toLowerCase()
@@ -57860,9 +58126,9 @@ function requireUtils$2 () {
 	 * Get the simple type checker.
 	 *
 	 * @param {string | string[]} type
-	 * @return {function}
+	 * @returns {Function}
+	 * @private
 	 */
-
 	function typeChecker (type) {
 	  return function checkType (req) {
 	    return Boolean(typeis(req, type))
@@ -57872,9 +58138,10 @@ function requireUtils$2 () {
 	/**
 	 * Normalizes the common options for all parsers.
 	 *
-	 * @param {object} options options to normalize
-	 * @param {string | string[] | function} defaultType default content type(s) or a function to determine it
-	 * @returns {object}
+	 * @param {Object} options options to normalize
+	 * @param {string | string[] | Function} defaultType default content type(s) or a function to determine it
+	 * @returns {Object}
+	 * @private
 	 */
 	function normalizeOptions (options, defaultType) {
 	  if (!defaultType) {
@@ -57913,7 +58180,8 @@ function requireUtils$2 () {
 	 * Used by parsers that don't need to transform the data.
 	 *
 	 * @param {*} value
-	 * @return {*}
+	 * @returns {*}
+	 * @private
 	 */
 	function passthrough (value) {
 	  return value
@@ -57956,15 +58224,14 @@ function requireRead () {
 	/**
 	 * Read a request into a buffer and parse.
 	 *
-	 * @param {object} req
-	 * @param {object} res
-	 * @param {function} next
-	 * @param {function} parse
-	 * @param {function} debug
-	 * @param {object} options
+	 * @param {Object} req
+	 * @param {Object} res
+	 * @param {Function} next
+	 * @param {Function} parse
+	 * @param {Function} debug
+	 * @param {Object} options
 	 * @private
 	 */
-
 	function read (req, res, next, parse, debug, options) {
 	  if (onFinished.isFinished(req)) {
 	    debug('body already parsed');
@@ -58104,13 +58371,12 @@ function requireRead () {
 	/**
 	 * Get the content stream of the request.
 	 *
-	 * @param {object} req
-	 * @param {function} debug
-	 * @param {boolean} [inflate=true]
-	 * @return {object}
-	 * @api private
+	 * @param {Object} req
+	 * @param {Function} debug
+	 * @param {boolean} inflate
+	 * @returns {Object}
+	 * @private
 	 */
-
 	function contentstream (req, debug, inflate) {
 	  var encoding = (req.headers['content-encoding'] || 'identity').toLowerCase();
 	  var length = req.headers['content-length'];
@@ -58137,9 +58403,9 @@ function requireRead () {
 	/**
 	 * Create a decompression stream for the given encoding.
 	 * @param {string} encoding
-	 * @param {function} debug
-	 * @return {object}
-	 * @api private
+	 * @param {Function} debug
+	 * @returns {Object}
+	 * @private
 	 */
 	function createDecompressionStream (encoding, debug) {
 	  switch (encoding) {
@@ -58163,11 +58429,10 @@ function requireRead () {
 	/**
 	 * Dump the contents of a request.
 	 *
-	 * @param {object} req
-	 * @param {function} callback
-	 * @api private
+	 * @param {Object} req
+	 * @param {Function} callback
+	 * @private
 	 */
-
 	function dump (req, callback) {
 	  if (onFinished.isFinished(req)) {
 	    callback(null);
@@ -58219,7 +58484,6 @@ function requireJson () {
 	 *            %x0A /              ; Line feed or New line
 	 *            %x0D )              ; Carriage return
 	 */
-
 	var FIRST_CHAR_REGEXP = /^[\x20\x09\x0a\x0d]*([^\x20\x09\x0a\x0d])/; // eslint-disable-line no-control-regex
 
 	var JSON_SYNTAX_CHAR = '#';
@@ -58228,11 +58492,10 @@ function requireJson () {
 	/**
 	 * Create a middleware to parse JSON bodies.
 	 *
-	 * @param {object} [options]
-	 * @return {function}
+	 * @param {Object} [options]
+	 * @returns {Function}
 	 * @public
 	 */
-
 	function json (options) {
 	  const normalizedOptions = normalizeOptions(options, 'application/json');
 
@@ -58282,20 +58545,15 @@ function requireJson () {
 	 *
 	 * @param {string} str
 	 * @param {string} char
-	 * @return {Error}
+	 * @returns {Error}
 	 * @private
 	 */
-
 	function createStrictSyntaxError (str, char) {
 	  var index = str.indexOf(char);
 	  var partial = '';
 
 	  if (index !== -1) {
-	    partial = str.substring(0, index) + JSON_SYNTAX_CHAR;
-
-	    for (var i = index + 1; i < str.length; i++) {
-	      partial += JSON_SYNTAX_CHAR;
-	    }
+	    partial = str.substring(0, index) + JSON_SYNTAX_CHAR.repeat(str.length - index);
 	  }
 
 	  try {
@@ -58314,10 +58572,9 @@ function requireJson () {
 	 * Get the first non-whitespace character in a string.
 	 *
 	 * @param {string} str
-	 * @return {function}
+	 * @returns {string|undefined}
 	 * @private
 	 */
-
 	function firstchar (str) {
 	  var match = FIRST_CHAR_REGEXP.exec(str);
 
@@ -58330,10 +58587,10 @@ function requireJson () {
 	 * Normalize a SyntaxError for JSON.parse.
 	 *
 	 * @param {SyntaxError} error
-	 * @param {object} obj
-	 * @return {SyntaxError}
+	 * @param {Object} obj
+	 * @returns {SyntaxError}
+	 * @private
 	 */
-
 	function normalizeJsonSyntaxError (error, obj) {
 	  var keys = Object.getOwnPropertyNames(error);
 
@@ -58383,11 +58640,10 @@ function requireRaw () {
 	/**
 	 * Create a middleware to parse raw bodies.
 	 *
-	 * @param {object} [options]
-	 * @return {function}
-	 * @api public
+	 * @param {Object} [options]
+	 * @returns {Function}
+	 * @public
 	 */
-
 	function raw (options) {
 	  const normalizedOptions = normalizeOptions(options, 'application/octet-stream');
 
@@ -58434,11 +58690,10 @@ function requireText () {
 	/**
 	 * Create a middleware to parse text bodies.
 	 *
-	 * @param {object} [options]
-	 * @return {function}
-	 * @api public
+	 * @param {Object} [options]
+	 * @returns {Function}
+	 * @public
 	 */
-
 	function text (options) {
 	  const normalizedOptions = normalizeOptions(options, 'text/plain');
 
@@ -59065,7 +59320,7 @@ function requireSideChannelList () {
 	/** @type {import('./list.d.ts').listGet} */
 	var listGet = function (objects, key) {
 		if (!objects) {
-			return void 0;
+			return void undefined;
 		}
 		var node = listGetNode(objects, key);
 		return node && node.value;
@@ -59118,7 +59373,7 @@ function requireSideChannelList () {
 				var root = $o && $o.next;
 				var deletedNode = listDelete($o, key);
 				if (deletedNode && root && root === deletedNode) {
-					$o = void 0;
+					$o = void undefined;
 				}
 				return !!deletedNode;
 			},
@@ -59132,7 +59387,7 @@ function requireSideChannelList () {
 				if (!$o) {
 					// Initialize the linked list as an empty node, so that we don't have to special-case handling of the first node: we can always refer to it as (previous node).next, instead of something like (list).head
 					$o = {
-						next: void 0
+						next: void undefined
 					};
 				}
 				// eslint-disable-next-line no-extra-parens
@@ -60116,7 +60371,7 @@ function requireGetIntrinsic () {
 					if (!allowMissing) {
 						throw new $TypeError('base intrinsic for ' + name + ' exists, but the property is not available.');
 					}
-					return void 0;
+					return void undefined$1;
 				}
 				if ($gOPD && (i + 1) >= parts.length) {
 					var desc = $gOPD(value, part);
@@ -60220,7 +60475,7 @@ function requireSideChannelMap () {
 				if ($m) {
 					var result = $mapDelete($m, key);
 					if ($mapSize($m) === 0) {
-						$m = void 0;
+						$m = void undefined;
 					}
 					return result;
 				}
@@ -60434,14 +60689,36 @@ function requireUtils$1 () {
 	hasRequiredUtils$1 = 1;
 
 	var formats = /*@__PURE__*/ requireFormats();
+	var getSideChannel = requireSideChannel();
 
 	var has = Object.prototype.hasOwnProperty;
 	var isArray = Array.isArray;
 
+	// Track objects created from arrayLimit overflow using side-channel
+	// Stores the current max numeric index for O(1) lookup
+	var overflowChannel = getSideChannel();
+
+	var markOverflow = function markOverflow(obj, maxIndex) {
+	    overflowChannel.set(obj, maxIndex);
+	    return obj;
+	};
+
+	var isOverflow = function isOverflow(obj) {
+	    return overflowChannel.has(obj);
+	};
+
+	var getMaxIndex = function getMaxIndex(obj) {
+	    return overflowChannel.get(obj);
+	};
+
+	var setMaxIndex = function setMaxIndex(obj, maxIndex) {
+	    overflowChannel.set(obj, maxIndex);
+	};
+
 	var hexTable = (function () {
 	    var array = [];
 	    for (var i = 0; i < 256; ++i) {
-	        array.push('%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase());
+	        array[array.length] = '%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase();
 	    }
 
 	    return array;
@@ -60457,7 +60734,7 @@ function requireUtils$1 () {
 
 	            for (var j = 0; j < obj.length; ++j) {
 	                if (typeof obj[j] !== 'undefined') {
-	                    compacted.push(obj[j]);
+	                    compacted[compacted.length] = obj[j];
 	                }
 	            }
 
@@ -60485,9 +60762,20 @@ function requireUtils$1 () {
 
 	    if (typeof source !== 'object' && typeof source !== 'function') {
 	        if (isArray(target)) {
-	            target.push(source);
+	            var nextIndex = target.length;
+	            if (options && typeof options.arrayLimit === 'number' && nextIndex > options.arrayLimit) {
+	                return markOverflow(arrayToObject(target.concat(source), options), nextIndex);
+	            }
+	            target[nextIndex] = source;
 	        } else if (target && typeof target === 'object') {
-	            if (
+	            if (isOverflow(target)) {
+	                // Add at next numeric index for overflow objects
+	                var newIndex = getMaxIndex(target) + 1;
+	                target[newIndex] = source;
+	                setMaxIndex(target, newIndex);
+	            } else if (options && options.strictMerge) {
+	                return [target, source];
+	            } else if (
 	                (options && (options.plainObjects || options.allowPrototypes))
 	                || !has.call(Object.prototype, source)
 	            ) {
@@ -60501,7 +60789,23 @@ function requireUtils$1 () {
 	    }
 
 	    if (!target || typeof target !== 'object') {
-	        return [target].concat(source);
+	        if (isOverflow(source)) {
+	            // Create new object with target at 0, source values shifted by 1
+	            var sourceKeys = Object.keys(source);
+	            var result = options && options.plainObjects
+	                ? { __proto__: null, 0: target }
+	                : { 0: target };
+	            for (var m = 0; m < sourceKeys.length; m++) {
+	                var oldKey = parseInt(sourceKeys[m], 10);
+	                result[oldKey + 1] = source[sourceKeys[m]];
+	            }
+	            return markOverflow(result, getMaxIndex(source) + 1);
+	        }
+	        var combined = [target].concat(source);
+	        if (options && typeof options.arrayLimit === 'number' && combined.length > options.arrayLimit) {
+	            return markOverflow(arrayToObject(combined, options), combined.length - 1);
+	        }
+	        return combined;
 	    }
 
 	    var mergeTarget = target;
@@ -60516,7 +60820,7 @@ function requireUtils$1 () {
 	                if (targetItem && typeof targetItem === 'object' && item && typeof item === 'object') {
 	                    target[i] = merge(targetItem, item, options);
 	                } else {
-	                    target.push(item);
+	                    target[target.length] = item;
 	                }
 	            } else {
 	                target[i] = item;
@@ -60533,6 +60837,17 @@ function requireUtils$1 () {
 	        } else {
 	            acc[key] = value;
 	        }
+
+	        if (isOverflow(source) && !isOverflow(acc)) {
+	            markOverflow(acc, getMaxIndex(source));
+	        }
+	        if (isOverflow(acc)) {
+	            var keyNum = parseInt(key, 10);
+	            if (String(keyNum) === key && keyNum >= 0 && keyNum > getMaxIndex(acc)) {
+	                setMaxIndex(acc, keyNum);
+	            }
+	        }
+
 	        return acc;
 	    }, mergeTarget);
 	};
@@ -60649,8 +60964,8 @@ function requireUtils$1 () {
 	            var key = keys[j];
 	            var val = obj[key];
 	            if (typeof val === 'object' && val !== null && refs.indexOf(val) === -1) {
-	                queue.push({ obj: obj, prop: key });
-	                refs.push(val);
+	                queue[queue.length] = { obj: obj, prop: key };
+	                refs[refs.length] = val;
 	            }
 	        }
 	    }
@@ -60672,15 +60987,27 @@ function requireUtils$1 () {
 	    return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
 	};
 
-	var combine = function combine(a, b) {
-	    return [].concat(a, b);
+	var combine = function combine(a, b, arrayLimit, plainObjects) {
+	    // If 'a' is already an overflow object, add to it
+	    if (isOverflow(a)) {
+	        var newIndex = getMaxIndex(a) + 1;
+	        a[newIndex] = b;
+	        setMaxIndex(a, newIndex);
+	        return a;
+	    }
+
+	    var result = [].concat(a, b);
+	    if (result.length > arrayLimit) {
+	        return markOverflow(arrayToObject(result, { plainObjects: plainObjects }), result.length - 1);
+	    }
+	    return result;
 	};
 
 	var maybeMap = function maybeMap(val, fn) {
 	    if (isArray(val)) {
 	        var mapped = [];
 	        for (var i = 0; i < val.length; i += 1) {
-	            mapped.push(fn(val[i]));
+	            mapped[mapped.length] = fn(val[i]);
 	        }
 	        return mapped;
 	    }
@@ -60695,7 +61022,9 @@ function requireUtils$1 () {
 	    decode: decode,
 	    encode: encode,
 	    isBuffer: isBuffer,
+	    isOverflow: isOverflow,
 	    isRegExp: isRegExp,
+	    markOverflow: markOverflow,
 	    maybeMap: maybeMap,
 	    merge: merge
 	};
@@ -60749,7 +61078,7 @@ function requireStringify () {
 	    encodeDotInKeys: false,
 	    encoder: utils.encode,
 	    encodeValuesOnly: false,
-	    filter: void 0,
+	    filter: void undefined,
 	    format: defaultFormat,
 	    formatter: formats.formatters[defaultFormat],
 	    // deprecated
@@ -60796,7 +61125,7 @@ function requireStringify () {
 	    var tmpSc = sideChannel;
 	    var step = 0;
 	    var findFlag = false;
-	    while ((tmpSc = tmpSc.get(sentinel)) !== void 0 && !findFlag) {
+	    while ((tmpSc = tmpSc.get(sentinel)) !== void undefined && !findFlag) {
 	        // Where object last appeared in the ref tree
 	        var pos = tmpSc.get(object);
 	        step += 1;
@@ -60853,7 +61182,7 @@ function requireStringify () {
 	        if (encodeValuesOnly && encoder) {
 	            obj = utils.maybeMap(obj, encoder);
 	        }
-	        objKeys = [{ value: obj.length > 0 ? obj.join(',') || null : void 0 }];
+	        objKeys = [{ value: obj.length > 0 ? obj.join(',') || null : void undefined }];
 	    } else if (isArray(filter)) {
 	        objKeys = filter;
 	    } else {
@@ -61098,6 +61427,7 @@ function requireParse () {
 	    parseArrays: true,
 	    plainObjects: false,
 	    strictDepth: false,
+	    strictMerge: true,
 	    strictNullHandling: false,
 	    throwOnLimitExceeded: false
 	};
@@ -61136,7 +61466,7 @@ function requireParse () {
 	    var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, '') : str;
 	    cleanStr = cleanStr.replace(/%5B/gi, '[').replace(/%5D/gi, ']');
 
-	    var limit = options.parameterLimit === Infinity ? undefined : options.parameterLimit;
+	    var limit = options.parameterLimit === Infinity ? void undefined : options.parameterLimit;
 	    var parts = cleanStr.split(
 	        options.delimiter,
 	        options.throwOnLimitExceeded ? limit + 1 : limit
@@ -61181,16 +61511,18 @@ function requireParse () {
 	        } else {
 	            key = options.decoder(part.slice(0, pos), defaults.decoder, charset, 'key');
 
-	            val = utils.maybeMap(
-	                parseArrayValue(
-	                    part.slice(pos + 1),
-	                    options,
-	                    isArray(obj[key]) ? obj[key].length : 0
-	                ),
-	                function (encodedVal) {
-	                    return options.decoder(encodedVal, defaults.decoder, charset, 'value');
-	                }
-	            );
+	            if (key !== null) {
+	                val = utils.maybeMap(
+	                    parseArrayValue(
+	                        part.slice(pos + 1),
+	                        options,
+	                        isArray(obj[key]) ? obj[key].length : 0
+	                    ),
+	                    function (encodedVal) {
+	                        return options.decoder(encodedVal, defaults.decoder, charset, 'value');
+	                    }
+	                );
+	            }
 	        }
 
 	        if (val && options.interpretNumericEntities && charset === 'iso-8859-1') {
@@ -61201,11 +61533,25 @@ function requireParse () {
 	            val = isArray(val) ? [val] : val;
 	        }
 
-	        var existing = has.call(obj, key);
-	        if (existing && options.duplicates === 'combine') {
-	            obj[key] = utils.combine(obj[key], val);
-	        } else if (!existing || options.duplicates === 'last') {
-	            obj[key] = val;
+	        if (options.comma && isArray(val) && val.length > options.arrayLimit) {
+	            if (options.throwOnLimitExceeded) {
+	                throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+	            }
+	            val = utils.combine([], val, options.arrayLimit, options.plainObjects);
+	        }
+
+	        if (key !== null) {
+	            var existing = has.call(obj, key);
+	            if (existing && (options.duplicates === 'combine' || part.indexOf('[]=') > -1)) {
+	                obj[key] = utils.combine(
+	                    obj[key],
+	                    val,
+	                    options.arrayLimit,
+	                    options.plainObjects
+	                );
+	            } else if (!existing || options.duplicates === 'last') {
+	                obj[key] = val;
+	            }
 	        }
 	    }
 
@@ -61226,25 +61572,39 @@ function requireParse () {
 	        var root = chain[i];
 
 	        if (root === '[]' && options.parseArrays) {
-	            obj = options.allowEmptyArrays && (leaf === '' || (options.strictNullHandling && leaf === null))
-	                ? []
-	                : utils.combine([], leaf);
+	            if (utils.isOverflow(leaf)) {
+	                // leaf is already an overflow object, preserve it
+	                obj = leaf;
+	            } else {
+	                obj = options.allowEmptyArrays && (leaf === '' || (options.strictNullHandling && leaf === null))
+	                    ? []
+	                    : utils.combine(
+	                        [],
+	                        leaf,
+	                        options.arrayLimit,
+	                        options.plainObjects
+	                    );
+	            }
 	        } else {
 	            obj = options.plainObjects ? { __proto__: null } : {};
 	            var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
 	            var decodedRoot = options.decodeDotInKeys ? cleanRoot.replace(/%2E/g, '.') : cleanRoot;
 	            var index = parseInt(decodedRoot, 10);
-	            if (!options.parseArrays && decodedRoot === '') {
-	                obj = { 0: leaf };
-	            } else if (
-	                !isNaN(index)
+	            var isValidArrayIndex = !isNaN(index)
 	                && root !== decodedRoot
 	                && String(index) === decodedRoot
 	                && index >= 0
-	                && (options.parseArrays && index <= options.arrayLimit)
-	            ) {
+	                && options.parseArrays;
+	            if (!options.parseArrays && decodedRoot === '') {
+	                obj = { 0: leaf };
+	            } else if (isValidArrayIndex && index < options.arrayLimit) {
 	                obj = [];
 	                obj[index] = leaf;
+	            } else if (isValidArrayIndex && options.throwOnLimitExceeded) {
+	                throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+	            } else if (isValidArrayIndex) {
+	                obj[index] = leaf;
+	                utils.markOverflow(obj, index);
 	            } else if (decodedRoot !== '__proto__') {
 	                obj[decodedRoot] = leaf;
 	            }
@@ -61256,58 +61616,71 @@ function requireParse () {
 	    return leaf;
 	};
 
-	var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
-	    if (!givenKey) {
-	        return;
-	    }
-
-	    // Transform dot notation to bracket notation
+	var splitKeyIntoSegments = function splitKeyIntoSegments(givenKey, options) {
 	    var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, '[$1]') : givenKey;
 
-	    // The regex chunks
+	    if (options.depth <= 0) {
+	        if (!options.plainObjects && has.call(Object.prototype, key)) {
+	            if (!options.allowPrototypes) {
+	                return;
+	            }
+	        }
+
+	        return [key];
+	    }
 
 	    var brackets = /(\[[^[\]]*])/;
 	    var child = /(\[[^[\]]*])/g;
 
-	    // Get the parent
-
-	    var segment = options.depth > 0 && brackets.exec(key);
+	    var segment = brackets.exec(key);
 	    var parent = segment ? key.slice(0, segment.index) : key;
 
-	    // Stash the parent if it exists
-
 	    var keys = [];
+
 	    if (parent) {
-	        // If we aren't using plain objects, optionally prefix keys that would overwrite object prototype properties
 	        if (!options.plainObjects && has.call(Object.prototype, parent)) {
 	            if (!options.allowPrototypes) {
 	                return;
 	            }
 	        }
 
-	        keys.push(parent);
+	        keys[keys.length] = parent;
 	    }
 
-	    // Loop through children appending to the array until we hit depth
-
 	    var i = 0;
-	    while (options.depth > 0 && (segment = child.exec(key)) !== null && i < options.depth) {
+	    while ((segment = child.exec(key)) !== null && i < options.depth) {
 	        i += 1;
-	        if (!options.plainObjects && has.call(Object.prototype, segment[1].slice(1, -1))) {
+
+	        var segmentContent = segment[1].slice(1, -1);
+	        if (!options.plainObjects && has.call(Object.prototype, segmentContent)) {
 	            if (!options.allowPrototypes) {
 	                return;
 	            }
 	        }
-	        keys.push(segment[1]);
-	    }
 
-	    // If there's a remainder, check strictDepth option for throw, else just add whatever is left
+	        keys[keys.length] = segment[1];
+	    }
 
 	    if (segment) {
 	        if (options.strictDepth === true) {
 	            throw new RangeError('Input depth exceeded depth option of ' + options.depth + ' and strictDepth is true');
 	        }
-	        keys.push('[' + key.slice(segment.index) + ']');
+
+	        keys[keys.length] = '[' + key.slice(segment.index) + ']';
+	    }
+
+	    return keys;
+	};
+
+	var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
+	    if (!givenKey) {
+	        return;
+	    }
+
+	    var keys = splitKeyIntoSegments(givenKey, options);
+
+	    if (!keys) {
+	        return;
 	    }
 
 	    return parseObject(keys, val, options, valuesParsed);
@@ -61369,6 +61742,7 @@ function requireParse () {
 	        parseArrays: opts.parseArrays !== false,
 	        plainObjects: typeof opts.plainObjects === 'boolean' ? opts.plainObjects : defaults.plainObjects,
 	        strictDepth: typeof opts.strictDepth === 'boolean' ? !!opts.strictDepth : defaults.strictDepth,
+	        strictMerge: typeof opts.strictMerge === 'boolean' ? !!opts.strictMerge : defaults.strictMerge,
 	        strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling,
 	        throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === 'boolean' ? opts.throwOnLimitExceeded : false
 	    };
@@ -61455,11 +61829,10 @@ function requireUrlencoded () {
 	/**
 	 * Create a middleware to parse urlencoded bodies.
 	 *
-	 * @param {object} [options]
-	 * @return {function}
+	 * @param {Object} [options]
+	 * @returns {Function}
 	 * @public
 	 */
-
 	function urlencoded (options) {
 	  const normalizedOptions = normalizeOptions(options, 'application/x-www-form-urlencoded');
 
@@ -61490,9 +61863,10 @@ function requireUrlencoded () {
 	/**
 	 * Get the extended query parser.
 	 *
-	 * @param {object} options
+	 * @param {Object} options
+	 * @returns {Function}
+	 * @private
 	 */
-
 	function createQueryParser (options) {
 	  var extended = Boolean(options?.extended);
 	  var parameterLimit = options?.parameterLimit !== undefined
@@ -61524,7 +61898,7 @@ function requireUrlencoded () {
 	      })
 	    }
 
-	    var arrayLimit = extended ? Math.max(100, paramCount) : 0;
+	    var arrayLimit = extended ? Math.max(100, paramCount) : paramCount;
 
 	    debug('parse ' + (extended ? 'extended ' : '') + 'urlencoding');
 	    try {
@@ -61555,8 +61929,8 @@ function requireUrlencoded () {
 	 *
 	 * @param {string} body
 	 * @param {number} limit
-	 * @return {number|undefined} Returns undefined if limit exceeded
-	 * @api private
+	 * @returns {number|undefined} Returns undefined if limit exceeded
+	 * @private
 	 */
 	function parameterCount (body, limit) {
 	  let count = 0;
@@ -61582,30 +61956,27 @@ var hasRequiredBodyParser;
 function requireBodyParser () {
 	if (hasRequiredBodyParser) return bodyParser.exports;
 	hasRequiredBodyParser = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 
 		/**
-		 * @typedef Parsers
-		 * @type {function}
-		 * @property {function} json
-		 * @property {function} raw
-		 * @property {function} text
-		 * @property {function} urlencoded
+		 * @typedef {Object} Parsers
+		 * @property {Function} json JSON parser
+		 * @property {Function} raw Raw parser
+		 * @property {Function} text Text parser
+		 * @property {Function} urlencoded URL-encoded parser
 		 */
 
 		/**
 		 * Module exports.
-		 * @type {Parsers}
+		 * @type {Function & Parsers}
 		 */
-
-		exports = module.exports = bodyParser;
+		exports$1 = module.exports = bodyParser;
 
 		/**
 		 * JSON parser.
 		 * @public
 		 */
-
-		Object.defineProperty(exports, 'json', {
+		Object.defineProperty(exports$1, 'json', {
 		  configurable: true,
 		  enumerable: true,
 		  get: () => requireJson()
@@ -61615,8 +61986,7 @@ function requireBodyParser () {
 		 * Raw parser.
 		 * @public
 		 */
-
-		Object.defineProperty(exports, 'raw', {
+		Object.defineProperty(exports$1, 'raw', {
 		  configurable: true,
 		  enumerable: true,
 		  get: () => requireRaw()
@@ -61626,8 +61996,7 @@ function requireBodyParser () {
 		 * Text parser.
 		 * @public
 		 */
-
-		Object.defineProperty(exports, 'text', {
+		Object.defineProperty(exports$1, 'text', {
 		  configurable: true,
 		  enumerable: true,
 		  get: () => requireText()
@@ -61637,8 +62006,7 @@ function requireBodyParser () {
 		 * URL-encoded parser.
 		 * @public
 		 */
-
-		Object.defineProperty(exports, 'urlencoded', {
+		Object.defineProperty(exports$1, 'urlencoded', {
 		  configurable: true,
 		  enumerable: true,
 		  get: () => requireUrlencoded()
@@ -61647,12 +62015,9 @@ function requireBodyParser () {
 		/**
 		 * Create a middleware to parse json and urlencoded bodies.
 		 *
-		 * @param {object} [options]
-		 * @return {function}
 		 * @deprecated
 		 * @public
 		 */
-
 		function bodyParser () {
 		  throw new Error('The bodyParser() generic has been split into individual middleware to use instead.')
 		} 
@@ -63799,7 +64164,7 @@ var hasRequiredUtils;
 function requireUtils () {
 	if (hasRequiredUtils) return utils;
 	hasRequiredUtils = 1;
-	(function (exports) {
+	(function (exports$1) {
 
 		/**
 		 * Module dependencies.
@@ -63818,7 +64183,7 @@ function requireUtils () {
 		 * A list of lowercased HTTP methods that are supported by Node.js.
 		 * @api private
 		 */
-		exports.methods = METHODS.map((method) => method.toLowerCase());
+		exports$1.methods = METHODS.map((method) => method.toLowerCase());
 
 		/**
 		 * Return strong ETag for `body`.
@@ -63829,7 +64194,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.etag = createETagGenerator({ weak: false });
+		exports$1.etag = createETagGenerator({ weak: false });
 
 		/**
 		 * Return weak ETag for `body`.
@@ -63840,7 +64205,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.wetag = createETagGenerator({ weak: true });
+		exports$1.wetag = createETagGenerator({ weak: true });
 
 		/**
 		 * Normalize the given `type`, for example "html" becomes "text/html".
@@ -63850,7 +64215,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.normalizeType = function(type){
+		exports$1.normalizeType = function(type){
 		  return ~type.indexOf('/')
 		    ? acceptParams(type)
 		    : { value: (mime.lookup(type) || 'application/octet-stream'), params: {} }
@@ -63864,8 +64229,8 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.normalizeTypes = function(types) {
-		  return types.map(exports.normalizeType);
+		exports$1.normalizeTypes = function(types) {
+		  return types.map(exports$1.normalizeType);
 		};
 
 
@@ -63919,7 +64284,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.compileETag = function(val) {
+		exports$1.compileETag = function(val) {
 		  var fn;
 
 		  if (typeof val === 'function') {
@@ -63929,12 +64294,12 @@ function requireUtils () {
 		  switch (val) {
 		    case true:
 		    case 'weak':
-		      fn = exports.wetag;
+		      fn = exports$1.wetag;
 		      break;
 		    case false:
 		      break;
 		    case 'strong':
-		      fn = exports.etag;
+		      fn = exports$1.etag;
 		      break;
 		    default:
 		      throw new TypeError('unknown value for etag function: ' + val);
@@ -63951,7 +64316,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.compileQueryParser = function compileQueryParser(val) {
+		exports$1.compileQueryParser = function compileQueryParser(val) {
 		  var fn;
 
 		  if (typeof val === 'function') {
@@ -63983,7 +64348,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.compileTrust = function(val) {
+		exports$1.compileTrust = function(val) {
 		  if (typeof val === 'function') return val;
 
 		  if (val === true) {
@@ -64014,7 +64379,7 @@ function requireUtils () {
 		 * @api private
 		 */
 
-		exports.setCharset = function setCharset(type, charset) {
+		exports$1.setCharset = function setCharset(type, charset) {
 		  if (!type || !charset) {
 		    return type;
 		  }
@@ -65862,7 +66227,7 @@ var hasRequiredApplication;
 function requireApplication () {
 	if (hasRequiredApplication) return application.exports;
 	hasRequiredApplication = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 
 		/**
 		 * Module dependencies.
@@ -68556,7 +68921,7 @@ var hasRequiredSafeBuffer;
 function requireSafeBuffer () {
 	if (hasRequiredSafeBuffer) return safeBuffer.exports;
 	hasRequiredSafeBuffer = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 		/* eslint-disable node/no-deprecated-api */
 		var buffer = require$$0$b;
 		var Buffer = buffer.Buffer;
@@ -68571,8 +68936,8 @@ function requireSafeBuffer () {
 		  module.exports = buffer;
 		} else {
 		  // Copy properties from require('buffer')
-		  copyProps(buffer, exports);
-		  exports.Buffer = SafeBuffer;
+		  copyProps(buffer, exports$1);
+		  exports$1.Buffer = SafeBuffer;
 		}
 
 		function SafeBuffer (arg, encodingOrOffset, length) {
@@ -69102,7 +69467,7 @@ var hasRequiredCookieSignature;
 function requireCookieSignature () {
 	if (hasRequiredCookieSignature) return cookieSignature;
 	hasRequiredCookieSignature = 1;
-	(function (exports) {
+	(function (exports$1) {
 		var crypto = require$$0$4;
 
 		/**
@@ -69114,7 +69479,7 @@ function requireCookieSignature () {
 		 * @api private
 		 */
 
-		exports.sign = function(val, secret){
+		exports$1.sign = function(val, secret){
 		  if ('string' != typeof val) throw new TypeError("Cookie value must be provided as a string.");
 		  if (null == secret) throw new TypeError("Secret key must be provided.");
 		  return val + '.' + crypto
@@ -69134,11 +69499,11 @@ function requireCookieSignature () {
 		 * @api private
 		 */
 
-		exports.unsign = function(input, secret){
+		exports$1.unsign = function(input, secret){
 		  if ('string' != typeof input) throw new TypeError("Signed cookie string must be provided.");
 		  if (null == secret) throw new TypeError("Secret key must be provided.");
 		  var tentativeValue = input.slice(0, input.lastIndexOf('.')),
-		      expectedInput = exports.sign(tentativeValue, secret),
+		      expectedInput = exports$1.sign(tentativeValue, secret),
 		      expectedBuffer = Buffer.from(expectedInput),
 		      inputBuffer = Buffer.from(input);
 		  return (
@@ -71933,7 +72298,7 @@ var hasRequiredExpress$1;
 function requireExpress$1 () {
 	if (hasRequiredExpress$1) return express$2.exports;
 	hasRequiredExpress$1 = 1;
-	(function (module, exports) {
+	(function (module, exports$1) {
 
 		/**
 		 * Module dependencies.
@@ -71951,7 +72316,7 @@ function requireExpress$1 () {
 		 * Expose `createApplication()`.
 		 */
 
-		exports = module.exports = createApplication;
+		exports$1 = module.exports = createApplication;
 
 		/**
 		 * Create an express application.
@@ -71986,26 +72351,26 @@ function requireExpress$1 () {
 		 * Expose the prototypes.
 		 */
 
-		exports.application = proto;
-		exports.request = req;
-		exports.response = res;
+		exports$1.application = proto;
+		exports$1.request = req;
+		exports$1.response = res;
 
 		/**
 		 * Expose constructors.
 		 */
 
-		exports.Route = Router.Route;
-		exports.Router = Router;
+		exports$1.Route = Router.Route;
+		exports$1.Router = Router;
 
 		/**
 		 * Expose middleware
 		 */
 
-		exports.json = bodyParser.json;
-		exports.raw = bodyParser.raw;
-		exports.static = requireServeStatic();
-		exports.text = bodyParser.text;
-		exports.urlencoded = bodyParser.urlencoded; 
+		exports$1.json = bodyParser.json;
+		exports$1.raw = bodyParser.raw;
+		exports$1.static = requireServeStatic();
+		exports$1.text = bodyParser.text;
+		exports$1.urlencoded = bodyParser.urlencoded; 
 	} (express$2, express$2.exports));
 	return express$2.exports;
 }
@@ -72522,19 +72887,16 @@ const stopServer = () => {
 process.on('SIGINT', () => {
     console.log('\nReceived SIGINT. Cleaning up...');
     stopServer();
-    stopPostgres();
     process.exit(0);
 });
 process.on('SIGTERM', () => {
     console.log('\nReceived SIGTERM. Cleaning up...');
     stopServer();
-    stopPostgres();
     process.exit(0);
 });
 async function run() {
     try {
         // Start the Express server
-        await startPostgres();
         startServer();
         const dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
@@ -72565,10 +72927,11 @@ async function run() {
         coreExports.debug(`Ignore failures: ${ignore_failures}`);
         coreExports.debug(`Test type: ${test_type}`);
         // Spawn the Python process
-        const this_file_dir = require$$1$8.dirname(new URL(import.meta.url).pathname);
+        const this_file_dir = require$$1$8.dirname(fileURLToPath(import.meta.url));
+        const run_test_path = require$$1$8.resolve(this_file_dir, '..', 'server_tests', 'run_test.py');
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
-                `${this_file_dir}/../server_tests/run_test.py`,
+                run_test_path,
                 '--dockerfile_path',
                 dockerfile_path,
                 '--max_parallel_tests',
@@ -72615,61 +72978,7 @@ async function run() {
     }
     finally {
         stopServer();
-        stopPostgres();
     }
-}
-async function startPostgres() {
-    const proc = spawn('docker', [
-        'run',
-        '--rm',
-        '--name',
-        'postgres',
-        '-e',
-        'POSTGRES_PASSWORD=mysecretpassword',
-        '-e',
-        'POSTGRES_USER=myuser',
-        '-e',
-        'POSTGRES_DB=mydb',
-        '-p',
-        '5432:5432',
-        '-d',
-        'postgres',
-        '-c',
-        'max_connections=200'
-    ], {
-        stdio: 'inherit'
-    });
-    console.log(`Started Postgres: ${proc.pid}`);
-    // wait for postgres to be ready
-    await new Promise((resolve) => {
-        setTimeout(resolve, 10000);
-    });
-    proc.on('close', (code) => {
-        if (code !== 0) {
-            coreExports.setFailed(`Failed to start Postgres: ${code}`);
-        }
-    });
-    proc.on('error', (err) => {
-        coreExports.setFailed(`Failed to start Postgres: ${err}`);
-    });
-    proc.on('exit', (code) => {
-        if (code !== 0) {
-            coreExports.setFailed(`Failed to start Postgres: ${code}`);
-        }
-    });
-    proc.on('message', (msg) => {
-        console.log(`Postgres: ${msg}`);
-    });
-}
-function stopPostgres() {
-    const proc = spawn('docker', ['stop', 'postgres'], {
-        stdio: 'inherit'
-    });
-    proc.on('close', (code) => {
-        if (code !== 0) {
-            coreExports.warning(`Failed to stop Postgres: ${code}`);
-        }
-    });
 }
 
 /**

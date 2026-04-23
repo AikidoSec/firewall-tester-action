@@ -26,7 +26,7 @@ DOCKER_OSTYPE = subprocess.run(
     capture_output=True,
     text=True,
     check=True,
-    timeout=15,
+    timeout=30,
 ).stdout.strip().lower()
 
 if DOCKER_OSTYPE == "linux":
@@ -39,9 +39,6 @@ else:
     POSTGRES_PASSWORD = "postgres"
 
 def get_docker_host_ip() -> str:
-    if os.environ.get("GITHUB_ACTIONS") == "true":
-        return "172.17.0.1"
-
     # Covers all local scenarios (linux, macos, windows)
     network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 
@@ -50,13 +47,18 @@ def get_docker_host_ip() -> str:
         capture_output=True,
         text=True,
         check=True,
-        timeout=15,
+        timeout=30,
     )
 
     networks = json.loads(result.stdout)
     ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
     gateway = ipam_configs[0].get("Gateway")
-    
+
+    if not gateway:
+        raise RuntimeError(
+            f"Could not determine gateway for docker network '{network_name}'"
+        )
+
     return gateway
 
 DOCKER_HOST_IP = get_docker_host_ip()
@@ -309,6 +311,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
+
         # 3. wait for the container to be ready
         time.sleep(sleep_before_test)
 

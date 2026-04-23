@@ -135,7 +135,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-dotnet-core
           path: ./zen-demo
-          ref: fix-qa-endpoints
+          ref: main
           submodules: recursive
 
       - name: Test Local Action
@@ -223,6 +223,14 @@ jobs:
 
       - name: Install Python test dependencies
         run: python -m pip install -r requirements.txt
+
+      - name: Allow firewall-tester core mock through Windows Firewall
+        shell: pwsh
+        run: |
+          $ruleName = 'Aikido Firewall Tester Action Core Mock'
+          Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+          New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Profile Any -Protocol TCP -LocalPort 3000 | Out-Null
+          Write-Host "Ensured inbound firewall rule for TCP 3000 on all profiles."
 
       - name: Test Local Action
         id: test-action

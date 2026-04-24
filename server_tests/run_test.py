@@ -89,7 +89,7 @@ def get_docker_host_ip() -> str:
     # Covers all local scenarios (linux, macos, windows)
     network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 
-    result = subprocess.run(
+    result = run_process_with_retries(
         ["docker", "network", "inspect", network_name],
         capture_output=True,
         text=True,

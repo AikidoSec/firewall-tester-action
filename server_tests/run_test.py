@@ -26,7 +26,7 @@ DOCKER_OSTYPE = subprocess.run(
     capture_output=True,
     text=True,
     check=True,
-    timeout=30,
+    timeout=60,
 ).stdout.strip().lower()
 
 if DOCKER_OSTYPE == "linux":

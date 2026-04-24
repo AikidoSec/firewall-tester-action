@@ -21,12 +21,59 @@ import html
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
 
-DOCKER_OSTYPE = subprocess.run(
+
+class GitHubActionsFormatter(logging.Formatter):
+    def format(self, record):
+        level = record.levelname.lower()
+        message = super().format(record)
+
+        if record.levelno == logging.ERROR:
+            return f"::error::{message}"
+        elif record.levelno == logging.WARNING:
+            return f"::warning::{message}"
+        elif record.levelno == logging.INFO:
+            return f"{message}"
+        elif record.levelno == logging.DEBUG:
+            return f"::debug::{message}"
+        else:
+            return message
+
+
+def get_logger(name: str = "github_actions_logger") -> logging.Logger:
+    sys.stdout.reconfigure(encoding='utf-8')
+    logger = logging.getLogger(name)
+    if not logger.hasHandlers():
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = GitHubActionsFormatter(
+            "%(asctime)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+    return logger
+
+
+logger = get_logger()
+
+
+def run_process_with_retries(*args, attempts: int = 3, retry_delay_seconds: int = 10, **kwargs):
+    for attempt in range(1, attempts + 1):
+        try:
+            return subprocess.run(*args, **kwargs)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+            logger.warning(
+                f"Command failed (attempt {attempt}/{attempts}): {error}. "
+                f"Retrying in {retry_delay_seconds} seconds..."
+            )
+            time.sleep(retry_delay_seconds)
+    raise RuntimeError(f"Command failed after {attempts} attempts")
+
+
+DOCKER_OSTYPE = run_process_with_retries(
     ["docker", "info", "--format", "{{.OSType}}"],
     capture_output=True,
     text=True,
     check=True,
-    timeout=60,
+    timeout=30,
 ).stdout.strip().lower()
 
 if DOCKER_OSTYPE == "linux":
@@ -42,7 +89,7 @@ def get_docker_host_ip() -> str:
     # Covers all local scenarios (linux, macos, windows)
     network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 
-    result = subprocess.run(
+    result = run_process_with_retries(
         ["docker", "network", "inspect", network_name],
         capture_output=True,
         text=True,
@@ -140,39 +187,6 @@ def create_test_database(test_dir: str) -> None:
     create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb",
                                "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
     subprocess.run(create_database_command, check=True)
-
-class GitHubActionsFormatter(logging.Formatter):
-    def format(self, record):
-        level = record.levelname.lower()
-        message = super().format(record)
-
-        if record.levelno == logging.ERROR:
-            return f"::error::{message}"
-        elif record.levelno == logging.WARNING:
-            return f"::warning::{message}"
-        elif record.levelno == logging.INFO:
-            return f"{message}"
-        elif record.levelno == logging.DEBUG:
-            return f"::debug::{message}"
-        else:
-            return message
-
-
-def get_logger(name: str = "github_actions_logger") -> logging.Logger:
-    sys.stdout.reconfigure(encoding='utf-8')
-    logger = logging.getLogger(name)
-    if not logger.hasHandlers():
-        handler = logging.StreamHandler(sys.stdout)
-        formatter = GitHubActionsFormatter(
-            "%(asctime)s - %(levelname)s - %(message)s")
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.DEBUG)
-    return logger
-
-
-logger = get_logger()
-
 
 class TestStatus(Enum):
     PASSED = "PASSED"
@@ -459,7 +473,7 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
             # extra_build_args is a string of arguments separated by spaces (e.g. "--build-arg APP_VERSION=2.0.1 --build-arg PHP_FIREWALL_VERSION=1.0.123")
             command.extend(extra_build_args.split(" "))
         except ValueError as e:
-            print(f"Invalid build args: {e}")
+            logger.warning(f"Invalid build args: {e}")
             return
 
     command.append(dockerfile_dir)

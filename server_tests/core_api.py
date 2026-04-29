@@ -31,7 +31,7 @@ class CoreApi:
         return response.json()
 
     def update_runtime_config_file(self, config_file: str) -> dict:
-        with open(self.get_full_path(config_file), "r") as f:
+        with open(self.get_full_path(config_file), "r", encoding="utf-8") as f:
             config = json.load(f)
         return self.update_runtime_config_json(config)
 
@@ -42,7 +42,7 @@ class CoreApi:
         return response.json()
 
     def update_runtime_firewall_file(self, file_name: str) -> dict:
-        with open(self.get_full_path(file_name), "r") as f:
+        with open(self.get_full_path(file_name), "r", encoding="utf-8") as f:
             firewall = json.load(f)
         return self.update_runtime_firewall_json(firewall)
 

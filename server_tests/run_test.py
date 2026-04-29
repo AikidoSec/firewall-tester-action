@@ -263,7 +263,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         core_api = CoreApi(token=token, core_url=CORE_URL, test_name=test_dir,
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r") as f:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r", encoding="utf-8") as f:
                 try:
                     config = json.load(f)
                     r = core_api.update_runtime_config_json(config)
@@ -274,7 +274,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                         f"Error applying start_config.json: {e} \n{traceback.format_exc()}")
 
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_firewall.json")):
-            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_firewall.json"), "r") as f:
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_firewall.json"), "r", encoding="utf-8") as f:
                 try:
                     config = json.load(f)
                     r = core_api.update_runtime_firewall_json(config)

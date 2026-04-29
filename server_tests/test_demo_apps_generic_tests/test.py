@@ -61,7 +61,8 @@ def run_test(s: TestServer, c: CoreApi):
 
     # ------ Big request ------
     file_path = os.path.join(os.path.dirname(__file__), "test.json")
-    response = s.post("/api/create", json.load(open(file_path, 'r')))
+    with open(file_path, 'r', encoding="utf-8") as file:
+        response = s.post("/api/create", json.load(file))
     collector.soft_assert_response_code_is(
         response, 200, f"Expected 200 for /api/create {response.text}")
 

@@ -389,7 +389,7 @@ def assert_event_contains_subset_file(event, event_subset_file):
     caller_lineno = caller_frame.f_lineno
     subset_path = os.path.join(os.path.dirname(caller_filename), event_subset_file)
     event_subset = None
-    with open(subset_path, 'r') as file:
+    with open(subset_path, 'r', encoding="utf-8") as file:
         event_subset = json.load(file)
     assert event_subset, f"Subset file '{event_subset_file}' is empty or invalid"
     try:

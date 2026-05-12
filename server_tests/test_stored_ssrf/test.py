@@ -30,6 +30,10 @@ Test Steps:
     - IPv4: 169.254.169.254, 100.100.100.200
     - IPv6: ::ffff:169.254.169.254, ::ffff:100.100.100.200, fd00:ec2::254, and various canonical forms
 13. For each IP, update /etc/hosts and verify that requests are blocked
+14. Test trailing-dot hostnames (FQDN form: "host." == "host" in DNS):
+    - evil-stored-ssrf-hostname. should still be blocked
+    - metadata.google.internal. should still be treated as trusted (not blocked)
+    - metadata.goog. should still be treated as trusted (not blocked)
 
 '''
 
@@ -41,6 +45,10 @@ def save_etc_hosts(target_container_name: str):
         f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.google.internal >> /tmp/hosts.original'", shell=True)
     subprocess.run(
         f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.goog >> /tmp/hosts.original'", shell=True)
+    subprocess.run(
+        f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.google.internal. >> /tmp/hosts.original'", shell=True)
+    subprocess.run(
+        f"docker exec  -u 0 {target_container_name} sh -c 'echo 169.254.169.254 metadata.goog. >> /tmp/hosts.original'", shell=True)
     time.sleep(1)
 
 
@@ -163,6 +171,26 @@ def run_test(s: TestServer, c: CoreApi, target_container_name: str):
 
     # 169.254.169.254 (url=3) is an IP, not a hostname resolution spoofing case, should not be blocked
     check_stored_ssrf_with_url(collector, s, "169.254.169.254", 3)
+
+    # Trailing dot tests: in DNS, "host." is the FQDN form of "host" and resolves identically.
+    # The firewall must normalize trailing dots so attackers can't bypass detection.
+
+    # evil-stored-ssrf-hostname. (url=4) — trailing dot on evil hostname, should still be blocked
+    set_etc_hosts(target_container_name, "169.254.169.254",
+                  "evil-stored-ssrf-hostname.")
+    response = s.post("/api/stored_ssrf", {"urlIndex": 4}, timeout=10)
+    collector.soft_assert_response_code_is(
+        response, 500,
+        f"evil-stored-ssrf-hostname. (trailing dot) should be blocked [{response.text}]")
+    collector.soft_assert_response_body_contains(
+        response, "blocked",
+        f"evil-stored-ssrf-hostname. (trailing dot) should be blocked [{response.text}]")
+
+    # metadata.google.internal. (url=5) — trailing dot on trusted host, should NOT be blocked
+    check_stored_ssrf_with_url(collector, s, "metadata.google.internal.", 5)
+
+    # metadata.goog. (url=6) — trailing dot on trusted host, should NOT be blocked
+    check_stored_ssrf_with_url(collector, s, "metadata.goog.", 6)
 
     collector.raise_if_failures()
 

@@ -1123,6 +1123,24 @@ function requireErrors () {
 	  [kSecureProxyConnectionError] = true
 	}
 
+	const kMessageSizeExceededError = Symbol.for('undici.error.UND_ERR_WS_MESSAGE_SIZE_EXCEEDED');
+	class MessageSizeExceededError extends UndiciError {
+	  constructor (message) {
+	    super(message);
+	    this.name = 'MessageSizeExceededError';
+	    this.message = message || 'Max decompressed message size exceeded';
+	    this.code = 'UND_ERR_WS_MESSAGE_SIZE_EXCEEDED';
+	  }
+
+	  static [Symbol.hasInstance] (instance) {
+	    return instance && instance[kMessageSizeExceededError] === true
+	  }
+
+	  get [kMessageSizeExceededError] () {
+	    return true
+	  }
+	}
+
 	errors = {
 	  AbortError,
 	  HTTPParserError,
@@ -1146,7 +1164,8 @@ function requireErrors () {
 	  ResponseExceededMaxSizeError,
 	  RequestRetryError,
 	  ResponseError,
-	  SecureProxyConnectionError
+	  SecureProxyConnectionError,
+	  MessageSizeExceededError
 	};
 	return errors;
 }
@@ -2447,6 +2466,10 @@ function requireRequest$2 () {
 	      throw new InvalidArgumentError('upgrade must be a string')
 	    }
 
+	    if (upgrade && !isValidHeaderValue(upgrade)) {
+	      throw new InvalidArgumentError('invalid upgrade header')
+	    }
+
 	    if (headersTimeout != null && (!Number.isFinite(headersTimeout) || headersTimeout < 0)) {
 	      throw new InvalidArgumentError('invalid headersTimeout')
 	    }
@@ -2741,13 +2764,19 @@ function requireRequest$2 () {
 	    val = `${val}`;
 	  }
 
-	  if (request.host === null && headerName === 'host') {
+	  if (headerName === 'host') {
+	    if (request.host !== null) {
+	      throw new InvalidArgumentError('duplicate host header')
+	    }
 	    if (typeof val !== 'string') {
 	      throw new InvalidArgumentError('invalid host header')
 	    }
 	    // Consumed by Client
 	    request.host = val;
-	  } else if (request.contentLength === null && headerName === 'content-length') {
+	  } else if (headerName === 'content-length') {
+	    if (request.contentLength !== null) {
+	      throw new InvalidArgumentError('duplicate content-length header')
+	    }
 	    request.contentLength = parseInt(val, 10);
 	    if (!Number.isFinite(request.contentLength)) {
 	      throw new InvalidArgumentError('invalid content-length header')
@@ -25104,6 +25133,12 @@ function requireUtil$1 () {
 	 * @param {string} value
 	 */
 	function isValidClientWindowBits (value) {
+	  // Must have at least one character
+	  if (value.length === 0) {
+	    return false
+	  }
+
+	  // Check all characters are ASCII digits
 	  for (let i = 0; i < value.length; i++) {
 	    const byte = value.charCodeAt(i);
 
@@ -25112,7 +25147,9 @@ function requireUtil$1 () {
 	    }
 	  }
 
-	  return true
+	  // Check numeric range: zlib requires windowBits in range 8-15
+	  const num = Number.parseInt(value, 10);
+	  return num >= 8 && num <= 15
 	}
 
 	// https://nodejs.org/api/intl.html#detecting-internationalization-support
@@ -25642,10 +25679,14 @@ function requirePermessageDeflate () {
 
 	const { createInflateRaw, Z_DEFAULT_WINDOWBITS } = require$$1$4;
 	const { isValidClientWindowBits } = requireUtil$1();
+	const { MessageSizeExceededError } = requireErrors();
 
 	const tail = Buffer.from([0x00, 0x00, 0xff, 0xff]);
 	const kBuffer = Symbol('kBuffer');
 	const kLength = Symbol('kLength');
+
+	// Default maximum decompressed message size: 4 MB
+	const kDefaultMaxDecompressedSize = 4 * 1024 * 1024;
 
 	class PerMessageDeflate {
 	  /** @type {import('node:zlib').InflateRaw} */
@@ -25653,9 +25694,23 @@ function requirePermessageDeflate () {
 
 	  #options = {}
 
-	  constructor (extensions) {
+	  /** @type {number} */
+	  #maxDecompressedSize
+
+	  /** @type {boolean} */
+	  #aborted = false
+
+	  /** @type {Function|null} */
+	  #currentCallback = null
+
+	  /**
+	   * @param {Map<string, string>} extensions
+	   * @param {{ maxDecompressedMessageSize?: number }} [options]
+	   */
+	  constructor (extensions, options = {}) {
 	    this.#options.serverNoContextTakeover = extensions.has('server_no_context_takeover');
 	    this.#options.serverMaxWindowBits = extensions.get('server_max_window_bits');
+	    this.#maxDecompressedSize = options.maxDecompressedMessageSize ?? kDefaultMaxDecompressedSize;
 	  }
 
 	  decompress (chunk, fin, callback) {
@@ -25663,6 +25718,11 @@ function requirePermessageDeflate () {
 	    // 1.  Append 4 octets of 0x00 0x00 0xff 0xff to the tail end of the
 	    //     payload of the message.
 	    // 2.  Decompress the resulting data using DEFLATE.
+
+	    if (this.#aborted) {
+	      callback(new MessageSizeExceededError());
+	      return
+	    }
 
 	    if (!this.#inflate) {
 	      let windowBits = Z_DEFAULT_WINDOWBITS;
@@ -25676,13 +25736,37 @@ function requirePermessageDeflate () {
 	        windowBits = Number.parseInt(this.#options.serverMaxWindowBits);
 	      }
 
-	      this.#inflate = createInflateRaw({ windowBits });
+	      try {
+	        this.#inflate = createInflateRaw({ windowBits });
+	      } catch (err) {
+	        callback(err);
+	        return
+	      }
 	      this.#inflate[kBuffer] = [];
 	      this.#inflate[kLength] = 0;
 
 	      this.#inflate.on('data', (data) => {
-	        this.#inflate[kBuffer].push(data);
+	        if (this.#aborted) {
+	          return
+	        }
+
 	        this.#inflate[kLength] += data.length;
+
+	        if (this.#inflate[kLength] > this.#maxDecompressedSize) {
+	          this.#aborted = true;
+	          this.#inflate.removeAllListeners();
+	          this.#inflate.destroy();
+	          this.#inflate = null;
+
+	          if (this.#currentCallback) {
+	            const cb = this.#currentCallback;
+	            this.#currentCallback = null;
+	            cb(new MessageSizeExceededError());
+	          }
+	          return
+	        }
+
+	        this.#inflate[kBuffer].push(data);
 	      });
 
 	      this.#inflate.on('error', (err) => {
@@ -25691,16 +25775,22 @@ function requirePermessageDeflate () {
 	      });
 	    }
 
+	    this.#currentCallback = callback;
 	    this.#inflate.write(chunk);
 	    if (fin) {
 	      this.#inflate.write(tail);
 	    }
 
 	    this.#inflate.flush(() => {
+	      if (this.#aborted || !this.#inflate) {
+	        return
+	      }
+
 	      const full = Buffer.concat(this.#inflate[kBuffer], this.#inflate[kLength]);
 
 	      this.#inflate[kBuffer].length = 0;
 	      this.#inflate[kLength] = 0;
+	      this.#currentCallback = null;
 
 	      callback(null, full);
 	    });
@@ -25755,14 +25845,23 @@ function requireReceiver () {
 	  /** @type {Map<string, PerMessageDeflate>} */
 	  #extensions
 
-	  constructor (ws, extensions) {
+	  /** @type {{ maxDecompressedMessageSize?: number }} */
+	  #options
+
+	  /**
+	   * @param {import('./websocket').WebSocket} ws
+	   * @param {Map<string, string>|null} extensions
+	   * @param {{ maxDecompressedMessageSize?: number }} [options]
+	   */
+	  constructor (ws, extensions, options = {}) {
 	    super();
 
 	    this.ws = ws;
 	    this.#extensions = extensions == null ? new Map() : extensions;
+	    this.#options = options;
 
 	    if (this.#extensions.has('permessage-deflate')) {
-	      this.#extensions.set('permessage-deflate', new PerMessageDeflate(extensions));
+	      this.#extensions.set('permessage-deflate', new PerMessageDeflate(extensions, options));
 	    }
 	  }
 
@@ -25897,6 +25996,7 @@ function requireReceiver () {
 
 	        const buffer = this.consume(8);
 	        const upper = buffer.readUInt32BE(0);
+	        const lower = buffer.readUInt32BE(4);
 
 	        // 2^31 is the maximum bytes an arraybuffer can contain
 	        // on 32-bit systems. Although, on 64-bit systems, this is
@@ -25904,14 +26004,12 @@ function requireReceiver () {
 	        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors/Invalid_array_length
 	        // https://source.chromium.org/chromium/chromium/src/+/main:v8/src/common/globals.h;drc=1946212ac0100668f14eb9e2843bdd846e510a1e;bpv=1;bpt=1;l=1275
 	        // https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/js-array-buffer.h;l=34;drc=1946212ac0100668f14eb9e2843bdd846e510a1e
-	        if (upper > 2 ** 31 - 1) {
+	        if (upper !== 0 || lower > 2 ** 31 - 1) {
 	          failWebsocketConnection(this.ws, 'Received payload length > 2^31 bytes.');
 	          return
 	        }
 
-	        const lower = buffer.readUInt32BE(4);
-
-	        this.#info.payloadLength = (upper << 8) + lower;
+	        this.#info.payloadLength = lower;
 	        this.#state = parserStates.READ_DATA;
 	      } else if (this.#state === parserStates.READ_DATA) {
 	        if (this.#byteOffset < this.#info.payloadLength) {
@@ -25941,7 +26039,7 @@ function requireReceiver () {
 	          } else {
 	            this.#extensions.get('permessage-deflate').decompress(body, this.#info.fin, (error, data) => {
 	              if (error) {
-	                closeWebSocketConnection(this.ws, 1007, error.message, error.message.length);
+	                failWebsocketConnection(this.ws, error.message);
 	                return
 	              }
 
@@ -26306,6 +26404,9 @@ function requireWebsocket () {
 	  /** @type {SendQueue} */
 	  #sendQueue
 
+	  /** @type {{ maxDecompressedMessageSize?: number }} */
+	  #options
+
 	  /**
 	   * @param {string} url
 	   * @param {string|string[]} protocols
@@ -26378,6 +26479,11 @@ function requireWebsocket () {
 
 	    // 10. Set this's url to urlRecord.
 	    this[kWebSocketURL] = new URL(urlRecord.href);
+
+	    // Store options for later use (e.g., maxDecompressedMessageSize)
+	    this.#options = {
+	      maxDecompressedMessageSize: options.maxDecompressedMessageSize
+	    };
 
 	    // 11. Let client be this's relevant settings object.
 	    const client = environmentSettingsObject.settingsObject;
@@ -26693,11 +26799,11 @@ function requireWebsocket () {
 	   * @see https://websockets.spec.whatwg.org/#feedback-from-the-protocol
 	   */
 	  #onConnectionEstablished (response, parsedExtensions) {
-	    // processResponse is called when the "response’s header list has been received and initialized."
+	    // processResponse is called when the "response's header list has been received and initialized."
 	    // once this happens, the connection is open
 	    this[kResponse] = response;
 
-	    const parser = new ByteParser(this, parsedExtensions);
+	    const parser = new ByteParser(this, parsedExtensions, this.#options);
 	    parser.on('drain', onParserDrain);
 	    parser.on('error', onParserError.bind(this));
 
@@ -26800,6 +26906,19 @@ function requireWebsocket () {
 	  {
 	    key: 'headers',
 	    converter: webidl.nullableConverter(webidl.converters.HeadersInit)
+	  },
+	  {
+	    key: 'maxDecompressedMessageSize',
+	    converter: webidl.nullableConverter((V) => {
+	      V = webidl.converters['unsigned long long'](V);
+	      if (V <= 0) {
+	        throw webidl.errors.exception({
+	          header: 'WebSocket constructor',
+	          message: 'maxDecompressedMessageSize must be greater than 0'
+	        })
+	      }
+	      return V
+	    })
 	  }
 	]);
 
@@ -64550,7 +64669,7 @@ function requireDist () {
 	if (hasRequiredDist) return dist;
 	hasRequiredDist = 1;
 	Object.defineProperty(dist, "__esModule", { value: true });
-	dist.TokenData = void 0;
+	dist.PathError = dist.TokenData = void 0;
 	dist.parse = parse;
 	dist.compile = compile;
 	dist.match = match;
@@ -64560,25 +64679,12 @@ function requireDist () {
 	const NOOP_VALUE = (value) => value;
 	const ID_START = /^[$_\p{ID_Start}]$/u;
 	const ID_CONTINUE = /^[$\u200c\u200d\p{ID_Continue}]$/u;
-	const DEBUG_URL = "https://git.new/pathToRegexpError";
-	const SIMPLE_TOKENS = {
-	    // Groups.
-	    "{": "{",
-	    "}": "}",
-	    // Reserved.
-	    "(": "(",
-	    ")": ")",
-	    "[": "[",
-	    "]": "]",
-	    "+": "+",
-	    "?": "?",
-	    "!": "!",
-	};
+	const ID = /^[$_\p{ID_Start}][$\u200c\u200d\p{ID_Continue}]*$/u;
 	/**
 	 * Escape text for stringify to path.
 	 */
 	function escapeText(str) {
-	    return str.replace(/[{}()\[\]+?!:*]/g, "\\$&");
+	    return str.replace(/[{}()\[\]+?!:*\\]/g, "\\$&");
 	}
 	/**
 	 * Escape a regular expression string.
@@ -64587,161 +64693,131 @@ function requireDist () {
 	    return str.replace(/[.+*?^${}()[\]|/\\]/g, "\\$&");
 	}
 	/**
-	 * Tokenize input string.
-	 */
-	function* lexer(str) {
-	    const chars = [...str];
-	    let i = 0;
-	    function name() {
-	        let value = "";
-	        if (ID_START.test(chars[++i])) {
-	            value += chars[i];
-	            while (ID_CONTINUE.test(chars[++i])) {
-	                value += chars[i];
-	            }
-	        }
-	        else if (chars[i] === '"') {
-	            let pos = i;
-	            while (i < chars.length) {
-	                if (chars[++i] === '"') {
-	                    i++;
-	                    pos = 0;
-	                    break;
-	                }
-	                if (chars[i] === "\\") {
-	                    value += chars[++i];
-	                }
-	                else {
-	                    value += chars[i];
-	                }
-	            }
-	            if (pos) {
-	                throw new TypeError(`Unterminated quote at ${pos}: ${DEBUG_URL}`);
-	            }
-	        }
-	        if (!value) {
-	            throw new TypeError(`Missing parameter name at ${i}: ${DEBUG_URL}`);
-	        }
-	        return value;
-	    }
-	    while (i < chars.length) {
-	        const value = chars[i];
-	        const type = SIMPLE_TOKENS[value];
-	        if (type) {
-	            yield { type, index: i++, value };
-	        }
-	        else if (value === "\\") {
-	            yield { type: "ESCAPED", index: i++, value: chars[i++] };
-	        }
-	        else if (value === ":") {
-	            const value = name();
-	            yield { type: "PARAM", index: i, value };
-	        }
-	        else if (value === "*") {
-	            const value = name();
-	            yield { type: "WILDCARD", index: i, value };
-	        }
-	        else {
-	            yield { type: "CHAR", index: i, value: chars[i++] };
-	        }
-	    }
-	    return { type: "END", index: i, value: "" };
-	}
-	class Iter {
-	    constructor(tokens) {
-	        this.tokens = tokens;
-	    }
-	    peek() {
-	        if (!this._peek) {
-	            const next = this.tokens.next();
-	            this._peek = next.value;
-	        }
-	        return this._peek;
-	    }
-	    tryConsume(type) {
-	        const token = this.peek();
-	        if (token.type !== type)
-	            return;
-	        this._peek = undefined; // Reset after consumed.
-	        return token.value;
-	    }
-	    consume(type) {
-	        const value = this.tryConsume(type);
-	        if (value !== undefined)
-	            return value;
-	        const { type: nextType, index } = this.peek();
-	        throw new TypeError(`Unexpected ${nextType} at ${index}, expected ${type}: ${DEBUG_URL}`);
-	    }
-	    text() {
-	        let result = "";
-	        let value;
-	        while ((value = this.tryConsume("CHAR") || this.tryConsume("ESCAPED"))) {
-	            result += value;
-	        }
-	        return result;
-	    }
-	}
-	/**
 	 * Tokenized path instance.
 	 */
 	class TokenData {
-	    constructor(tokens) {
+	    constructor(tokens, originalPath) {
 	        this.tokens = tokens;
+	        this.originalPath = originalPath;
 	    }
 	}
 	dist.TokenData = TokenData;
+	/**
+	 * ParseError is thrown when there is an error processing the path.
+	 */
+	class PathError extends TypeError {
+	    constructor(message, originalPath) {
+	        let text = message;
+	        if (originalPath)
+	            text += `: ${originalPath}`;
+	        text += `; visit https://git.new/pathToRegexpError for info`;
+	        super(text);
+	        this.originalPath = originalPath;
+	    }
+	}
+	dist.PathError = PathError;
 	/**
 	 * Parse a string for the raw tokens.
 	 */
 	function parse(str, options = {}) {
 	    const { encodePath = NOOP_VALUE } = options;
-	    const it = new Iter(lexer(str));
-	    function consume(endType) {
-	        const tokens = [];
-	        while (true) {
-	            const path = it.text();
-	            if (path)
-	                tokens.push({ type: "text", value: encodePath(path) });
-	            const param = it.tryConsume("PARAM");
-	            if (param) {
-	                tokens.push({
-	                    type: "param",
-	                    name: param,
-	                });
-	                continue;
-	            }
-	            const wildcard = it.tryConsume("WILDCARD");
-	            if (wildcard) {
-	                tokens.push({
-	                    type: "wildcard",
-	                    name: wildcard,
-	                });
-	                continue;
-	            }
-	            const open = it.tryConsume("{");
-	            if (open) {
-	                tokens.push({
-	                    type: "group",
-	                    tokens: consume("}"),
-	                });
-	                continue;
-	            }
-	            it.consume(endType);
-	            return tokens;
+	    const chars = [...str];
+	    let index = 0;
+	    function consumeUntil(end) {
+	        const output = [];
+	        let path = "";
+	        function writePath() {
+	            if (!path)
+	                return;
+	            output.push({
+	                type: "text",
+	                value: encodePath(path),
+	            });
+	            path = "";
 	        }
+	        while (index < chars.length) {
+	            const value = chars[index++];
+	            if (value === end) {
+	                writePath();
+	                return output;
+	            }
+	            if (value === "\\") {
+	                if (index === chars.length) {
+	                    throw new PathError(`Unexpected end after \\ at index ${index}`, str);
+	                }
+	                path += chars[index++];
+	                continue;
+	            }
+	            if (value === ":" || value === "*") {
+	                const type = value === ":" ? "param" : "wildcard";
+	                let name = "";
+	                if (ID_START.test(chars[index])) {
+	                    do {
+	                        name += chars[index++];
+	                    } while (ID_CONTINUE.test(chars[index]));
+	                }
+	                else if (chars[index] === '"') {
+	                    let quoteStart = index;
+	                    while (index < chars.length) {
+	                        if (chars[++index] === '"') {
+	                            index++;
+	                            quoteStart = 0;
+	                            break;
+	                        }
+	                        // Increment over escape characters.
+	                        if (chars[index] === "\\")
+	                            index++;
+	                        name += chars[index];
+	                    }
+	                    if (quoteStart) {
+	                        throw new PathError(`Unterminated quote at index ${quoteStart}`, str);
+	                    }
+	                }
+	                if (!name) {
+	                    throw new PathError(`Missing parameter name at index ${index}`, str);
+	                }
+	                writePath();
+	                output.push({ type, name });
+	                continue;
+	            }
+	            if (value === "{") {
+	                writePath();
+	                output.push({
+	                    type: "group",
+	                    tokens: consumeUntil("}"),
+	                });
+	                continue;
+	            }
+	            if (value === "}" ||
+	                value === "(" ||
+	                value === ")" ||
+	                value === "[" ||
+	                value === "]" ||
+	                value === "+" ||
+	                value === "?" ||
+	                value === "!") {
+	                throw new PathError(`Unexpected ${value} at index ${index - 1}`, str);
+	            }
+	            path += value;
+	        }
+	        if (end) {
+	            throw new PathError(`Unexpected end at index ${index}, expected ${end}`, str);
+	        }
+	        writePath();
+	        return output;
 	    }
-	    const tokens = consume("END");
-	    return new TokenData(tokens);
+	    return new TokenData(consumeUntil(""), str);
 	}
 	/**
 	 * Compile a string to a template function for the path.
 	 */
 	function compile(path, options = {}) {
 	    const { encode = encodeURIComponent, delimiter = DEFAULT_DELIMITER } = options;
-	    const data = path instanceof TokenData ? path : parse(path, options);
+	    const data = typeof path === "object" ? path : parse(path, options);
 	    const fn = tokensToFunction(data.tokens, delimiter, encode);
-	    return function path(data = {}) {
-	        const [path, ...missing] = fn(data);
+	    return function path(params = {}) {
+	        const missing = [];
+	        const path = fn(params, missing);
 	        if (missing.length) {
 	            throw new TypeError(`Missing parameters: ${missing.join(", ")}`);
 	        }
@@ -64750,12 +64826,10 @@ function requireDist () {
 	}
 	function tokensToFunction(tokens, delimiter, encode) {
 	    const encoders = tokens.map((token) => tokenToFunction(token, delimiter, encode));
-	    return (data) => {
-	        const result = [""];
+	    return (data, missing) => {
+	        let result = "";
 	        for (const encoder of encoders) {
-	            const [value, ...extras] = encoder(data);
-	            result[0] += value;
-	            result.push(...extras);
+	            result += encoder(data, missing);
 	        }
 	        return result;
 	    };
@@ -64765,45 +64839,51 @@ function requireDist () {
 	 */
 	function tokenToFunction(token, delimiter, encode) {
 	    if (token.type === "text")
-	        return () => [token.value];
+	        return () => token.value;
 	    if (token.type === "group") {
 	        const fn = tokensToFunction(token.tokens, delimiter, encode);
-	        return (data) => {
-	            const [value, ...missing] = fn(data);
-	            if (!missing.length)
-	                return [value];
-	            return [""];
+	        return (data, missing) => {
+	            const len = missing.length;
+	            const value = fn(data, missing);
+	            if (missing.length === len)
+	                return value;
+	            missing.length = len; // Reset optional group.
+	            return "";
 	        };
 	    }
 	    const encodeValue = encode || NOOP_VALUE;
 	    if (token.type === "wildcard" && encode !== false) {
-	        return (data) => {
+	        return (data, missing) => {
 	            const value = data[token.name];
-	            if (value == null)
-	                return ["", token.name];
+	            if (value == null) {
+	                missing.push(token.name);
+	                return "";
+	            }
 	            if (!Array.isArray(value) || value.length === 0) {
 	                throw new TypeError(`Expected "${token.name}" to be a non-empty array`);
 	            }
-	            return [
-	                value
-	                    .map((value, index) => {
-	                    if (typeof value !== "string") {
-	                        throw new TypeError(`Expected "${token.name}/${index}" to be a string`);
-	                    }
-	                    return encodeValue(value);
-	                })
-	                    .join(delimiter),
-	            ];
+	            let result = "";
+	            for (let i = 0; i < value.length; i++) {
+	                if (typeof value[i] !== "string") {
+	                    throw new TypeError(`Expected "${token.name}/${i}" to be a string`);
+	                }
+	                if (i > 0)
+	                    result += delimiter;
+	                result += encodeValue(value[i]);
+	            }
+	            return result;
 	        };
 	    }
-	    return (data) => {
+	    return (data, missing) => {
 	        const value = data[token.name];
-	        if (value == null)
-	            return ["", token.name];
+	        if (value == null) {
+	            missing.push(token.name);
+	            return "";
+	        }
 	        if (typeof value !== "string") {
 	            throw new TypeError(`Expected "${token.name}" to be a string`);
 	        }
-	        return [encodeValue(value)];
+	        return encodeValue(value);
 	    };
 	}
 	/**
@@ -64835,120 +64915,187 @@ function requireDist () {
 	        return { path, params };
 	    };
 	}
+	/**
+	 * Transform a path into a regular expression and capture keys.
+	 */
 	function pathToRegexp(path, options = {}) {
 	    const { delimiter = DEFAULT_DELIMITER, end = true, sensitive = false, trailing = true, } = options;
 	    const keys = [];
-	    const sources = [];
-	    const flags = sensitive ? "" : "i";
-	    const paths = Array.isArray(path) ? path : [path];
-	    const items = paths.map((path) => path instanceof TokenData ? path : parse(path, options));
-	    for (const { tokens } of items) {
-	        for (const seq of flatten(tokens, 0, [])) {
-	            const regexp = sequenceToRegExp(seq, delimiter, keys);
-	            sources.push(regexp);
+	    let source = "";
+	    let combinations = 0;
+	    function process(path) {
+	        if (Array.isArray(path)) {
+	            for (const p of path)
+	                process(p);
+	            return;
 	        }
+	        const data = typeof path === "object" ? path : parse(path, options);
+	        flatten(data.tokens, 0, [], (tokens) => {
+	            if (combinations >= 256) {
+	                throw new PathError("Too many path combinations", data.originalPath);
+	            }
+	            if (combinations > 0)
+	                source += "|";
+	            source += toRegExpSource(tokens, delimiter, keys, data.originalPath);
+	            combinations++;
+	        });
 	    }
-	    let pattern = `^(?:${sources.join("|")})`;
+	    process(path);
+	    let pattern = `^(?:${source})`;
 	    if (trailing)
-	        pattern += `(?:${escape(delimiter)}$)?`;
-	    pattern += end ? "$" : `(?=${escape(delimiter)}|$)`;
-	    const regexp = new RegExp(pattern, flags);
-	    return { regexp, keys };
+	        pattern += "(?:" + escape(delimiter) + "$)?";
+	    pattern += end ? "$" : "(?=" + escape(delimiter) + "|$)";
+	    return { regexp: new RegExp(pattern, sensitive ? "" : "i"), keys };
 	}
 	/**
 	 * Generate a flat list of sequence tokens from the given tokens.
 	 */
-	function* flatten(tokens, index, init) {
-	    if (index === tokens.length) {
-	        return yield init;
-	    }
-	    const token = tokens[index];
-	    if (token.type === "group") {
-	        const fork = init.slice();
-	        for (const seq of flatten(token.tokens, 0, fork)) {
-	            yield* flatten(tokens, index + 1, seq);
+	function flatten(tokens, index, result, callback) {
+	    while (index < tokens.length) {
+	        const token = tokens[index++];
+	        if (token.type === "group") {
+	            const len = result.length;
+	            flatten(token.tokens, 0, result, (seq) => flatten(tokens, index, seq, callback));
+	            result.length = len;
+	            continue;
 	        }
+	        result.push(token);
 	    }
-	    else {
-	        init.push(token);
-	    }
-	    yield* flatten(tokens, index + 1, init);
+	    callback(result);
 	}
 	/**
 	 * Transform a flat sequence of tokens into a regular expression.
 	 */
-	function sequenceToRegExp(tokens, delimiter, keys) {
+	function toRegExpSource(tokens, delimiter, keys, originalPath) {
 	    let result = "";
 	    let backtrack = "";
-	    let isSafeSegmentParam = true;
-	    for (let i = 0; i < tokens.length; i++) {
-	        const token = tokens[i];
+	    let wildcardBacktrack = "";
+	    let prevCaptureType = 0;
+	    let hasSegmentCapture = 0;
+	    let index = 0;
+	    function hasInSegment(index, type) {
+	        while (index < tokens.length) {
+	            const token = tokens[index++];
+	            if (token.type === type)
+	                return true;
+	            if (token.type === "text") {
+	                if (token.value.includes(delimiter))
+	                    break;
+	            }
+	        }
+	        return false;
+	    }
+	    function peekText(index) {
+	        let result = "";
+	        while (index < tokens.length) {
+	            const token = tokens[index++];
+	            if (token.type !== "text")
+	                break;
+	            result += token.value;
+	        }
+	        return result;
+	    }
+	    while (index < tokens.length) {
+	        const token = tokens[index++];
 	        if (token.type === "text") {
 	            result += escape(token.value);
 	            backtrack += token.value;
-	            isSafeSegmentParam || (isSafeSegmentParam = token.value.includes(delimiter));
+	            if (prevCaptureType === 2)
+	                wildcardBacktrack += token.value;
+	            if (token.value.includes(delimiter))
+	                hasSegmentCapture = 0;
 	            continue;
 	        }
 	        if (token.type === "param" || token.type === "wildcard") {
-	            if (!isSafeSegmentParam && !backtrack) {
-	                throw new TypeError(`Missing text after "${token.name}": ${DEBUG_URL}`);
+	            if (prevCaptureType && !backtrack) {
+	                throw new PathError(`Missing text before "${token.name}" ${token.type}`, originalPath);
 	            }
 	            if (token.type === "param") {
-	                result += `(${negate(delimiter, isSafeSegmentParam ? "" : backtrack)}+)`;
+	                result +=
+	                    hasSegmentCapture & 2 // Seen wildcard in segment.
+	                        ? `(${negate(delimiter, backtrack)}+)`
+	                        : hasInSegment(index, "wildcard") // See wildcard later in segment.
+	                            ? `(${negate(delimiter, peekText(index))}+)`
+	                            : hasSegmentCapture & 1 // Seen parameter in segment.
+	                                ? `(${negate(delimiter, backtrack)}+|${escape(backtrack)})`
+	                                : `(${negate(delimiter, "")}+)`;
+	                hasSegmentCapture |= prevCaptureType = 1;
 	            }
 	            else {
-	                result += `([\\s\\S]+)`;
+	                result +=
+	                    hasSegmentCapture & 2 // Seen wildcard in segment.
+	                        ? `(${negate(backtrack, "")}+)`
+	                        : wildcardBacktrack // No capture in segment, seen wildcard in path.
+	                            ? `(${negate(wildcardBacktrack, "")}+|${negate(delimiter, "")}+)`
+	                            : `([^]+)`;
+	                wildcardBacktrack = "";
+	                hasSegmentCapture |= prevCaptureType = 2;
 	            }
 	            keys.push(token);
 	            backtrack = "";
-	            isSafeSegmentParam = false;
 	            continue;
 	        }
+	        throw new TypeError(`Unknown token type: ${token.type}`);
 	    }
 	    return result;
 	}
-	function negate(delimiter, backtrack) {
-	    if (backtrack.length < 2) {
-	        if (delimiter.length < 2)
-	            return `[^${escape(delimiter + backtrack)}]`;
-	        return `(?:(?!${escape(delimiter)})[^${escape(backtrack)}])`;
+	/**
+	 * Block backtracking on previous text/delimiter.
+	 */
+	function negate(a, b) {
+	    if (b.length > a.length)
+	        return negate(b, a); // Longest string first.
+	    if (a === b)
+	        b = ""; // Cleaner regex strings, no duplication.
+	    if (b.length > 1)
+	        return `(?:(?!${escape(a)}|${escape(b)})[^])`;
+	    if (a.length > 1)
+	        return `(?:(?!${escape(a)})[^${escape(b)}])`;
+	    return `[^${escape(a + b)}]`;
+	}
+	/**
+	 * Stringify an array of tokens into a path string.
+	 */
+	function stringifyTokens(tokens, index) {
+	    let value = "";
+	    while (index < tokens.length) {
+	        const token = tokens[index++];
+	        if (token.type === "text") {
+	            value += escapeText(token.value);
+	            continue;
+	        }
+	        if (token.type === "group") {
+	            value += "{" + stringifyTokens(token.tokens, 0) + "}";
+	            continue;
+	        }
+	        if (token.type === "param") {
+	            value += ":" + stringifyName(token.name, tokens[index]);
+	            continue;
+	        }
+	        if (token.type === "wildcard") {
+	            value += "*" + stringifyName(token.name, tokens[index]);
+	            continue;
+	        }
+	        throw new TypeError(`Unknown token type: ${token.type}`);
 	    }
-	    if (delimiter.length < 2) {
-	        return `(?:(?!${escape(backtrack)})[^${escape(delimiter)}])`;
-	    }
-	    return `(?:(?!${escape(backtrack)}|${escape(delimiter)})[\\s\\S])`;
+	    return value;
 	}
 	/**
 	 * Stringify token data into a path string.
 	 */
 	function stringify(data) {
-	    return data.tokens
-	        .map(function stringifyToken(token, index, tokens) {
-	        if (token.type === "text")
-	            return escapeText(token.value);
-	        if (token.type === "group") {
-	            return `{${token.tokens.map(stringifyToken).join("")}}`;
-	        }
-	        const isSafe = isNameSafe(token.name) && isNextNameSafe(tokens[index + 1]);
-	        const key = isSafe ? token.name : JSON.stringify(token.name);
-	        if (token.type === "param")
-	            return `:${key}`;
-	        if (token.type === "wildcard")
-	            return `*${key}`;
-	        throw new TypeError(`Unexpected token: ${token}`);
-	    })
-	        .join("");
+	    return stringifyTokens(data.tokens, 0);
 	}
-	function isNameSafe(name) {
-	    const [first, ...rest] = name;
-	    if (!ID_START.test(first))
-	        return false;
-	    return rest.every((char) => ID_CONTINUE.test(char));
-	}
-	function isNextNameSafe(token) {
-	    if ((token === null || token === void 0 ? void 0 : token.type) !== "text")
-	        return true;
-	    return !ID_CONTINUE.test(token.value[0]);
+	/**
+	 * Stringify a parameter name, escaping when it cannot be emitted directly.
+	 */
+	function stringifyName(name, next) {
+	    if (!ID.test(name))
+	        return JSON.stringify(name);
+	    if ((next === null || next === void 0 ? void 0 : next.type) === "text" && ID_CONTINUE.test(next.value[0])) {
+	        return JSON.stringify(name);
+	    }
+	    return name;
 	}
 	
 	return dist;

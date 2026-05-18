@@ -75,4 +75,5 @@ npm run local-action-nodejs -- test_sql_injection
 npm run local-action-php -- test_shell_injection,test_path_traversal
 ```
 
-Each language has a corresponding `.env.example.<lang>` file where you can adjust the Dockerfile path, parallelism, timeouts, etc.
+Each language has a corresponding `.env.example.<lang>` file where you can
+adjust the Dockerfile path, parallelism, timeouts, etc.

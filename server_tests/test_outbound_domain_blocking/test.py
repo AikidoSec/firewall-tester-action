@@ -5,7 +5,7 @@ Tests the outbound domain blocking feature:
 
 1. Tests that explicitly blocked domains are always blocked
 2. Tests that bypassed IPs (allowedIPAddresses) can access any domain including blocked ones and new domains
-3. Tests that forceProtectionOff does not affect outbound domain blocking
+3. Tests that forceProtectionOff bypasses outbound domain blocking for matching endpoints
 4. Tests that allowed domains can be accessed when blockNewOutgoingRequests is true
 5. Tests that new/unknown domains are blocked when blockNewOutgoingRequests is true
 6. Tests case-insensitive hostname matching (uppercase and mixed case)
@@ -105,13 +105,11 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is_not(
         response, 500, f"{response.text} - bypassed IP address should be allowed for new domains")
 
-    """Test that force protection off does not affect outbound domain blocking"""
+    """Test that force protection off bypasses outbound domain blocking"""
     response = s.post("/api/request2",
                       {"url": "http://evil.example.com/test"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - force protection off should not affect outbound domain blocking")
-    collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection")
+        response, 200, f"{response.text} - force protection off should bypass outbound domain blocking")
 
     """Test that allowed domains can be accessed when blockNewOutgoingRequests is true"""
     response = s.post("/api/request", {"url": "http://safe.example.com"})

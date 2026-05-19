@@ -85,36 +85,59 @@ else:
     POSTGRES_USER = "postgres"
     POSTGRES_PASSWORD = "postgres"
 
-def get_docker_host_ip() -> str:
-    # Covers all local scenarios (linux, macos, windows)
-    network_name = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
+TEST_NETWORK_NAME = "firewall-tester-action-network"
+TEST_NETWORK_DRIVER = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
+TEST_NETWORK_SUBNET = "172.31.255.0/24"
+TEST_NETWORK_GATEWAY = "172.31.255.1"
+POSTGRES_HOST = "172.31.255.2"
+DOCKER_HOST = TEST_NETWORK_GATEWAY
 
-    result = run_process_with_retries(
-        ["docker", "network", "inspect", network_name],
+
+def create_test_network() -> None:
+    subprocess.run(
+        ["docker", "network", "rm", TEST_NETWORK_NAME],
+        check=False,
         capture_output=True,
-        text=True,
+    )
+    subprocess.run(
+        [
+            "docker",
+            "network",
+            "create",
+            "--driver",
+            TEST_NETWORK_DRIVER,
+            "--subnet",
+            TEST_NETWORK_SUBNET,
+            "--gateway",
+            TEST_NETWORK_GATEWAY,
+            TEST_NETWORK_NAME,
+        ],
         check=True,
-        timeout=30,
+    )
+    logger.info(
+        f"Created Docker test network {TEST_NETWORK_NAME} "
+        f"({TEST_NETWORK_DRIVER}, gateway {TEST_NETWORK_GATEWAY})"
     )
 
-    networks = json.loads(result.stdout)
-    ipam_configs = networks[0].get("IPAM", {}).get("Config", [])
-    gateway = ipam_configs[0].get("Gateway")
 
-    if not gateway:
-        raise RuntimeError(
-            f"Could not determine gateway for docker network '{network_name}'"
-        )
-
-    return gateway
-
-DOCKER_HOST_IP = get_docker_host_ip()
+def remove_test_network() -> None:
+    subprocess.run(
+        ["docker", "network", "rm", TEST_NETWORK_NAME],
+        check=False,
+        capture_output=True,
+    )
 
 
 def start_postgres() -> None:
-    docker_args = ["docker", "run", "--rm", "--name", "postgres",
-                   "-e", f"POSTGRES_USER={POSTGRES_USER}", "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
-                   "-e", "POSTGRES_DB=mydb", "-p", "5432:5432", "-d", POSTGRES_IMAGE]
+    docker_args = [
+        "docker", "run", "--rm", "--name", "postgres",
+        "--network", TEST_NETWORK_NAME, "--ip", POSTGRES_HOST,
+        "-e", f"POSTGRES_USER={POSTGRES_USER}",
+        "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
+        "-e", "POSTGRES_DB=mydb",
+        "-p", "5432:5432",
+        "-d", POSTGRES_IMAGE
+    ]
 
     subprocess.run(docker_args, check=True)
     logger.info("Started Postgres container")
@@ -163,25 +186,6 @@ def wait_for_running_container(container_name: str, timeout_seconds: int = 20) -
         f"Container {container_name} did not start after {timeout_seconds} seconds"
     )
 
-
-def get_running_container_ip(container_name: str, timeout_seconds: int = 20) -> str:
-    wait_for_running_container(container_name, timeout_seconds=timeout_seconds)
-
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        result = subprocess.run(
-            ["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_name],
-            capture_output=True,
-            text=True,
-        )
-        ip_address = result.stdout.strip()
-        if result.returncode == 0 and ip_address:
-            return ip_address
-        time.sleep(1)
-
-    raise RuntimeError(
-        f"Could not determine IP address for container {container_name}"
-    )
 
 def create_test_database(test_dir: str) -> None:
     create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb",
@@ -292,10 +296,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
             "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_URL": f"http://{DOCKER_HOST_IP}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST_IP}:3000",
+            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST}:3000",
+            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST}:3000",
+            "AIKIDO_URL": f"http://{DOCKER_HOST}:3000",
+            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST}:3000",
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
@@ -311,6 +315,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         command = (
             f"docker run -d "
             f"{sanitize_extra_run_args(extra_args)} "
+            f"--network {TEST_NETWORK_NAME} "
             f"--env-file {env_file_path} "
             f"--name {test_dir} "
             f"-p {start_port}:{app_port} "
@@ -689,8 +694,8 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
 def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
     logger.debug(f"Dockerfile path: {dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    docker_postgres_host = get_running_container_ip("postgres")
-    logger.info(f"Using postgres container IP: {docker_postgres_host}:5432")
+    docker_postgres_host = POSTGRES_HOST
+    logger.info(f"Using postgres host: {docker_postgres_host}:5432")
     build_docker_image(dockerfile_path, extra_build_args)
     if test_type == "control":
         dir_start = "control_"
@@ -824,9 +829,13 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
-    start_postgres()
+    create_test_network()
     try:
-        run_tests(args.dockerfile_path, args.max_parallel_tests,
-                  args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+        start_postgres()
+        try:
+            run_tests(args.dockerfile_path, args.max_parallel_tests,
+                      args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+        finally:
+            stop_postgres()
     finally:
-        stop_postgres()
+        remove_test_network()

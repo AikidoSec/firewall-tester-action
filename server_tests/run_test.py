@@ -17,9 +17,29 @@ import shlex
 import re
 import io
 import html
+from helpers.docker_helpers import (
+    create_network,
+    docker_network_driver,
+    remove_container,
+    remove_network,
+    wait_for_docker_ready,
+)
+from helpers.imds_helpers import start_mock_imds_servers, stop_mock_imds_servers
+from helpers.postgres_helpers import (
+    POSTGRES_PASSWORD,
+    POSTGRES_USER,
+    create_test_database,
+    start_postgres,
+    stop_postgres,
+)
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+TEST_NETWORK_NAME = "firewall-tester-action-network"
+TEST_NETWORK_SUBNET = "172.31.255.0/24"
+TEST_NETWORK_GATEWAY = "172.31.255.1"
+POSTGRES_HOST = "172.31.255.2"
+DOCKER_HOST = TEST_NETWORK_GATEWAY
 
 
 class GitHubActionsFormatter(logging.Formatter):
@@ -55,142 +75,18 @@ def get_logger(name: str = "github_actions_logger") -> logging.Logger:
 logger = get_logger()
 
 
-def run_process_with_retries(*args, attempts: int = 3, retry_delay_seconds: int = 10, **kwargs):
-    for attempt in range(1, attempts + 1):
-        try:
-            return subprocess.run(*args, **kwargs)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-            logger.warning(
-                f"Command failed (attempt {attempt}/{attempts}): {error}. "
-                f"Retrying in {retry_delay_seconds} seconds..."
-            )
-            time.sleep(retry_delay_seconds)
-    raise RuntimeError(f"Command failed after {attempts} attempts")
-
-
-DOCKER_OSTYPE = run_process_with_retries(
-    ["docker", "info", "--format", "{{.OSType}}"],
-    capture_output=True,
-    text=True,
-    check=True,
-    timeout=30,
-).stdout.strip().lower()
-
-if DOCKER_OSTYPE == "linux":
-    POSTGRES_IMAGE = "postgres"
-    POSTGRES_USER = "myuser"
-    POSTGRES_PASSWORD = "mysecretpassword"
-else:
-    POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
-    POSTGRES_USER = "postgres"
-    POSTGRES_PASSWORD = "postgres"
-
-TEST_NETWORK_NAME = "firewall-tester-action-network"
-TEST_NETWORK_DRIVER = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
-TEST_NETWORK_SUBNET = "172.31.255.0/24"
-TEST_NETWORK_GATEWAY = "172.31.255.1"
-POSTGRES_HOST = "172.31.255.2"
-DOCKER_HOST = TEST_NETWORK_GATEWAY
-
-
 def create_test_network() -> None:
-    subprocess.run(
-        ["docker", "network", "rm", TEST_NETWORK_NAME],
-        check=False,
-        capture_output=True,
-    )
-    subprocess.run(
-        [
-            "docker",
-            "network",
-            "create",
-            "--driver",
-            TEST_NETWORK_DRIVER,
-            "--subnet",
-            TEST_NETWORK_SUBNET,
-            "--gateway",
-            TEST_NETWORK_GATEWAY,
-            TEST_NETWORK_NAME,
-        ],
-        check=True,
-    )
+    remove_network(TEST_NETWORK_NAME)
+    create_network(TEST_NETWORK_NAME, TEST_NETWORK_SUBNET, gateway=TEST_NETWORK_GATEWAY)
     logger.info(
         f"Created Docker test network {TEST_NETWORK_NAME} "
-        f"({TEST_NETWORK_DRIVER}, gateway {TEST_NETWORK_GATEWAY})"
+        f"({docker_network_driver()}, gateway {TEST_NETWORK_GATEWAY})"
     )
 
 
 def remove_test_network() -> None:
-    subprocess.run(
-        ["docker", "network", "rm", TEST_NETWORK_NAME],
-        check=False,
-        capture_output=True,
-    )
+    remove_network(TEST_NETWORK_NAME)
 
-
-def start_postgres() -> None:
-    docker_args = [
-        "docker", "run", "--rm", "--name", "postgres",
-        "--network", TEST_NETWORK_NAME, "--ip", POSTGRES_HOST,
-        "-e", f"POSTGRES_USER={POSTGRES_USER}",
-        "-e", f"POSTGRES_PASSWORD={POSTGRES_PASSWORD}",
-        "-e", "POSTGRES_DB=mydb",
-        "-p", "5432:5432",
-        "-d", POSTGRES_IMAGE
-    ]
-
-    subprocess.run(docker_args, check=True)
-    logger.info("Started Postgres container")
-    wait_for_postgres_ready()
-
-
-def wait_for_postgres_ready(timeout_seconds: int = 180) -> None:
-    ready_command = ["docker", "exec", "postgres", "pg_isready", "-U", POSTGRES_USER, "-h", "127.0.0.1", "-p", "5432"]
-
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        result = subprocess.run(
-            ready_command,
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            return
-        time.sleep(1)
-
-    raise RuntimeError(
-        f"Postgres did not become ready after {timeout_seconds} seconds"
-    )
-
-
-def stop_postgres() -> None:
-    subprocess.run(
-        ["docker", "stop", "postgres"],
-        check=False,
-        capture_output=False,
-    )
-
-
-def wait_for_running_container(container_name: str, timeout_seconds: int = 20) -> None:
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        result = subprocess.run(
-            ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0 and result.stdout.strip().lower() == "true":
-            return
-        time.sleep(1)
-    raise RuntimeError(
-        f"Container {container_name} did not start after {timeout_seconds} seconds"
-    )
-
-
-def create_test_database(test_dir: str) -> None:
-    create_database_command = ["docker", "exec", "-e", f"PGPASSWORD={POSTGRES_PASSWORD}", "postgres", "createdb",
-                               "-w", "-h", "127.0.0.1", "-p", "5432", "-U", POSTGRES_USER, test_dir]
-    subprocess.run(create_database_command, check=True)
 
 class TestStatus(Enum):
     PASSED = "PASSED"
@@ -453,12 +349,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                             "Segmentation fault or core dumped")
             return result
 
-        # stop the container
-        subprocess.run(f"docker stop {test_dir}",
-                       shell=True, check=False, capture_output=False)
-        # remove the container
-        subprocess.run(f"docker rm -f {test_dir}",
-                       shell=True, check=False, capture_output=False)
+        remove_container(test_dir)
 
 
 def build_docker_image(dockerfile_path: str, extra_build_args: str):
@@ -829,13 +720,14 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
+    wait_for_docker_ready()
     create_test_network()
     try:
-        start_postgres()
-        try:
-            run_tests(args.dockerfile_path, args.max_parallel_tests,
-                      args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
-        finally:
-            stop_postgres()
+        start_mock_imds_servers()
+        start_postgres(TEST_NETWORK_NAME, POSTGRES_HOST)
+        run_tests(args.dockerfile_path, args.max_parallel_tests,
+                  args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
     finally:
+        stop_postgres()
+        stop_mock_imds_servers()
         remove_test_network()

@@ -1,5 +1,16 @@
+import time
+
 from testlib import *
 from core_api import CoreApi
+from helpers.docker_helpers import (
+    append_hosts_entry,
+    connect_target_to_network,
+    create_network,
+    disconnect_target_from_network,
+    remove_network,
+    start_mock_http_server_on_network,
+    stop_mock_http_server_on_network,
+)
 '''
 Tests the outbound domain blocking feature:
 
@@ -28,58 +39,27 @@ TARGET_CONTAINER_NAME = "test_outbound_domain_blocking"
 MOCK_SERVER_IP = "11.22.33.44"
 # The dedicated subnet that reserves the mock server's public-looking IP.
 MOCK_SERVER_SUBNET = "11.22.33.0/24"
+# The gateway for the mock server's dedicated subnet.
+MOCK_SERVER_GATEWAY = "11.22.33.1"
 # The helper container that pretends to be the outbound destination.
 MOCK_SERVER_CONTAINER = "mock-server-outbound-domain-blocking"
 # The temporary network that connects the demo app to the mock server.
 MOCK_SERVER_NETWORK = "mock-network-outbound-domain-blocking"
-# The active Docker engine type, used to choose Linux vs Windows container commands.
-DOCKER_OSTYPE = subprocess.run(
-    ["docker", "info", "--format", "{{.OSType}}"],
-    capture_output=True,
-    text=True,
-    check=True,
-).stdout.strip().lower()
-
-
-def wait_for_running_container(container_name: str, timeout_seconds: int = 20):
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        result = subprocess.run(f'docker inspect -f "{{{{.State.Running}}}}" {container_name}', shell=True, capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip().lower() == "true":
-            return
-        time.sleep(1)
-    raise Exception(f"Container {container_name} did not start after {timeout_seconds} seconds")
-
 
 def start_mock_server():
-    path = os.path.dirname(__file__)
-
-    driver = "nat" if DOCKER_OSTYPE == "windows" else "bridge"
-    subprocess.run(f'docker network create --driver {driver} --subnet {MOCK_SERVER_SUBNET} {MOCK_SERVER_NETWORK}', shell=True, check=True)
-    subprocess.run(f'docker network connect {MOCK_SERVER_NETWORK} {TARGET_CONTAINER_NAME}', shell=True, check=True)
-
-    if DOCKER_OSTYPE == "windows":
-        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:C:\\test:ro" mcr.microsoft.com/windows-cssc/python:3.13-nanoserver-ltsc2022 python C:\\test\\mock-server.py'
-    else:
-        command = f'docker run -d --name {MOCK_SERVER_CONTAINER} --network {MOCK_SERVER_NETWORK} --ip {MOCK_SERVER_IP} -v "{path}:/test:ro" python:3.13-alpine python /test/mock-server.py'
-
-    subprocess.run(command, shell=True, check=True)
-    wait_for_running_container(MOCK_SERVER_CONTAINER)
+    create_network(MOCK_SERVER_NETWORK, MOCK_SERVER_SUBNET, MOCK_SERVER_GATEWAY)
+    connect_target_to_network(TARGET_CONTAINER_NAME, MOCK_SERVER_NETWORK)
+    start_mock_http_server_on_network(MOCK_SERVER_CONTAINER, MOCK_SERVER_NETWORK, MOCK_SERVER_IP)
 
 
 def stop_mock_server():
-    subprocess.run(f'docker rm -f {MOCK_SERVER_CONTAINER}', shell=True, check=False, capture_output=True)
-    subprocess.run(f'docker network disconnect {MOCK_SERVER_NETWORK} {TARGET_CONTAINER_NAME}', shell=True, check=False, capture_output=True)
-    subprocess.run(f'docker network rm {MOCK_SERVER_NETWORK}', shell=True, check=False, capture_output=True)
+    stop_mock_http_server_on_network(MOCK_SERVER_CONTAINER)
+    disconnect_target_from_network(TARGET_CONTAINER_NAME, MOCK_SERVER_NETWORK)
+    remove_network(MOCK_SERVER_NETWORK)
 
 
 def set_etc_hosts(hostname: str):
-    if DOCKER_OSTYPE == "windows":
-        command = f'docker exec {TARGET_CONTAINER_NAME} cmd /c "echo {MOCK_SERVER_IP} {hostname} >> %SystemRoot%\\System32\\drivers\\etc\\hosts"'
-    else:
-        command = f'docker exec -u 0 {TARGET_CONTAINER_NAME} sh -c "echo {MOCK_SERVER_IP} {hostname} >> /etc/hosts"'
-
-    subprocess.run(command, shell=True, check=True)
+    append_hosts_entry(TARGET_CONTAINER_NAME, MOCK_SERVER_IP, hostname)
 
 
 def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):

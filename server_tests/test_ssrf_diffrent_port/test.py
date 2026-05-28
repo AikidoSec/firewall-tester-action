@@ -1,9 +1,9 @@
-import requests
-import time
-import sys
 from testlib import *
 from core_api import CoreApi
-import os
+from helpers.docker_helpers import (
+    start_mock_http_server_on_target_loopback,
+    stop_mock_http_server_on_target_loopback,
+)
 
 
 '''
@@ -14,26 +14,17 @@ import os
 5. The server should not block the request.
 '''
 
-
-def start_mock_servers(target_container_name: str):
-    path = os.path.join(os.path.dirname(__file__), "mock-4000.sh")
-    subprocess.run(
-        f"docker run -d --name mock-4000-for-php -v {path}:/mock-4000.sh:ro --network container:{target_container_name} alpine:3.20 sh /mock-4000.sh", shell=True)
-    time.sleep(20)
-
-
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
+    target_container_name = "test_ssrf_diffrent_port"
     try:
-        container_name = "test_ssrf_diffrent_port"
-        start_mock_servers(container_name)
+        start_mock_http_server_on_target_loopback(target_container_name)
         response = s.post("/api/request_different_port",
                           {"url": "http://127.0.0.1:4001", "port": "4000"})
         collector.soft_assert_response_code_is(
             response, 200, f"Aikido Zen should not block the request {response.text}")
     finally:
-        subprocess.run(
-            f"docker rm -f mock-4000-for-php", shell=True)
+        stop_mock_http_server_on_target_loopback(target_container_name)
     collector.raise_if_failures()
 
 

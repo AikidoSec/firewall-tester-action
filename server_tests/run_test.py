@@ -20,6 +20,8 @@ import html
 
 CORE_URL = "http://localhost:3000"
 DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+CORE_IMAGE_NAME = "firewall-tester-action-core-image"
+CORE_CONTAINER_NAME = "firewall-tester-action-core"
 
 
 class GitHubActionsFormatter(logging.Formatter):
@@ -89,8 +91,9 @@ TEST_NETWORK_NAME = "firewall-tester-action-network"
 TEST_NETWORK_DRIVER = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 TEST_NETWORK_SUBNET = "172.31.255.0/24"
 TEST_NETWORK_GATEWAY = "172.31.255.1"
-POSTGRES_HOST = "172.31.255.2"
-DOCKER_HOST = TEST_NETWORK_GATEWAY
+CORE_CONTAINER_HOST = "172.31.255.10"
+POSTGRES_HOST = "172.31.255.20"
+CORE_CONTAINER_URL = f"http://{CORE_CONTAINER_HOST}:3000"
 
 
 def create_test_network() -> None:
@@ -125,6 +128,84 @@ def remove_test_network() -> None:
         ["docker", "network", "rm", TEST_NETWORK_NAME],
         check=False,
         capture_output=True,
+    )
+
+
+def build_core_image(core_dockerfile_path: str) -> None:
+    server_tests_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(server_tests_dir)
+    if not os.path.exists(core_dockerfile_path):
+        raise Exception(f"Core mock Dockerfile not found: {core_dockerfile_path}")
+
+    core_base_image = (
+        "node:20-alpine"
+        if DOCKER_OSTYPE == "linux"
+        else "ghcr.io/amitie10g/node-nanoserver:20-ltsc2022"
+    )
+    command = [
+        "docker",
+        "build",
+        "-t",
+        CORE_IMAGE_NAME,
+        "-f",
+        core_dockerfile_path,
+        "--build-arg",
+        f"CORE_BASE_IMAGE={core_base_image}",
+        repo_root,
+    ]
+    logger.debug(f"Building core mock image: {' '.join(command)}")
+    subprocess.run(command, check=True)
+
+
+def start_core(core_dockerfile_path: str) -> None:
+    build_core_image(core_dockerfile_path)
+    subprocess.run(
+        ["docker", "rm", "-f", CORE_CONTAINER_NAME],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            CORE_CONTAINER_NAME,
+            "--network",
+            TEST_NETWORK_NAME,
+            "--ip",
+            CORE_CONTAINER_HOST,
+            "-p",
+            "3000:3000",
+            "-d",
+            CORE_IMAGE_NAME,
+        ],
+        check=True,
+    )
+    logger.info("Started core mock container")
+    wait_for_running_container(CORE_CONTAINER_NAME)
+    wait_for_core_ready()
+
+
+def wait_for_core_ready(timeout_seconds: int = 60) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        try:
+            requests.get(CORE_URL, timeout=1)
+            return
+        except requests.RequestException:
+            time.sleep(1)
+
+    raise RuntimeError(
+        f"Core mock did not become ready after {timeout_seconds} seconds"
+    )
+
+
+def stop_core() -> None:
+    subprocess.run(
+        ["docker", "stop", CORE_CONTAINER_NAME],
+        check=False,
+        capture_output=False,
     )
 
 
@@ -296,10 +377,10 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
             "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_URL": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST}:3000",
+            "AIKIDO_ENDPOINT": CORE_CONTAINER_URL,
+            "AIKIDO_REALTIME_ENDPOINT": CORE_CONTAINER_URL,
+            "AIKIDO_URL": CORE_CONTAINER_URL,
+            "AIKIDO_REALTIME_URL": CORE_CONTAINER_URL,
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
@@ -814,6 +895,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dockerfile_path", type=str, required=True)
+    parser.add_argument("--core_dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
     parser.add_argument("--skip_tests", type=str, required=False)
@@ -829,13 +911,15 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
-    create_test_network()
     try:
+        create_test_network()
+        start_core(args.core_dockerfile_path)
         start_postgres()
-        try:
-            run_tests(args.dockerfile_path, args.max_parallel_tests,
-                      args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
-        finally:
-            stop_postgres()
+
+        run_tests(args.dockerfile_path, args.max_parallel_tests,
+            args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    
     finally:
+        stop_postgres()
+        stop_core()
         remove_test_network()

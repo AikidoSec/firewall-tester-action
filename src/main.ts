@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -7,20 +6,16 @@ import { fileURLToPath } from 'url'
 // Handle process termination signals
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. Cleaning up...')
-  stopServer()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
   console.log('\nReceived SIGTERM. Cleaning up...')
-  stopServer()
   process.exit(0)
 })
 
 export async function run(): Promise<void> {
   try {
-    // Start the Express server
-    startServer()
     const dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
       core.getInput('max_parallel_tests')
@@ -61,12 +56,20 @@ export async function run(): Promise<void> {
     core.debug(`Test type: ${test_type}`)
     // Spawn the Python process
     const this_file_dir = path.dirname(fileURLToPath(import.meta.url))
+    const action_path = path.resolve(this_file_dir, '..')
     const run_test_path = path.resolve(
-      this_file_dir,
-      '..',
+      action_path,
       'server_tests',
       'run_test.py'
     )
+    const core_dockerfile_path = path.resolve(
+      action_path,
+      'src',
+      'coremock',
+      'Dockerfile'
+    )
+    core.debug(`Core mock Dockerfile path: ${core_dockerfile_path}`)
+
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
@@ -74,6 +77,8 @@ export async function run(): Promise<void> {
           run_test_path,
           '--dockerfile_path',
           dockerfile_path,
+          '--core_dockerfile_path',
+          core_dockerfile_path,
           '--max_parallel_tests',
           max_parallel_tests.toString(),
           '--config_update_delay',
@@ -116,7 +121,5 @@ export async function run(): Promise<void> {
     })
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
-  } finally {
-    stopServer()
   }
 }

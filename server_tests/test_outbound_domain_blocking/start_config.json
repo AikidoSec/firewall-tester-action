@@ -40,7 +40,7 @@
       "mode": "allow"
     },
     {
-      "hostname": "172.31.255.1",
+      "hostname": "172.31.255.10",
       "mode": "allow"
     }
   ]

@@ -52,7 +52,7 @@ def _enabled_imds_specs():
 def start_mock_imds_servers():
     for spec in _enabled_imds_specs():
         if not network_exists(spec["network"]):
-            create_network(spec["network"], spec["subnet"], gateway=spec["gateway"])
+            create_network(spec["network"], spec["subnet"], gateway=spec["gateway"], internal=True)
 
         if not container_running(spec["container"]):
             stop_mock_http_server_on_network(spec["container"])

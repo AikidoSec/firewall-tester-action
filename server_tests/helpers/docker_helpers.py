@@ -153,16 +153,18 @@ def wait_for_docker_ready():
     _DOCKER_OSTYPE_CACHE = docker_os
 
 
-def create_network(network_name: str, subnet: str, gateway: str):
+def create_network(network_name: str, subnet: str, gateway: str, internal: bool = False):
     network = ipaddress.ip_network(subnet, strict=False)
     if is_windows_container_mode() and network.version == 6:
         raise RuntimeError("IPv6 Docker networks are not supported on Windows")
 
+    internal_args = ["--internal"] if internal else []
     ipv6_args = ["--ipv6"] if network.version == 6 else []
     command = [
         "docker",
         "network",
         "create",
+        *internal_args,
         "--driver",
         docker_network_driver(),
         "--subnet",

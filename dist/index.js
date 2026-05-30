@@ -30985,7 +30985,7 @@ process.on('SIGTERM', () => {
 });
 async function run() {
     try {
-        const dockerfile_path = coreExports.getInput('dockerfile_path');
+        const demo_dockerfile_path = coreExports.getInput('dockerfile_path');
         const max_parallel_tests = parseInt(coreExports.getInput('max_parallel_tests'));
         const config_update_delay = parseInt(coreExports.getInput('config_update_delay'));
         const skip_tests = coreExports.getInput('skip_tests');
@@ -31001,7 +31001,13 @@ async function run() {
             coreExports.setFailed(`Invalid test type: ${test_type} Must be one of: server, control`);
             return;
         }
-        coreExports.debug(`Dockerfile path: ${dockerfile_path}`);
+        const this_file_dir = path.dirname(fileURLToPath(import.meta.url));
+        const action_path = path.resolve(this_file_dir, '..');
+        const run_test_path = path.resolve(action_path, 'server_tests', 'run_test.py');
+        const core_dockerfile_name = process.platform === 'win32' ? 'Dockerfile.windows' : 'Dockerfile.linux';
+        const core_dockerfile_path = path.resolve(action_path, 'src', 'coremock', core_dockerfile_name);
+        coreExports.debug(`Demo Dockerfile path: ${demo_dockerfile_path}`);
+        coreExports.debug(`Core mock Dockerfile path: ${core_dockerfile_path}`);
         coreExports.debug(`Max parallel tests: ${max_parallel_tests}`);
         coreExports.debug(`Config update delay: ${config_update_delay}`);
         coreExports.debug(`Skip tests: ${skip_tests}`);
@@ -31014,16 +31020,11 @@ async function run() {
         coreExports.debug(`Ignore failures: ${ignore_failures}`);
         coreExports.debug(`Test type: ${test_type}`);
         // Spawn the Python process
-        const this_file_dir = path.dirname(fileURLToPath(import.meta.url));
-        const action_path = path.resolve(this_file_dir, '..');
-        const run_test_path = path.resolve(action_path, 'server_tests', 'run_test.py');
-        const core_dockerfile_path = path.resolve(action_path, 'src', 'coremock', 'Dockerfile');
-        coreExports.debug(`Core mock Dockerfile path: ${core_dockerfile_path}`);
         await new Promise((resolve, reject) => {
             const proc = spawn('python', [
                 run_test_path,
-                '--dockerfile_path',
-                dockerfile_path,
+                '--demo_dockerfile_path',
+                demo_dockerfile_path,
                 '--core_dockerfile_path',
                 core_dockerfile_path,
                 '--max_parallel_tests',

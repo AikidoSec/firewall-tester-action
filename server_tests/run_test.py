@@ -86,14 +86,16 @@ else:
     POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
     POSTGRES_USER = "postgres"
     POSTGRES_PASSWORD = "postgres"
+POSTGRES_HOST = "172.31.255.20"
+POSTGRES_BASE_URL = f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:5432"
+
+CORE_CONTAINER_HOST = "172.31.255.10"
+CORE_CONTAINER_URL = f"http://{CORE_CONTAINER_HOST}:3000"
 
 TEST_NETWORK_NAME = "firewall-tester-action-network"
 TEST_NETWORK_DRIVER = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 TEST_NETWORK_SUBNET = "172.31.255.0/24"
 TEST_NETWORK_GATEWAY = "172.31.255.1"
-CORE_CONTAINER_HOST = "172.31.255.10"
-POSTGRES_HOST = "172.31.255.20"
-CORE_CONTAINER_URL = f"http://{CORE_CONTAINER_HOST}:3000"
 
 
 def create_test_network() -> None:
@@ -137,11 +139,6 @@ def build_core_image(core_dockerfile_path: str) -> None:
     if not os.path.exists(core_dockerfile_path):
         raise Exception(f"Core mock Dockerfile not found: {core_dockerfile_path}")
 
-    core_base_image = (
-        "node:20-alpine"
-        if DOCKER_OSTYPE == "linux"
-        else "ghcr.io/amitie10g/node-nanoserver:20-ltsc2022"
-    )
     command = [
         "docker",
         "build",
@@ -149,8 +146,6 @@ def build_core_image(core_dockerfile_path: str) -> None:
         CORE_IMAGE_NAME,
         "-f",
         core_dockerfile_path,
-        "--build-arg",
-        f"CORE_BASE_IMAGE={core_base_image}",
         repo_root,
     ]
     logger.debug(f"Building core mock image: {' '.join(command)}")
@@ -341,7 +336,7 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_postgres_host: str) -> TestResult:
+def run_test(test_dir: str, token: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
@@ -376,7 +371,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
+            "DATABASE_URL": f"{POSTGRES_BASE_URL}/{test_dir}?sslmode=disable",
             "AIKIDO_ENDPOINT": CORE_CONTAINER_URL,
             "AIKIDO_REALTIME_ENDPOINT": CORE_CONTAINER_URL,
             "AIKIDO_URL": CORE_CONTAINER_URL,
@@ -542,18 +537,13 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
                        shell=True, check=False, capture_output=False)
 
 
-def build_docker_image(dockerfile_path: str, extra_build_args: str):
-    if not os.path.exists(dockerfile_path):
-        # list files from dockerfile_path root
-        logger.debug(f"Dockerfile not found: {dockerfile_path}")
-        logger.debug(
-            f"Files in {os.path.dirname(dockerfile_path)}: {os.listdir(os.path.dirname(dockerfile_path))}")
-        raise Exception(f"Dockerfile not found: {dockerfile_path}")
+def build_docker_image(demo_dockerfile_path: str, extra_build_args: str):
+    if not os.path.exists(demo_dockerfile_path):
+        raise Exception(f"Dockerfile not found: {demo_dockerfile_path}")
 
-    # Get the directory containing the Dockerfile
-    dockerfile_dir = os.path.dirname(dockerfile_path)
+    demo_build_context = os.path.dirname(demo_dockerfile_path)
     command = ["docker", "build", "-t",
-               DOCKER_IMAGE_NAME, "-f", dockerfile_path]
+               DOCKER_IMAGE_NAME, "-f", demo_dockerfile_path]
     if extra_build_args:
         try:
             # extra_build_args is a string of arguments separated by spaces (e.g. "--build-arg APP_VERSION=2.0.1 --build-arg PHP_FIREWALL_VERSION=1.0.123")
@@ -562,7 +552,7 @@ def build_docker_image(dockerfile_path: str, extra_build_args: str):
             logger.warning(f"Invalid build args: {e}")
             return
 
-    command.append(dockerfile_dir)
+    command.append(demo_build_context)
     logger.debug(f"Building Docker image: {' '.join(command)}")
     subprocess.run(" ".join(command), shell=True, check=True)
 
@@ -772,12 +762,10 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write(header + truncation_notice)
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
-    logger.debug(f"Dockerfile path: {dockerfile_path}")
+def run_tests(demo_dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
+    logger.debug(f"Demo Dockerfile path: {demo_dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    docker_postgres_host = POSTGRES_HOST
-    logger.info(f"Using postgres host: {docker_postgres_host}:5432")
-    build_docker_image(dockerfile_path, extra_build_args)
+    build_docker_image(demo_dockerfile_path, extra_build_args)
     if test_type == "control":
         dir_start = "control_"
     else:
@@ -817,7 +805,6 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 run_test,
                 test_dir,
                 token,
-                dockerfile_path,
                 start_port,
                 config_update_delay,
                 test_timeout,
@@ -825,7 +812,6 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 app_port,
                 sleep_before_test,
                 None if test_type == "server" else control_start_port,
-                docker_postgres_host,
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -894,7 +880,7 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dockerfile_path", type=str, required=True)
+    parser.add_argument("--demo_dockerfile_path", type=str, required=True)
     parser.add_argument("--core_dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
@@ -916,7 +902,7 @@ if __name__ == "__main__":
         start_core(args.core_dockerfile_path)
         start_postgres()
 
-        run_tests(args.dockerfile_path, args.max_parallel_tests,
+        run_tests(args.demo_dockerfile_path, args.max_parallel_tests,
             args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
     
     finally:

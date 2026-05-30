@@ -10,4 +10,5 @@ RUN npm ci
 
 EXPOSE 3000
 
-CMD npm run start-core
+ENTRYPOINT []
+CMD ["node", "--loader", "ts-node/esm", "-e", "import { startServer } from './src/coremock/app.js'; startServer();"]

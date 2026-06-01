@@ -9,6 +9,9 @@ Positive Tests (expect detection):
 - Directory patterns: Tests detection of suspicious directory names (e.g., .git, .vscode)
 - File Extension patterns: Tests detection of suspicious file extensions (e.g., .env, .sql)
 - Query patterns: Tests detection of suspicious query parameters (e.g., SQL injection attempts)
+- Foreign extension patterns (404 only): Tests that requests to foreign-platform extensions
+  (e.g., .php, .java, .jsp) are counted as scan hits when the server returns 404. A 200
+  would indicate the app is proxying to another backend, so only 404 responses trigger detection.
 Each positive test sends 16 requests with the same IP address, waits 20 seconds, and verifies
 that exactly 1 attack wave event is detected and contains the correct IP and user information.
 The tests also validate the samples metadata in the attack event, ensuring that:
@@ -76,6 +79,20 @@ file_extensions = [
 ]
 _file_extension_iterator = itertools.cycle(file_extensions)
 
+# Foreign-platform extensions: only counted as scan hits when the response is 404.
+# A 200 would mean the app is proxying to a backend that actually serves these files.
+foreign_extensions = [
+    "php",
+    "php3",
+    "php4",
+    "php5",
+    "phtml",
+    "java",
+    "jsp",
+    "jspx",
+]
+_foreign_extension_iterator = itertools.cycle(foreign_extensions)
+
 queries = [
     "SELECT (CASE WHEN 1=1",
     "SELECT COUNT(1)",
@@ -108,6 +125,10 @@ def get_file_extension():
     return next(_file_extension_iterator)
 
 
+def get_foreign_extension():
+    return next(_foreign_extension_iterator)
+
+
 def get_query():
     return next(_query_iterator)
 
@@ -122,6 +143,12 @@ def get_random_path_directory():
 
 def get_random_path_extension():
     return "GET", f"/api/pets/file.{get_file_extension()}"
+
+
+def get_random_path_foreign_extension():
+    # These routes don't exist in the demo app, so the server returns 404.
+    # The firewall should count 404 responses to foreign-platform extensions as scan hits.
+    return "GET", f"/api/pets/file.{get_foreign_extension()}"
 
 
 def get_random_path_query():
@@ -266,6 +293,8 @@ def run_test(s: TestServer, c: CoreApi):
                       "1236", len(file_extensions))
     check_wave_attack(collector, get_random_path_query,
                       "2.16.53.8", "1237", len(queries))
+    check_wave_attack(collector, get_random_path_foreign_extension,
+                      "2.16.53.11", "1240", len(foreign_extensions))
 
     check_wave_attack_with_same_ip(collector,
                                    get_random_path_filename, "2.16.53.5", "1234")
@@ -275,6 +304,8 @@ def run_test(s: TestServer, c: CoreApi):
                                    get_random_path_extension, "2.16.53.7", "1236")
     check_wave_attack_with_same_ip(
         collector, get_random_path_query, "2.16.53.8", "1237")
+    check_wave_attack_with_same_ip(
+        collector, get_random_path_foreign_extension, "2.16.53.11", "1240")
 
     check_wave_attack_with_same_ip_sliding_window_and_LRU(
         collector, "2.16.53.9", "1238")

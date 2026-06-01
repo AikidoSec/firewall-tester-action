@@ -61,10 +61,11 @@ def run_test(s: TestServer, c: CoreApi):
     paths = [
         "../secrets/key.txt",
         "//./etc/passwd",
+        "//./ETC/PASSWD",
         "/.//etc/passwd",
         "/././etc/passwd",
         "/././etc/./passwd/./",
-        "/././etc/passwd/../passwd"
+        "/././etc/passwd/../passwd",
         ".%252E/etc/passwd",
         ".%252E/secrets/key.txt",
         "////etc/passwd",
@@ -86,12 +87,14 @@ def run_test(s: TestServer, c: CoreApi):
         "..//secrets//key.txt",
         "..%c0%afsecrets%c0%afkey.txt",
         "..\\\\secrets\\\\key.txt",
+        "c:\\windows\\system32\\cmd.exe",
+        "C:\\Windows\\System32\\cmd.exe",
         "..//..//..//etc/passwd",
         "..%252F..%252F..%252Fetc%252Fpasswd",  # URL-encoded with %252F
         "file:///files/test/{..}/{..}/etc/passwd",
         "file://localhost/etc/passwd",
         "/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/etc/passwd",
-        "/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/etc/passwd"
+        "/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/etc/passwd",
         "%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
     ]
 

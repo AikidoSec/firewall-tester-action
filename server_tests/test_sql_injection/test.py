@@ -75,6 +75,7 @@ def run_test(s: TestServer, c: CoreApi):
     s.get("/clear")
     payloads = [
         "Malicious Pet', 'Gru from the Minions') --",
+        "  Malicious Pet', 'Gru from the Minions') --  ",
         "\0Malicious Pet', 'Gru from the Minions') --",
         "%00Malicious Pet', 'Gru from the Minions') --",
         "\x00Malicious Pet', 'Gru from the Minions') --",

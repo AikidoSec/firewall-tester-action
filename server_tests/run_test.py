@@ -18,8 +18,9 @@ import re
 import io
 import html
 
-CORE_URL = "http://localhost:3000"
-DOCKER_IMAGE_NAME = "firewall-tester-action-docker-image"
+DEMO_IMAGE_NAME = "firewall-tester-action-demo-image"
+CORE_IMAGE_NAME = "firewall-tester-action-core-image"
+CORE_CONTAINER_NAME = "firewall-tester-action-core"
 
 
 class GitHubActionsFormatter(logging.Formatter):
@@ -84,13 +85,19 @@ else:
     POSTGRES_IMAGE = "sokigo/postgresql-windows:15.15-2022"
     POSTGRES_USER = "postgres"
     POSTGRES_PASSWORD = "postgres"
+POSTGRES_HOST = "172.31.255.20"
+POSTGRES_BASE_URL = f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:5432"
+
+# Tests run on the host and reach core through the published port.
+CORE_HOST_URL = "http://localhost:3000"
+# Demo app containers reach core through the Docker test network.
+CORE_CONTAINER_HOST = "172.31.255.10"
+CORE_CONTAINER_URL = f"http://{CORE_CONTAINER_HOST}:3000"
 
 TEST_NETWORK_NAME = "firewall-tester-action-network"
 TEST_NETWORK_DRIVER = "bridge" if DOCKER_OSTYPE == "linux" else "nat"
 TEST_NETWORK_SUBNET = "172.31.255.0/24"
 TEST_NETWORK_GATEWAY = "172.31.255.1"
-POSTGRES_HOST = "172.31.255.2"
-DOCKER_HOST = TEST_NETWORK_GATEWAY
 
 
 def create_test_network() -> None:
@@ -125,6 +132,80 @@ def remove_test_network() -> None:
         ["docker", "network", "rm", TEST_NETWORK_NAME],
         check=False,
         capture_output=True,
+    )
+
+
+def build_image(image_name: str, dockerfile_path: str, build_context: str, extra_build_args: str = "") -> None:
+    if not os.path.exists(dockerfile_path):
+        raise Exception(f"Dockerfile not found: {dockerfile_path}")
+
+    command = [
+        "docker",
+        "build",
+        "-t",
+        image_name,
+        "-f",
+        dockerfile_path,
+    ]
+    if extra_build_args:
+        command.extend(shlex.split(extra_build_args))
+
+    command.append(build_context)
+    logger.debug(f"Building Docker image: {shlex.join(command)}")
+    subprocess.run(command, check=True)
+
+
+def start_core(core_dockerfile_path: str) -> None:
+    server_tests_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.dirname(server_tests_dir)
+    build_image(CORE_IMAGE_NAME, core_dockerfile_path, repo_root)
+    subprocess.run(
+        ["docker", "rm", "-f", CORE_CONTAINER_NAME],
+        check=False,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--name",
+            CORE_CONTAINER_NAME,
+            "--network",
+            TEST_NETWORK_NAME,
+            "--ip",
+            CORE_CONTAINER_HOST,
+            "-p",
+            "3000:3000",
+            "-d",
+            CORE_IMAGE_NAME,
+        ],
+        check=True,
+    )
+    logger.info("Started core mock container")
+    wait_for_running_container(CORE_CONTAINER_NAME)
+    wait_for_core_ready()
+
+
+def wait_for_core_ready(timeout_seconds: int = 60) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        try:
+            requests.get(CORE_HOST_URL, timeout=1)
+            return
+        except requests.RequestException:
+            time.sleep(1)
+
+    raise RuntimeError(
+        f"Core mock did not become ready after {timeout_seconds} seconds"
+    )
+
+
+def stop_core() -> None:
+    subprocess.run(
+        ["docker", "stop", CORE_CONTAINER_NAME],
+        check=False,
+        capture_output=False,
     )
 
 
@@ -260,11 +341,11 @@ def sanitize_extra_run_args(extra_args: str):
     return " ".join(result)
 
 
-def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int, docker_postgres_host: str) -> TestResult:
+def run_test(test_dir: str, token: str, start_port: int, config_update_delay: int, test_timeout: int, extra_args: str, app_port: int, sleep_before_test: int, control_port: int) -> TestResult:
     result = TestResult(test_dir=test_dir, start_time=datetime.now())
     try:
         # 1. if start_config.json and start_firewall.json exists, apply them
-        core_api = CoreApi(token=token, core_url=CORE_URL, test_name=test_dir,
+        core_api = CoreApi(token=token, core_url=CORE_HOST_URL, test_name=test_dir,
                            config_update_delay=1)
         if os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json")):
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_dir, "start_config.json"), "r", encoding="utf-8") as f:
@@ -295,11 +376,11 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         extra_envs = {
             "AIKIDO_TOKEN": token,
             "PORT": app_port,
-            "DATABASE_URL": f"postgres://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{docker_postgres_host}:5432/{test_dir}?sslmode=disable",
-            "AIKIDO_ENDPOINT": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_REALTIME_ENDPOINT": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_URL": f"http://{DOCKER_HOST}:3000",
-            "AIKIDO_REALTIME_URL": f"http://{DOCKER_HOST}:3000",
+            "DATABASE_URL": f"{POSTGRES_BASE_URL}/{test_dir}?sslmode=disable",
+            "AIKIDO_ENDPOINT": CORE_CONTAINER_URL,
+            "AIKIDO_REALTIME_ENDPOINT": CORE_CONTAINER_URL,
+            "AIKIDO_URL": CORE_CONTAINER_URL,
+            "AIKIDO_REALTIME_URL": CORE_CONTAINER_URL,
         }
         env_file_path = os.path.join(os.path.dirname(
             os.path.abspath(__file__)), test_dir, 'test.env')
@@ -326,7 +407,7 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
 
         for env, value in extra_envs.items():
             command += f" --env {env}={value}"
-        command += f" {DOCKER_IMAGE_NAME}"
+        command += f" {DEMO_IMAGE_NAME}"
 
         logger.debug(f"Running Docker container: {command}")
         subprocess.run(command, shell=True, check=True)
@@ -459,31 +540,6 @@ def run_test(test_dir: str, token: str, dockerfile_path: str, start_port: int, c
         # remove the container
         subprocess.run(f"docker rm -f {test_dir}",
                        shell=True, check=False, capture_output=False)
-
-
-def build_docker_image(dockerfile_path: str, extra_build_args: str):
-    if not os.path.exists(dockerfile_path):
-        # list files from dockerfile_path root
-        logger.debug(f"Dockerfile not found: {dockerfile_path}")
-        logger.debug(
-            f"Files in {os.path.dirname(dockerfile_path)}: {os.listdir(os.path.dirname(dockerfile_path))}")
-        raise Exception(f"Dockerfile not found: {dockerfile_path}")
-
-    # Get the directory containing the Dockerfile
-    dockerfile_dir = os.path.dirname(dockerfile_path)
-    command = ["docker", "build", "-t",
-               DOCKER_IMAGE_NAME, "-f", dockerfile_path]
-    if extra_build_args:
-        try:
-            # extra_build_args is a string of arguments separated by spaces (e.g. "--build-arg APP_VERSION=2.0.1 --build-arg PHP_FIREWALL_VERSION=1.0.123")
-            command.extend(extra_build_args.split(" "))
-        except ValueError as e:
-            logger.warning(f"Invalid build args: {e}")
-            return
-
-    command.append(dockerfile_dir)
-    logger.debug(f"Building Docker image: {' '.join(command)}")
-    subprocess.run(" ".join(command), shell=True, check=True)
 
 
 def _escape_markdown(text: str) -> str:
@@ -691,12 +747,12 @@ def write_summary_to_github_step_summary(test_results: List[TestResult]):
         f.write(header + truncation_notice)
 
 
-def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
-    logger.debug(f"Dockerfile path: {dockerfile_path}")
+def run_tests(demo_dockerfile_path: str, max_parallel_tests: int, config_update_delay: int, skip_tests: str, run_tests: str, test_timeout: int, extra_args: str, extra_build_args: str, app_port: int, sleep_before_test: int, ignore_failures: bool = False, test_type: str = "server"):
+    logger.debug(f"Demo Dockerfile path: {demo_dockerfile_path}")
     logger.debug(f"Max parallel tests: {max_parallel_tests}")
-    docker_postgres_host = POSTGRES_HOST
-    logger.info(f"Using postgres host: {docker_postgres_host}:5432")
-    build_docker_image(dockerfile_path, extra_build_args)
+    demo_build_context = os.path.dirname(demo_dockerfile_path)
+    build_image(DEMO_IMAGE_NAME, demo_dockerfile_path,
+                demo_build_context, extra_build_args)
     if test_type == "control":
         dir_start = "control_"
     else:
@@ -731,12 +787,11 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 logger.info(f"Test {test_dir} ⏭️ SKIPPED")
                 continue
 
-            token = CoreApi.get_app_token(CORE_URL)
+            token = CoreApi.get_app_token(CORE_HOST_URL)
             future = executor.submit(
                 run_test,
                 test_dir,
                 token,
-                dockerfile_path,
                 start_port,
                 config_update_delay,
                 test_timeout,
@@ -744,7 +799,6 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
                 app_port,
                 sleep_before_test,
                 None if test_type == "server" else control_start_port,
-                docker_postgres_host,
             )
             future_to_test[future] = test_dir
             start_port += 1
@@ -813,7 +867,8 @@ def run_tests(dockerfile_path: str, max_parallel_tests: int, config_update_delay
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dockerfile_path", type=str, required=True)
+    parser.add_argument("--demo_dockerfile_path", type=str, required=True)
+    parser.add_argument("--core_dockerfile_path", type=str, required=True)
     parser.add_argument("--max_parallel_tests", type=int, required=True)
     parser.add_argument("--config_update_delay", type=int, required=True)
     parser.add_argument("--skip_tests", type=str, required=False)
@@ -829,13 +884,15 @@ if __name__ == "__main__":
                         required=False, default="server")
 
     args = parser.parse_args()
-    create_test_network()
     try:
+        create_test_network()
+        start_core(args.core_dockerfile_path)
         start_postgres()
-        try:
-            run_tests(args.dockerfile_path, args.max_parallel_tests,
-                      args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
-        finally:
-            stop_postgres()
+
+        run_tests(args.demo_dockerfile_path, args.max_parallel_tests,
+            args.config_update_delay, args.skip_tests, args.run_tests or '', args.test_timeout, args.extra_args, args.extra_build_args, args.app_port, args.sleep_before_test, args.ignore_failures, args.test_type)
+    
     finally:
+        stop_postgres()
+        stop_core()
         remove_test_network()

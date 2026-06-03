@@ -1,5 +1,4 @@
 import * as core from '@actions/core'
-import { startServer, stopServer } from './coremock/app.js'
 import { spawn } from 'child_process'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -7,21 +6,17 @@ import { fileURLToPath } from 'url'
 // Handle process termination signals
 process.on('SIGINT', () => {
   console.log('\nReceived SIGINT. Cleaning up...')
-  stopServer()
   process.exit(0)
 })
 
 process.on('SIGTERM', () => {
   console.log('\nReceived SIGTERM. Cleaning up...')
-  stopServer()
   process.exit(0)
 })
 
 export async function run(): Promise<void> {
   try {
-    // Start the Express server
-    startServer()
-    const dockerfile_path: string = core.getInput('dockerfile_path')
+    const demo_dockerfile_path: string = core.getInput('dockerfile_path')
     const max_parallel_tests: number = parseInt(
       core.getInput('max_parallel_tests')
     )
@@ -47,7 +42,24 @@ export async function run(): Promise<void> {
       return
     }
 
-    core.debug(`Dockerfile path: ${dockerfile_path}`)
+    const this_file_dir = path.dirname(fileURLToPath(import.meta.url))
+    const action_path = path.resolve(this_file_dir, '..')
+    const run_test_path = path.resolve(
+      action_path,
+      'server_tests',
+      'run_test.py'
+    )
+    const core_dockerfile_name =
+      process.platform === 'win32' ? 'Dockerfile.windows' : 'Dockerfile.linux'
+    const core_dockerfile_path = path.resolve(
+      action_path,
+      'src',
+      'coremock',
+      core_dockerfile_name
+    )
+
+    core.debug(`Demo Dockerfile path: ${demo_dockerfile_path}`)
+    core.debug(`Core mock Dockerfile path: ${core_dockerfile_path}`)
     core.debug(`Max parallel tests: ${max_parallel_tests}`)
     core.debug(`Config update delay: ${config_update_delay}`)
     core.debug(`Skip tests: ${skip_tests}`)
@@ -59,21 +71,17 @@ export async function run(): Promise<void> {
     core.debug(`Sleep before test: ${sleep_before_test}`)
     core.debug(`Ignore failures: ${ignore_failures}`)
     core.debug(`Test type: ${test_type}`)
+
     // Spawn the Python process
-    const this_file_dir = path.dirname(fileURLToPath(import.meta.url))
-    const run_test_path = path.resolve(
-      this_file_dir,
-      '..',
-      'server_tests',
-      'run_test.py'
-    )
     await new Promise<void>((resolve, reject) => {
       const proc = spawn(
         'python',
         [
           run_test_path,
-          '--dockerfile_path',
-          dockerfile_path,
+          '--demo_dockerfile_path',
+          demo_dockerfile_path,
+          '--core_dockerfile_path',
+          core_dockerfile_path,
           '--max_parallel_tests',
           max_parallel_tests.toString(),
           '--config_update_delay',
@@ -116,7 +124,5 @@ export async function run(): Promise<void> {
     })
   } catch (error) {
     if (error instanceof Error) core.setFailed(error.message)
-  } finally {
-    stopServer()
   }
 }

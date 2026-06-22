@@ -3,7 +3,7 @@
   "request": {
     "method": "POST",
     "route": "/api/create",
-    "url": "REGEX:^https?://app(?::\\d+)?/api/create$"
+    "url": "REGEX:^https?://app(?:_[a-z0-9_]+)?(?::\\d+)?/api/create$"
   },
   "attack": {
     "kind": "sql_injection",

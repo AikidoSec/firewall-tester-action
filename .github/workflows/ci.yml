@@ -235,7 +235,7 @@ jobs:
             done
 
             if [ "${#services[@]}" -gt 0 ]; then
-              "${compose[@]}" stop "${services[@]}" >/dev/null 2>&1 || true
+              "${compose[@]}" kill "${services[@]}" >/dev/null 2>&1 || true
               "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
             fi
           }
@@ -494,7 +494,7 @@ jobs:
             done
 
             if [ "${#services[@]}" -gt 0 ]; then
-              "${compose[@]}" stop "${services[@]}" >/dev/null 2>&1 || true
+              "${compose[@]}" kill "${services[@]}" >/dev/null 2>&1 || true
               "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
             fi
           }

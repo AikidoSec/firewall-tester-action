@@ -13,12 +13,11 @@ permissions:
 
 jobs:
   server-tests-linux:
-    name: ${{ matrix.app.name }} / ${{ matrix.test_name }}
+    name: ${{ matrix.app.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 20
       matrix:
         app:
           - name: nodejs
@@ -30,6 +29,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
+            parallelism: 4
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
@@ -39,6 +39,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
+            parallelism: 4
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
@@ -48,6 +49,7 @@ jobs:
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
             php_firewall_version: 1.0.126
+            parallelism: 4
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
@@ -57,6 +59,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
+            parallelism: 4
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
@@ -66,6 +69,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
+            parallelism: 4
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
@@ -75,6 +79,7 @@ jobs:
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
+            parallelism: 4
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
@@ -84,41 +89,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-        test_name:
-          - test_aikido_disable
-          - test_allow_traffic_by_countries
-          - test_allowed_ip_for_routes
-          - test_allowed_ip_for_wildcard_route
-          - test_allowed_ip_most_restrictive
-          - test_api_spec
-          - test_block_traffic_by_countries
-          - test_bypassed_ip
-          - test_bypassed_ip_for_geo_blocking
-          - test_bypassed_ip_for_rate_limiting
-          - test_core_went_down
-          - test_demo_apps_generic_tests
-          - test_excluded_user_from_rate_limiting
-          - test_force_protection_off
-          - test_internet_not_available
-          - test_invalid_token
-          - test_logs_sensitive_data
-          - test_no_token_set
-          - test_outbound_domain_blocking
-          - test_path_traversal
-          - test_rate_limiting_group_id_1_minute
-          - test_rate_limiting_retry_after
-          - test_shell_injection
-          - test_sql_injection
-          - test_ssrf
-          - test_ssrf_diffrent_port
-          - test_stored_ssrf
-          - test_stored_ssrf_no_context
-          - test_user_ip_from_proxy
-          - test_user_rate_limiting_1_minute
-          - test_user_rate_limiting_1_minute_enable_disable
-          - test_user_rate_limiting_1_minute_for_wildcard_route
-          - test_user_rate_limiting_1_minute_without_x_forwarded_for
-          - test_wave_attack
+            parallelism: 4
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -131,54 +102,121 @@ jobs:
           ref: ${{ matrix.app.ref }}
           submodules: recursive
 
-      - name: Run Compose test
+      - name: Build Compose images
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
-          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
+          COMPOSE_PROJECT_NAME: test_sql_injection
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
           DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
           SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
         run: |
           docker compose \
             -f compose.linux.yml \
-            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
-            up --build --exit-code-from test test
+            -f server_tests/test_sql_injection/compose.yml \
+            build core app test
 
-      - name: Clean up Compose test
-        if: always()
+      - name: Run Compose tests
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
-          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
+          COMPOSE_TEST_PARALLELISM: ${{ matrix.app.parallelism }}
+          CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
           DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
+          SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
+          TEST_NAMES: |
+            test_aikido_disable
+            test_allow_traffic_by_countries
+            test_allowed_ip_for_routes
+            test_allowed_ip_for_wildcard_route
+            test_allowed_ip_most_restrictive
+            test_api_spec
+            test_block_traffic_by_countries
+            test_bypassed_ip
+            test_bypassed_ip_for_geo_blocking
+            test_bypassed_ip_for_rate_limiting
+            test_core_went_down
+            test_demo_apps_generic_tests
+            test_excluded_user_from_rate_limiting
+            test_force_protection_off
+            test_internet_not_available
+            test_invalid_token
+            test_logs_sensitive_data
+            test_no_token_set
+            test_outbound_domain_blocking
+            test_path_traversal
+            test_rate_limiting_group_id_1_minute
+            test_rate_limiting_retry_after
+            test_shell_injection
+            test_sql_injection
+            test_ssrf
+            test_ssrf_diffrent_port
+            test_stored_ssrf
+            test_stored_ssrf_no_context
+            test_user_ip_from_proxy
+            test_user_rate_limiting_1_minute
+            test_user_rate_limiting_1_minute_enable_disable
+            test_user_rate_limiting_1_minute_for_wildcard_route
+            test_user_rate_limiting_1_minute_without_x_forwarded_for
+            test_wave_attack
         run: |
-          docker compose \
-            -f compose.linux.yml \
-            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
-            down -v --remove-orphans
+          set -uo pipefail
+
+          mkdir -p "$RUNNER_TEMP/compose-test-logs"
+          : > "$RUNNER_TEMP/compose-test-failures"
+
+          run_compose_test() {
+            local test_name="$1"
+            local log_file="$RUNNER_TEMP/compose-test-logs/${test_name}.log"
+            local status=0
+
+            echo "START ${test_name}"
+            if COMPOSE_PROJECT_NAME="$test_name" docker compose \
+              -f compose.linux.yml \
+              -f "server_tests/${test_name}/compose.yml" \
+              up --no-build --exit-code-from test test > "$log_file" 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
+
+            COMPOSE_PROJECT_NAME="$test_name" docker compose \
+              -f compose.linux.yml \
+              -f "server_tests/${test_name}/compose.yml" \
+              down -v --remove-orphans >> "$log_file" 2>&1 || true
+
+            if [ "$status" -eq 0 ]; then
+              echo "PASS ${test_name}"
+            else
+              echo "FAIL ${test_name}"
+              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              echo "::group::${test_name} log"
+              cat "$log_file"
+              echo "::endgroup::"
+            fi
+          }
+
+          export -f run_compose_test
+          export RUNNER_TEMP
+
+          printf '%s\n' $TEST_NAMES | xargs -r -n1 -P "$COMPOSE_TEST_PARALLELISM" bash -c 'run_compose_test "$1"' _
+
+          if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
+            echo "Failed tests:"
+            sort "$RUNNER_TEMP/compose-test-failures"
+            exit 1
+          fi
 
   control-tests-linux:
-    name: php-control / ${{ matrix.test_name }}
+    name: php-control
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix:
-        test_name:
-          - control_test_detects_attacks_when_started_under_load
-          - control_test_graceful_restart
-          - control_test_graceful_stop
-          - control_test_install_aikido
-          - control_test_kill_agent
-          - control_test_restart
-          - control_test_start_stop
-          - control_test_update_aikido
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -191,33 +229,87 @@ jobs:
           ref: apache-mod-php-control-server
           submodules: recursive
 
-      - name: Run Compose control test
+      - name: Build Compose images
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
-          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
+          COMPOSE_PROJECT_NAME: control_test_restart
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
           SLEEP_BEFORE_TEST: 20
         run: |
           docker compose \
             -f compose.linux.yml \
-            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
-            up --build --exit-code-from test test
+            -f server_tests/control_test_restart/compose.yml \
+            build core app test
 
-      - name: Clean up Compose control test
-        if: always()
+      - name: Run Compose control tests
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
-          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
+          COMPOSE_TEST_PARALLELISM: 4
+          CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
+          SLEEP_BEFORE_TEST: 20
+          TEST_NAMES: |
+            control_test_detects_attacks_when_started_under_load
+            control_test_graceful_restart
+            control_test_graceful_stop
+            control_test_install_aikido
+            control_test_kill_agent
+            control_test_restart
+            control_test_start_stop
+            control_test_update_aikido
         run: |
-          docker compose \
-            -f compose.linux.yml \
-            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
-            down -v --remove-orphans
+          set -uo pipefail
+
+          mkdir -p "$RUNNER_TEMP/compose-test-logs"
+          : > "$RUNNER_TEMP/compose-test-failures"
+
+          run_compose_test() {
+            local test_name="$1"
+            local log_file="$RUNNER_TEMP/compose-test-logs/${test_name}.log"
+            local status=0
+
+            echo "START ${test_name}"
+            if COMPOSE_PROJECT_NAME="$test_name" docker compose \
+              -f compose.linux.yml \
+              -f "server_tests/${test_name}/compose.yml" \
+              up --no-build --exit-code-from test test > "$log_file" 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
+
+            COMPOSE_PROJECT_NAME="$test_name" docker compose \
+              -f compose.linux.yml \
+              -f "server_tests/${test_name}/compose.yml" \
+              down -v --remove-orphans >> "$log_file" 2>&1 || true
+
+            if [ "$status" -eq 0 ]; then
+              echo "PASS ${test_name}"
+            else
+              echo "FAIL ${test_name}"
+              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              echo "::group::${test_name} log"
+              cat "$log_file"
+              echo "::endgroup::"
+            fi
+          }
+
+          export -f run_compose_test
+          export RUNNER_TEMP
+
+          printf '%s\n' $TEST_NAMES | xargs -r -n1 -P "$COMPOSE_TEST_PARALLELISM" bash -c 'run_compose_test "$1"' _
+
+          if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
+            echo "Failed tests:"
+            sort "$RUNNER_TEMP/compose-test-failures"
+            exit 1
+          fi

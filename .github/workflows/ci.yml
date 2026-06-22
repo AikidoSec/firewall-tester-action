@@ -245,45 +245,31 @@ jobs:
             "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
           }
 
-          start_tests() {
-            local start_log="$RUNNER_TEMP/compose-test-logs/start.log"
-            local test_name
+          start_test() {
+            local test_name="$1"
+            local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
 
-            for test_name in "$@"; do
-              echo "START ${test_name}"
-            done
-
-            if "${compose[@]}" --parallel "$COMPOSE_TEST_PARALLELISM" up --no-build -d "$@" > "$start_log" 2>&1; then
-              running_tests=("$@")
+            echo "START ${test_name}"
+            if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
+              running_tests+=("$test_name")
               return
             fi
 
-            echo "::group::Compose startup log"
+            echo "FAIL ${test_name}"
+            printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+            echo "::group::${test_name} startup log"
             cat "$start_log"
+            services=()
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
+              fi
+            done < <(related_services "$test_name")
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" logs --no-color "${services[@]}" || true
+            fi
             echo "::endgroup::"
-
-            running_tests=()
-            for test_name in "$@"; do
-              if [ -n "$(test_container_id "$test_name")" ]; then
-                running_tests+=("$test_name")
-                continue
-              fi
-
-              echo "FAIL ${test_name}"
-              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              echo "::group::${test_name} startup log"
-              services=()
-              while IFS= read -r service; do
-                if [ -n "$service" ]; then
-                  services+=("$service")
-                fi
-              done < <(related_services "$test_name")
-              if [ "${#services[@]}" -gt 0 ]; then
-                "${compose[@]}" logs --no-color "${services[@]}" || true
-              fi
-              echo "::endgroup::"
-              cleanup_tests "$test_name"
-            done
+            cleanup_tests "$test_name"
           }
 
           test_finished() {
@@ -350,13 +336,19 @@ jobs:
               echo "SKIP ${test_name}"
             fi
           done < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          next_test_index=0
           running_tests=()
 
-          if [ "${#tests[@]}" -gt 0 ]; then
-            start_tests "${tests[@]}"
-          fi
+          while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
+            while [ "${#running_tests[@]}" -lt "$COMPOSE_TEST_PARALLELISM" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
+              start_test "${tests[$next_test_index]}"
+              next_test_index=$((next_test_index + 1))
+            done
 
-          while [ "${#running_tests[@]}" -gt 0 ]; do
+            if [ "${#running_tests[@]}" -eq 0 ]; then
+              continue
+            fi
+
             next_running_tests=()
             completed_any=0
             for test_name in "${running_tests[@]}"; do
@@ -512,45 +504,31 @@ jobs:
             "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
           }
 
-          start_tests() {
-            local start_log="$RUNNER_TEMP/compose-test-logs/start.log"
-            local test_name
+          start_test() {
+            local test_name="$1"
+            local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
 
-            for test_name in "$@"; do
-              echo "START ${test_name}"
-            done
-
-            if "${compose[@]}" --parallel "$COMPOSE_TEST_PARALLELISM" up --no-build -d "$@" > "$start_log" 2>&1; then
-              running_tests=("$@")
+            echo "START ${test_name}"
+            if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
+              running_tests+=("$test_name")
               return
             fi
 
-            echo "::group::Compose startup log"
+            echo "FAIL ${test_name}"
+            printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+            echo "::group::${test_name} startup log"
             cat "$start_log"
+            services=()
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
+              fi
+            done < <(related_services "$test_name")
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" logs --no-color "${services[@]}" || true
+            fi
             echo "::endgroup::"
-
-            running_tests=()
-            for test_name in "$@"; do
-              if [ -n "$(test_container_id "$test_name")" ]; then
-                running_tests+=("$test_name")
-                continue
-              fi
-
-              echo "FAIL ${test_name}"
-              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              echo "::group::${test_name} startup log"
-              services=()
-              while IFS= read -r service; do
-                if [ -n "$service" ]; then
-                  services+=("$service")
-                fi
-              done < <(related_services "$test_name")
-              if [ "${#services[@]}" -gt 0 ]; then
-                "${compose[@]}" logs --no-color "${services[@]}" || true
-              fi
-              echo "::endgroup::"
-              cleanup_tests "$test_name"
-            done
+            cleanup_tests "$test_name"
           }
 
           test_finished() {
@@ -607,13 +585,19 @@ jobs:
               tests+=("$test_name")
             fi
           done < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          next_test_index=0
           running_tests=()
 
-          if [ "${#tests[@]}" -gt 0 ]; then
-            start_tests "${tests[@]}"
-          fi
+          while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
+            while [ "${#running_tests[@]}" -lt "$COMPOSE_TEST_PARALLELISM" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
+              start_test "${tests[$next_test_index]}"
+              next_test_index=$((next_test_index + 1))
+            done
 
-          while [ "${#running_tests[@]}" -gt 0 ]; do
+            if [ "${#running_tests[@]}" -eq 0 ]; then
+              continue
+            fi
+
             next_running_tests=()
             completed_any=0
             for test_name in "${running_tests[@]}"; do

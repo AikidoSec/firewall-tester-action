@@ -29,7 +29,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
@@ -40,7 +40,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: ''
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
@@ -51,7 +51,7 @@ jobs:
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
             php_firewall_version: 1.0.126
-            parallelism: 5
+            parallelism: 8
             skip_tests: test_stored_ssrf,test_stored_ssrf_no_context
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
@@ -62,7 +62,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec,test_stored_ssrf_no_context,test_stored_ssrf
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
@@ -73,7 +73,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: ''
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
@@ -84,7 +84,7 @@ jobs:
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: ''
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
@@ -95,7 +95,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 5
+            parallelism: 8
             skip_tests: ''
     steps:
       - name: Checkout action
@@ -446,7 +446,7 @@ jobs:
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
           COMPOSE_PROJECT_NAME: php-control
-          COMPOSE_TEST_PARALLELISM: 5
+          COMPOSE_TEST_PARALLELISM: 8
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control

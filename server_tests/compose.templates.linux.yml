@@ -96,6 +96,7 @@ services:
       TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
       PYTHONPATH: /workspace/server_tests
       APP_PORT: ${APP_PORT:-8080}
+      APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
       SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-}
@@ -124,11 +125,22 @@ services:
         if [ -z "$$control_server_port" ]; then
           python - <<'PY'
         import os
+        import time
         import requests
-        try:
-            requests.get(f"http://{os.environ['TEST_SERVER_HOST']}:{os.environ['APP_PORT']}/", timeout=5)
-        except Exception as e:
-            print(f"Warmup request failed: {e}")
+
+        url = f"http://{os.environ['TEST_SERVER_HOST']}:{os.environ['APP_PORT']}/"
+        deadline = time.monotonic() + int(os.environ.get("APP_READY_TIMEOUT", "120"))
+        last_error = None
+        while time.monotonic() < deadline:
+            try:
+                requests.get(url, timeout=5)
+                break
+            except Exception as e:
+                last_error = e
+                print(f"Waiting for app at {url}: {e}", flush=True)
+                time.sleep(2)
+        else:
+            raise SystemExit(f"App did not become reachable at {url}: {last_error}")
         PY
           sleep 1
         fi

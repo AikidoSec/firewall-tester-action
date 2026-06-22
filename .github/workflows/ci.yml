@@ -218,12 +218,10 @@ jobs:
           cleanup_tests() {
             local services=()
             local service
-            declare -A seen=()
             for test_name in "$@"; do
               while IFS= read -r service; do
-                if [ -n "$service" ] && [ -z "${seen[$service]+x}" ]; then
+                if [ -n "$service" ]; then
                   services+=("$service")
-                  seen[$service]=1
                 fi
               done < <(related_services "$test_name")
             done
@@ -234,69 +232,124 @@ jobs:
             fi
           }
 
-          run_batch() {
-            local batch=("$@")
-            local batch_name
-            batch_name="$(IFS=_; printf '%s' "${batch[*]}")"
-            local batch_log="$RUNNER_TEMP/compose-test-logs/batch-${batch_name}.log"
+          test_container_id() {
+            local test_name="$1"
+            "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
+          }
 
-            for test_name in "${batch[@]}"; do
-              echo "START ${test_name}"
-            done
+          start_test() {
+            local test_name="$1"
+            local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
 
-            if ! "${compose[@]}" up --no-build -d "${batch[@]}" > "$batch_log" 2>&1; then
-              echo "FAIL batch ${batch_name}"
-              echo "::group::batch ${batch_name} startup log"
-              cat "$batch_log"
-              echo "::endgroup::"
-              for test_name in "${batch[@]}"; do
-                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              done
-              cleanup_tests "${batch[@]}"
+            echo "START ${test_name}"
+            if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
+              running_tests+=("$test_name")
               return
             fi
 
-            "${compose[@]}" wait "${batch[@]}" >> "$batch_log" 2>&1 || true
-
-            for test_name in "${batch[@]}"; do
-              local container_id
-              local status=1
-              container_id="$(${compose[@]} ps -a -q "$test_name" 2>/dev/null | tail -n 1)"
-              if [ -n "$container_id" ]; then
-                status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+            echo "FAIL ${test_name}"
+            printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+            echo "::group::${test_name} startup log"
+            cat "$start_log"
+            services=()
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
               fi
-
-              if [ "$status" = "0" ]; then
-                echo "PASS ${test_name}"
-              else
-                echo "FAIL ${test_name}"
-                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-                mapfile -t services < <(related_services "$test_name")
-                echo "::group::${test_name} log"
-                if [ "${#services[@]}" -gt 0 ]; then
-                  "${compose[@]}" logs --no-color "${services[@]}" || true
-                else
-                  cat "$batch_log"
-                fi
-                echo "::endgroup::"
-              fi
-            done
-
-            cleanup_tests "${batch[@]}"
+            done < <(related_services "$test_name")
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" logs --no-color "${services[@]}" || true
+            fi
+            echo "::endgroup::"
+            cleanup_tests "$test_name"
           }
 
-          mapfile -t tests < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
-          batch=()
-          for test_name in "${tests[@]}"; do
-            batch+=("$test_name")
-            if [ "${#batch[@]}" -ge "$COMPOSE_TEST_PARALLELISM" ]; then
-              run_batch "${batch[@]}"
-              batch=()
+          test_finished() {
+            local test_name="$1"
+            local container_id
+            local state
+            container_id="$(test_container_id "$test_name")"
+            if [ -z "$container_id" ]; then
+              return 1
+            fi
+
+            state="$(docker inspect -f '{{.State.Status}}' "$container_id" 2>/dev/null || echo missing)"
+            [ "$state" = "exited" ] || [ "$state" = "dead" ]
+          }
+
+          collect_test() {
+            local test_name="$1"
+            local container_id
+            local status=1
+            container_id="$(test_container_id "$test_name")"
+            if [ -n "$container_id" ]; then
+              status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+            fi
+
+            if [ "$status" = "0" ]; then
+              echo "PASS ${test_name}"
+            else
+              echo "FAIL ${test_name}"
+              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              services=()
+              while IFS= read -r service; do
+                if [ -n "$service" ]; then
+                  services+=("$service")
+                fi
+              done < <(related_services "$test_name")
+              echo "::group::${test_name} log"
+              if [ "${#services[@]}" -gt 0 ]; then
+                "${compose[@]}" logs --no-color "${services[@]}" || true
+              fi
+              echo "::endgroup::"
+            fi
+
+            cleanup_tests "$test_name"
+          }
+
+          if ! [[ "${COMPOSE_TEST_PARALLELISM:-}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "COMPOSE_TEST_PARALLELISM must be a positive integer" >&2
+            exit 1
+          fi
+
+          tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then
+              tests+=("$test_name")
+            fi
+          done < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          next_test_index=0
+          running_tests=()
+
+          while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
+            while [ "${#running_tests[@]}" -lt "$COMPOSE_TEST_PARALLELISM" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
+              start_test "${tests[$next_test_index]}"
+              next_test_index=$((next_test_index + 1))
+            done
+
+            if [ "${#running_tests[@]}" -eq 0 ]; then
+              continue
+            fi
+
+            next_running_tests=()
+            completed_any=0
+            for test_name in "${running_tests[@]}"; do
+              if test_finished "$test_name"; then
+                collect_test "$test_name"
+                completed_any=1
+              else
+                next_running_tests+=("$test_name")
+              fi
+            done
+            running_tests=()
+            if [ "${#next_running_tests[@]}" -gt 0 ]; then
+              running_tests=("${next_running_tests[@]}")
+            fi
+
+            if [ "$completed_any" -eq 0 ]; then
+              sleep 2
             fi
           done
-          if [ "${#batch[@]}" -gt 0 ]; then
-            run_batch "${batch[@]}"
-          fi
 
           if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
             echo "Failed tests:"
@@ -414,12 +467,10 @@ jobs:
           cleanup_tests() {
             local services=()
             local service
-            declare -A seen=()
             for test_name in "$@"; do
               while IFS= read -r service; do
-                if [ -n "$service" ] && [ -z "${seen[$service]+x}" ]; then
+                if [ -n "$service" ]; then
                   services+=("$service")
-                  seen[$service]=1
                 fi
               done < <(related_services "$test_name")
             done
@@ -430,69 +481,124 @@ jobs:
             fi
           }
 
-          run_batch() {
-            local batch=("$@")
-            local batch_name
-            batch_name="$(IFS=_; printf '%s' "${batch[*]}")"
-            local batch_log="$RUNNER_TEMP/compose-test-logs/batch-${batch_name}.log"
+          test_container_id() {
+            local test_name="$1"
+            "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
+          }
 
-            for test_name in "${batch[@]}"; do
-              echo "START ${test_name}"
-            done
+          start_test() {
+            local test_name="$1"
+            local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
 
-            if ! "${compose[@]}" up --no-build -d "${batch[@]}" > "$batch_log" 2>&1; then
-              echo "FAIL batch ${batch_name}"
-              echo "::group::batch ${batch_name} startup log"
-              cat "$batch_log"
-              echo "::endgroup::"
-              for test_name in "${batch[@]}"; do
-                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              done
-              cleanup_tests "${batch[@]}"
+            echo "START ${test_name}"
+            if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
+              running_tests+=("$test_name")
               return
             fi
 
-            "${compose[@]}" wait "${batch[@]}" >> "$batch_log" 2>&1 || true
-
-            for test_name in "${batch[@]}"; do
-              local container_id
-              local status=1
-              container_id="$(${compose[@]} ps -a -q "$test_name" 2>/dev/null | tail -n 1)"
-              if [ -n "$container_id" ]; then
-                status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+            echo "FAIL ${test_name}"
+            printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+            echo "::group::${test_name} startup log"
+            cat "$start_log"
+            services=()
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
               fi
-
-              if [ "$status" = "0" ]; then
-                echo "PASS ${test_name}"
-              else
-                echo "FAIL ${test_name}"
-                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-                mapfile -t services < <(related_services "$test_name")
-                echo "::group::${test_name} log"
-                if [ "${#services[@]}" -gt 0 ]; then
-                  "${compose[@]}" logs --no-color "${services[@]}" || true
-                else
-                  cat "$batch_log"
-                fi
-                echo "::endgroup::"
-              fi
-            done
-
-            cleanup_tests "${batch[@]}"
+            done < <(related_services "$test_name")
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" logs --no-color "${services[@]}" || true
+            fi
+            echo "::endgroup::"
+            cleanup_tests "$test_name"
           }
 
-          mapfile -t tests < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
-          batch=()
-          for test_name in "${tests[@]}"; do
-            batch+=("$test_name")
-            if [ "${#batch[@]}" -ge "$COMPOSE_TEST_PARALLELISM" ]; then
-              run_batch "${batch[@]}"
-              batch=()
+          test_finished() {
+            local test_name="$1"
+            local container_id
+            local state
+            container_id="$(test_container_id "$test_name")"
+            if [ -z "$container_id" ]; then
+              return 1
+            fi
+
+            state="$(docker inspect -f '{{.State.Status}}' "$container_id" 2>/dev/null || echo missing)"
+            [ "$state" = "exited" ] || [ "$state" = "dead" ]
+          }
+
+          collect_test() {
+            local test_name="$1"
+            local container_id
+            local status=1
+            container_id="$(test_container_id "$test_name")"
+            if [ -n "$container_id" ]; then
+              status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+            fi
+
+            if [ "$status" = "0" ]; then
+              echo "PASS ${test_name}"
+            else
+              echo "FAIL ${test_name}"
+              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              services=()
+              while IFS= read -r service; do
+                if [ -n "$service" ]; then
+                  services+=("$service")
+                fi
+              done < <(related_services "$test_name")
+              echo "::group::${test_name} log"
+              if [ "${#services[@]}" -gt 0 ]; then
+                "${compose[@]}" logs --no-color "${services[@]}" || true
+              fi
+              echo "::endgroup::"
+            fi
+
+            cleanup_tests "$test_name"
+          }
+
+          if ! [[ "${COMPOSE_TEST_PARALLELISM:-}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "COMPOSE_TEST_PARALLELISM must be a positive integer" >&2
+            exit 1
+          fi
+
+          tests=()
+          while IFS= read -r test_name; do
+            if [ -n "$test_name" ]; then
+              tests+=("$test_name")
+            fi
+          done < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          next_test_index=0
+          running_tests=()
+
+          while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
+            while [ "${#running_tests[@]}" -lt "$COMPOSE_TEST_PARALLELISM" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
+              start_test "${tests[$next_test_index]}"
+              next_test_index=$((next_test_index + 1))
+            done
+
+            if [ "${#running_tests[@]}" -eq 0 ]; then
+              continue
+            fi
+
+            next_running_tests=()
+            completed_any=0
+            for test_name in "${running_tests[@]}"; do
+              if test_finished "$test_name"; then
+                collect_test "$test_name"
+                completed_any=1
+              else
+                next_running_tests+=("$test_name")
+              fi
+            done
+            running_tests=()
+            if [ "${#next_running_tests[@]}" -gt 0 ]; then
+              running_tests=("${next_running_tests[@]}")
+            fi
+
+            if [ "$completed_any" -eq 0 ]; then
+              sleep 2
             fi
           done
-          if [ "${#batch[@]}" -gt 0 ]; then
-            run_batch "${batch[@]}"
-          fi
 
           if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
             echo "Failed tests:"

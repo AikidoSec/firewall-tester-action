@@ -69,3 +69,17 @@ services:
       interval: 1s
       timeout: 5s
       retries: 60
+
+  demo_app_image:
+    extends:
+      file: ./server_tests/compose.templates.linux.yml
+      service: app_template
+    profiles:
+      - build
+
+  test_runner_image:
+    extends:
+      file: ./server_tests/compose.templates.linux.yml
+      service: test_template
+    profiles:
+      - build

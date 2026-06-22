@@ -138,10 +138,10 @@ jobs:
           export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          docker compose -f compose.linux.yml build \
+          docker compose -f compose.linux.yml --profile build build \
             core \
-            app_test_sql_injection \
-            test_sql_injection
+            demo_app_image \
+            test_runner_image
 
       - name: Run Compose tests
         env:
@@ -435,10 +435,10 @@ jobs:
           export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          docker compose -f compose.linux.yml build \
+          docker compose -f compose.linux.yml --profile build build \
             core \
-            app_control_test_restart \
-            control_test_restart
+            demo_app_image \
+            test_runner_image
 
       - name: Run Compose control tests
         env:

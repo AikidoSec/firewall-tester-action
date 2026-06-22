@@ -60,8 +60,11 @@ runs:
         export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
         export APP_ENV_FILE="${APP_ENV_FILE:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
         export APP_ENV_FILE_2="${APP_ENV_FILE_2:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
+        export COMPOSE_PROJECT_NAME="$TEST_NAME"
+        container_os="$(docker info --format '{{.OSType}}')"
 
         docker compose \
+          -f "$GITHUB_ACTION_PATH/compose.$container_os.yml" \
           -f "$GITHUB_ACTION_PATH/server_tests/$TEST_NAME/compose.yml" \
           up --build --exit-code-from test test
 
@@ -80,7 +83,10 @@ runs:
         export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
         export APP_ENV_FILE="${APP_ENV_FILE:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
         export APP_ENV_FILE_2="${APP_ENV_FILE_2:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
+        export COMPOSE_PROJECT_NAME="$TEST_NAME"
+        container_os="$(docker info --format '{{.OSType}}')"
 
         docker compose \
+          -f "$GITHUB_ACTION_PATH/compose.$container_os.yml" \
           -f "$GITHUB_ACTION_PATH/server_tests/$TEST_NAME/compose.yml" \
           down -v --remove-orphans

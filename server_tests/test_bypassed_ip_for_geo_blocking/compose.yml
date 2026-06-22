@@ -1,2 +1,0 @@
-include:
-  - ../../compose.${CONTAINER_OS:-linux}.yml

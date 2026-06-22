@@ -1,6 +1,3 @@
-include:
-  - ../../compose.${CONTAINER_OS:-linux}.yml
-
 services:
   app:
     environment:

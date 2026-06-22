@@ -136,12 +136,14 @@ jobs:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
+          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
           DEMO_CONTEXT: ./zen-demo
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
           SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
         run: |
           docker compose \
+            -f compose.linux.yml \
             -f "server_tests/${{ matrix.test_name }}/compose.yml" \
             up --build --exit-code-from test test
 
@@ -151,10 +153,12 @@ jobs:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
+          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
           DEMO_CONTEXT: ./zen-demo
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
         run: |
           docker compose \
+            -f compose.linux.yml \
             -f "server_tests/${{ matrix.test_name }}/compose.yml" \
             down -v --remove-orphans
 
@@ -192,12 +196,14 @@ jobs:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
+          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           PHP_FIREWALL_VERSION: ''
           SLEEP_BEFORE_TEST: 20
         run: |
           docker compose \
+            -f compose.linux.yml \
             -f "server_tests/${{ matrix.test_name }}/compose.yml" \
             up --build --exit-code-from test test
 
@@ -207,9 +213,11 @@ jobs:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
+          COMPOSE_PROJECT_NAME: ${{ matrix.test_name }}
           DEMO_CONTEXT: ./zen-demo
           PHP_FIREWALL_VERSION: ''
         run: |
           docker compose \
+            -f compose.linux.yml \
             -f "server_tests/${{ matrix.test_name }}/compose.yml" \
             down -v --remove-orphans

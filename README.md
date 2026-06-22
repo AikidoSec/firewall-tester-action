@@ -55,15 +55,15 @@ git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 Run a single test directly with Docker Compose:
 
 ```sh
-DEMO_CONTEXT=./zen-demo APP_PORT=3000 SLEEP_BEFORE_TEST=15 \
-  docker compose -f server_tests/test_sql_injection/compose.yml \
+COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo APP_PORT=3000 SLEEP_BEFORE_TEST=15 \
+  docker compose -f compose.linux.yml -f server_tests/test_sql_injection/compose.yml \
   up --build --exit-code-from test test
 ```
 
 Clean up after a run:
 
 ```sh
-DEMO_CONTEXT=./zen-demo APP_PORT=3000 \
-  docker compose -f server_tests/test_sql_injection/compose.yml \
+COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo APP_PORT=3000 \
+  docker compose -f compose.linux.yml -f server_tests/test_sql_injection/compose.yml \
   down -v --remove-orphans
 ```

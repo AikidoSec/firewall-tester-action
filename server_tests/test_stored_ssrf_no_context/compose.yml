@@ -1,6 +1,3 @@
-include:
-  - ../../compose.${CONTAINER_OS:-linux}.yml
-
 services:
   app:
     depends_on:
@@ -24,7 +21,7 @@ services:
   dns_mock:
     image: python:3.13-alpine
     volumes:
-      - ../dns_mock.py:/dns_mock.py:ro
+      - ./server_tests/dns_mock.py:/dns_mock.py:ro
     command: python /dns_mock.py
     healthcheck:
       test:
@@ -49,7 +46,7 @@ services:
     cap_add:
       - NET_ADMIN
     volumes:
-      - ./mock-imds.py:/mock-imds.py:ro
+      - ./server_tests/test_stored_ssrf_no_context/mock-imds.py:/mock-imds.py:ro
     command:
       - sh
       - -c

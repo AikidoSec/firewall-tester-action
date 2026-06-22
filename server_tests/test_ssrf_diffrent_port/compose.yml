@@ -1,6 +1,3 @@
-include:
-  - ../../compose.${CONTAINER_OS:-linux}.yml
-
 services:
   test:
     depends_on:
@@ -14,5 +11,5 @@ services:
         condition: service_started
     network_mode: service:app
     volumes:
-      - ./mock-4000.sh:/mock-4000.sh:ro
+      - ./server_tests/test_ssrf_diffrent_port/mock-4000.sh:/mock-4000.sh:ro
     command: sh /mock-4000.sh

@@ -18,7 +18,7 @@ Same as test_user_rate_limiting_1_minute but without X-Forwarded-For header.
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    for _ in range(4):  # one it's made in run_test.py (Cold turkey)
+    for _ in range(4):  # one warmup request is made by the Compose test service
         response = s.get(
             "/")
         collector.soft_assert_response_code_is(response, 200)

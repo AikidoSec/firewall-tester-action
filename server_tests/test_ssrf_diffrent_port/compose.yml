@@ -1,0 +1,18 @@
+include:
+  - ../../compose.${CONTAINER_OS:-linux}.yml
+
+services:
+  test:
+    depends_on:
+      ssrf_mock_4000:
+        condition: service_started
+
+  ssrf_mock_4000:
+    image: alpine:3.20
+    depends_on:
+      app:
+        condition: service_started
+    network_mode: service:app
+    volumes:
+      - ./mock-4000.sh:/mock-4000.sh:ro
+    command: sh /mock-4000.sh

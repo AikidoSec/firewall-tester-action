@@ -1,0 +1,193 @@
+x-windows-runner-image: &windows-runner-image
+  image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner-windows}
+  build:
+    context: .
+    dockerfile: server_tests/Dockerfile.runner.windows
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-sokigo/postgresql-windows:15.15-2022}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "%POSTGRES_USER%" -h 127.0.0.1 -p 5432
+      interval: 1s
+      timeout: 5s
+      retries: 180
+
+  core:
+    image: ${CORE_IMAGE:-firewall-tester-action-core-windows}
+    build:
+      context: .
+      dockerfile: ${CORE_DOCKERFILE:-src/coremock/Dockerfile.windows}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - powershell -NoProfile -Command "try { Invoke-WebRequest
+          -UseBasicParsing http://localhost:3000/health | Out-Null; exit 0 }
+          catch { exit 1 }"
+      interval: 1s
+      timeout: 5s
+      retries: 60
+
+  setup_test:
+    image: ${POSTGRES_IMAGE:-sokigo/postgresql-windows:15.15-2022}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: .
+        target: C:\workspace
+        read_only: true
+    working_dir: C:\workspace
+    environment:
+      TEST_NAME: ${COMPOSE_PROJECT_NAME}
+      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      CORE_URL: http://core:3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command:
+      - powershell
+      - -NoProfile
+      - -Command
+      - |
+        $$ErrorActionPreference = 'Stop'
+
+        if (-not $$env:TEST_NAME -or $$env:TEST_NAME -notmatch '^(test|control_test)_[A-Za-z0-9_]+$') {
+          throw "Invalid TEST_NAME: $$env:TEST_NAME"
+        }
+
+        $$testDir = "C:\workspace\server_tests\$$env:TEST_NAME"
+        if (-not (Test-Path "$$testDir\test.py")) {
+          throw "Unknown test: $$env:TEST_NAME"
+        }
+
+        $$exists = (& psql -h $$env:POSTGRES_HOST -p $$env:POSTGRES_PORT -U $$env:POSTGRES_USER -tAc "SELECT 1 FROM pg_database WHERE datname = '$$env:TEST_NAME'") -join ''
+        if ($$exists.Trim() -ne '1') {
+          & createdb -h $$env:POSTGRES_HOST -p $$env:POSTGRES_PORT -U $$env:POSTGRES_USER $$env:TEST_NAME
+          if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
+        }
+
+        $$jsonHeaders = @{ 'Content-Type' = 'application/json' }
+        Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/apps" -Headers $$jsonHeaders -Body (@{ token = $$env:TEST_TOKEN } | ConvertTo-Json) | Out-Null
+
+        $$authHeaders = @{
+          'Authorization' = $$env:TEST_TOKEN
+          'Content-Type' = 'application/json'
+        }
+
+        $$startConfig = "$$testDir\start_config.json"
+        if (Test-Path $$startConfig) {
+          Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/config" -Headers $$authHeaders -Body (Get-Content -Raw $$startConfig) | Out-Null
+        }
+
+        $$startFirewall = "$$testDir\start_firewall.json"
+        if (Test-Path $$startFirewall) {
+          Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/firewall/lists" -Headers $$authHeaders -Body (Get-Content -Raw $$startFirewall) | Out-Null
+        }
+
+  app:
+    image: ${DEMO_IMAGE:-firewall-tester-action-demo-image-windows}
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
+      args:
+        DOTNET_BUILD_ARGS: ${DOTNET_BUILD_ARGS:-}
+        MSBUILD_ARGS: ${MSBUILD_ARGS:-}
+        PHP_FIREWALL_VERSION: ${PHP_FIREWALL_VERSION:-}
+    env_file:
+      - ${APP_ENV_FILE:-./server_tests/empty.env}
+      - ${APP_ENV_FILE_2:-./server_tests/empty.env}
+      - ./server_tests/default.env
+      - ./server_tests/${COMPOSE_PROJECT_NAME}/test.env
+    environment:
+      PORT: ${APP_PORT:-8080}
+      # prettier-ignore
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${COMPOSE_PROJECT_NAME}?sslmode=disable"
+    depends_on:
+      setup_test:
+        condition: service_completed_successfully
+    restart: 'no'
+
+  test:
+    <<: *windows-runner-image
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - type: bind
+        source: .
+        target: C:\workspace
+        read_only: true
+    working_dir: C:\workspace\server_tests
+    environment:
+      TEST_NAME: ${COMPOSE_PROJECT_NAME}
+      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      TEST_SERVER_HOST: app
+      TEST_CONTROL_SERVER_HOST: app
+      TEST_CORE_HOST: core
+      TEST_DNS_MOCK_URL: ${TEST_DNS_MOCK_URL:-}
+      TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
+      PYTHONPATH: C:\workspace\server_tests
+      APP_PORT: ${APP_PORT:-8080}
+      CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
+      CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
+      SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-}
+    command:
+      - powershell
+      - -NoProfile
+      - -Command
+      - |
+        $$ErrorActionPreference = 'Stop'
+        $$sleepSeconds = $$env:SLEEP_BEFORE_TEST
+        if (-not $$sleepSeconds) {
+          switch ($$env:TEST_NAME) {
+            'test_ssrf' { $$sleepSeconds = 20; break }
+            'test_ssrf_diffrent_port' { $$sleepSeconds = 20; break }
+            'test_stored_ssrf' { $$sleepSeconds = 20; break }
+            'test_stored_ssrf_no_context' { $$sleepSeconds = 20; break }
+            default { $$sleepSeconds = 5 }
+          }
+        }
+
+        $$controlServerPort = $$env:CONTROL_SERVER_PORT
+        if (-not $$controlServerPort -and $$env:TEST_NAME.StartsWith('control_test_')) {
+          $$controlServerPort = '8081'
+        }
+
+        Start-Sleep -Seconds ([int]$$sleepSeconds)
+
+        if (-not $$controlServerPort) {
+          try {
+            Invoke-WebRequest -UseBasicParsing "http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/" | Out-Null
+          } catch {
+            Write-Host "Warmup request failed: $$($$_.Exception.Message)"
+          }
+          Start-Sleep -Seconds 1
+        }
+
+        $$extraArgs = @()
+        if ($$controlServerPort) {
+          $$extraArgs += '--control_server_port'
+          $$extraArgs += $$controlServerPort
+        }
+
+        & python "C:\workspace\server_tests\$$env:TEST_NAME\test.py" `
+          --test_name $$env:TEST_NAME `
+          --server_port $$env:APP_PORT `
+          --token $$env:TEST_TOKEN `
+          --core_port 3000 `
+          --config_update_delay $$env:CONFIG_UPDATE_DELAY `
+          @extraArgs
+        if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
+    restart: 'no'

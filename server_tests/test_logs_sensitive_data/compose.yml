@@ -1,0 +1,41 @@
+include:
+  - ../../compose.${CONTAINER_OS:-linux}.yml
+
+services:
+  app:
+    depends_on:
+      log_collector:
+        condition: service_healthy
+    logging:
+      driver: syslog
+      options:
+        syslog-address: tcp://${SYSLOG_COLLECTOR_HOST:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}
+        tag: '{{.Name}}'
+
+  test:
+    environment:
+      TEST_APP_LOG_FILE: ${TEST_LOG_DIR:-/logs}/test_logs_sensitive_data.log
+    volumes:
+      - test_logs_sensitive_data_logs:${TEST_LOG_DIR:-/logs}:ro
+
+  log_collector:
+    image: python:3.13-alpine
+    environment:
+      SYSLOG_COLLECTOR_LOG_FILE: /logs/test_logs_sensitive_data.log
+    volumes:
+      - ../syslog_collector.py:/syslog_collector.py:ro
+      - test_logs_sensitive_data_logs:/logs
+    ports:
+      - '${SYSLOG_COLLECTOR_BIND_ADDRESS:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}:5514'
+    command: python /syslog_collector.py
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import socket; socket.create_connection(('127.0.0.1',
+          5514), 1).close()"
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  test_logs_sensitive_data_logs:

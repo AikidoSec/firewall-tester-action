@@ -1,0 +1,36 @@
+include:
+  - ../../compose.${CONTAINER_OS:-linux}.yml
+
+services:
+  app:
+    depends_on:
+      mock_server_outbound_domain_blocking:
+        condition: service_started
+    networks:
+      - default
+      - outbound_domain_blocking
+
+  mock_server_outbound_domain_blocking:
+    image: python:3.13-alpine
+    volumes:
+      - .:/test:ro
+    command: python /test/mock-server.py
+    networks:
+      outbound_domain_blocking:
+        ipv4_address: 11.22.33.44
+        aliases:
+          - evil.example.com
+          - domain1.example.com
+          - domain2.example.com
+          - safe.example.com
+          - another-unknown.example.com
+          - unknown.example.com
+          - xn--bse-sna.example.com
+          - xn--mnchen-3ya.example.com
+          - xn--mnchen-allowed-gsb.example.com
+
+networks:
+  outbound_domain_blocking:
+    ipam:
+      config:
+        - subnet: 11.22.33.0/24

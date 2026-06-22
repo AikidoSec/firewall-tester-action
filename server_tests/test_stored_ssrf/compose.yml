@@ -1,0 +1,64 @@
+include:
+  - ../../compose.${CONTAINER_OS:-linux}.yml
+
+services:
+  app:
+    depends_on:
+      dns_mock:
+        condition: service_healthy
+    dns:
+      - 10.254.254.53
+    networks:
+      - default
+      - dns_net
+
+  test:
+    depends_on:
+      dns_mock:
+        condition: service_healthy
+      imds_mock:
+        condition: service_started
+    environment:
+      TEST_DNS_MOCK_URL: http://dns_mock:8053
+
+  dns_mock:
+    image: python:3.13-alpine
+    volumes:
+      - ../dns_mock.py:/dns_mock.py:ro
+    command: python /dns_mock.py
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8053/health',
+          timeout=1).read()"
+      interval: 1s
+      timeout: 5s
+      retries: 30
+    networks:
+      default: null
+      dns_net:
+        ipv4_address: 10.254.254.53
+
+  imds_mock:
+    image: python:3.12-alpine
+    depends_on:
+      app:
+        condition: service_started
+    network_mode: service:app
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./mock-imds.py:/mock-imds.py:ro
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache iproute2
+        python /mock-imds.py 169.254.169.254 100.100.100.200 fd00:ec2::254
+
+networks:
+  dns_net:
+    ipam:
+      config:
+        - subnet: 10.254.254.0/24

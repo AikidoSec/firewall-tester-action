@@ -1,10 +1,6 @@
-import requests
-import time
-import sys
 from testlib import *
 from core_api import CoreApi
 import itertools
-import os
 
 '''
 1. Sets up a simple config and env AIKIDO_BLOCK=1
@@ -15,17 +11,6 @@ import os
 6. Change the config to enable blocking
 7. Test that the firewall blocks SSRF attacks
 '''
-
-
-def start_mock_servers(target_container_name: str):
-    path = os.path.join(os.path.dirname(__file__), "mock-4000.sh")
-    subprocess.run(
-        f"docker run -d --name mock-4000-for-ssrf -v {path}:/mock-4000.sh:ro --network container:{target_container_name} alpine:3.20 sh /mock-4000.sh", shell=True)
-
-    path = os.path.join(os.path.dirname(__file__), "mock-imds.py")
-    subprocess.run(
-        f"docker run -d --name mock-imds -v {path}:/mock-imds.py:ro --network container:{target_container_name} --cap-add NET_ADMIN python:3.12-alpine sh -c 'apk add --no-cache iproute2 && python /mock-imds.py 169.254.169.254 100.100.100.200'", shell=True)
-    time.sleep(20)
 
 
 def prefixnum(num, base):
@@ -209,11 +194,4 @@ def run_test(s: TestServer, c: CoreApi):
 
 if __name__ == "__main__":
     args, s, c = init_server_and_core()
-    try:
-        start_mock_servers("test_ssrf")
-        run_test(s, c)
-    finally:
-        subprocess.run(
-            f"docker rm -f mock-4000-for-ssrf", shell=True)
-        subprocess.run(
-            f"docker rm -f mock-imds", shell=True)
+    run_test(s, c)

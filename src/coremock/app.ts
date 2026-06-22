@@ -25,6 +25,10 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' })
+})
+
 app.get('/api/runtime/config', checkToken, getConfigHandler)
 app.post('/api/runtime/config', checkToken, updateConfigHandler)
 

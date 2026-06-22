@@ -1,0 +1,7 @@
+# escape=`
+FROM python:3.13-windowsservercore-ltsc2022
+
+WORKDIR C:\workspace
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt

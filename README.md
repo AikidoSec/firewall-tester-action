@@ -1,79 +1,69 @@
 # Firewall Tester Action
 
-This is an **internal validation framework** used to validate that firewall
-agents work correctly.  
-It runs QA tests against firewall agents in a Dockerized environment and checks
-expected behaviors like startup events, heartbeats, runtime protection.
+Internal validation framework for Aikido firewall agents. Tests are orchestrated
+with Docker Compose: each test directory has a `compose.yml` that starts the
+mock core, Postgres, the demo app, and the Python test runner for that test.
 
-## 🚀 Usage
+## Usage
+
+Run one test with the composite action:
 
 ```yaml
 jobs:
-  run-firewall-tests:
+  run-firewall-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Run Firewall QA Tests
-        uses: AikidoSec/firewall-tester-action@v1
+      - uses: actions/checkout@v4
         with:
-          dockerfile_path: ./test-app-dockerfiles/Dockerfile.hono
+          repository: Aikido-demo-apps/zen-demo-nodejs
+          path: ./zen-demo
+          ref: dev-testing
+
+      - uses: AikidoSec/firewall-tester-action@v1
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          test_name: test_sql_injection
+          app_port: 3000
 ```
 
-## 🧩 Inputs
+The CI workflow in this repository runs all Linux demo apps through a GitHub
+matrix, with one Compose test per matrix job.
 
-| Name                  | Description                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed (required)                                      |
-| `extra_args`          | Extra arguments to pass to the `docker run` command (`--env`, `-e`, and `--env-file` only are allowed) |
-| `extra_build_args`    | Extra arguments to pass to the `docker build` command (e.g. `--build-arg APP_VERSION=2.0.1`)           |
-| `app_port`            | The port exposed by the application during Docker runtime                                              |
-| `max_parallel_tests`  | Maximum number of tests to run in parallel (default: `5`)                                              |
-| `config_update_delay` | Delay (in seconds) after updating the config to ensure it's applied (default: `60`)                    |
-| `skip_tests`          | Comma-separated list of tests to skip (e.g. `test_allowed_ip,test_sql_injection`)                      |
-| `test_timeout`        | Timeout (in seconds) for each test (default: `60`)                                                     |
-| `sleep_before_test`   | Number of seconds to wait before starting the test (default: `1`)                                      |
+## Inputs
 
-## Running locally
+| Name                   | Description                                                       |
+| ---------------------- | ----------------------------------------------------------------- |
+| `dockerfile_path`      | Path to the Dockerfile with the Aikido agent installed            |
+| `test_name`            | Test directory under `server_tests`, such as `test_sql_injection` |
+| `app_port`             | Port exposed by the application during Docker runtime             |
+| `config_update_delay`  | Delay in seconds after runtime config updates                     |
+| `sleep_before_test`    | Seconds to wait before starting the test                          |
+| `app_env_file`         | Optional env file passed to the application service               |
+| `app_env_file_2`       | Optional second env file passed to the application service        |
+| `php_firewall_version` | Optional PHP firewall package version build arg                   |
 
-You'll need Docker, Node.js >= 20, and Python 3.
+## Running Locally
 
-Clone the demo app you want to test into `./zen-demo/`:
+Clone a demo app into `./zen-demo`:
 
 ```sh
-git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo/zen-demo-nodejs
-# or whichever language you're working on
+git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 ```
 
-Then install dependencies:
+Run a single test directly with Docker Compose:
 
 ```sh
-npm install
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+DEMO_CONTEXT=./zen-demo APP_PORT=3000 SLEEP_BEFORE_TEST=15 \
+  docker compose -f server_tests/test_sql_injection/compose.yml \
+  up --build --exit-code-from test test
 ```
 
-Run tests for a language:
+Clean up after a run:
 
 ```sh
-npm run local-action-nodejs
-npm run local-action-php
-npm run local-action-java
-npm run local-action-python
-npm run local-action-ruby
-npm run local-action-go
-npm run local-action-dotnet
+DEMO_CONTEXT=./zen-demo APP_PORT=3000 \
+  docker compose -f server_tests/test_sql_injection/compose.yml \
+  down -v --remove-orphans
 ```
-
-To run a single test, pass the name after `--`:
-
-```sh
-npm run local-action-nodejs -- test_sql_injection
-npm run local-action-php -- test_shell_injection,test_path_traversal
-```
-
-Each language has a corresponding `.env.example.<lang>` file where you can
-adjust the Dockerfile path, parallelism, timeouts, etc.

@@ -12,95 +12,171 @@ permissions:
   contents: read
 
 jobs:
-  test-nodejs:
-    name: Node.js Tests (zen-demo-nodejs)
+  server-tests-linux:
+    name: ${{ matrix.app.name }} / ${{ matrix.test_name }}
     runs-on: ubuntu-latest
-
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        app:
+          - name: nodejs
+            repository: Aikido-demo-apps/zen-demo-nodejs
+            ref: dev-testing
+            app_port: 3000
+            sleep_before_test: 15
+            config_update_delay: 60
+            app_env_file: ./server_tests/empty.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+          - name: python
+            repository: Aikido-demo-apps/zen-demo-python
+            ref: gunicorn-threads-1w-4t
+            app_port: 8080
+            sleep_before_test: 15
+            config_update_delay: 60
+            app_env_file: ./server_tests/empty.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+          - name: php
+            repository: Aikido-demo-apps/zen-demo-php
+            ref: dev-testing
+            app_port: 8080
+            sleep_before_test: 20
+            config_update_delay: 120
+            app_env_file: ./zen-demo/.env.example
+            app_env_file_2: ./server_tests/app_env/php.env
+            php_firewall_version: 1.0.126
+          - name: dotnet-core
+            repository: Aikido-demo-apps/zen-demo-dotnet-core
+            ref: main
+            app_port: 8080
+            sleep_before_test: 15
+            config_update_delay: 60
+            app_env_file: ./server_tests/empty.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+          - name: java
+            repository: Aikido-demo-apps/zen-demo-java
+            ref: dev-testing
+            app_port: 8080
+            sleep_before_test: 15
+            config_update_delay: 60
+            app_env_file: ./server_tests/empty.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+          - name: ruby
+            repository: Aikido-demo-apps/zen-demo-ruby
+            ref: dev-testing
+            app_port: 3000
+            sleep_before_test: 30
+            config_update_delay: 60
+            app_env_file: ./server_tests/app_env/ruby.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+          - name: go
+            repository: Aikido-demo-apps/zen-demo-go
+            ref: main
+            app_port: 3000
+            sleep_before_test: 20
+            config_update_delay: 60
+            app_env_file: ./server_tests/empty.env
+            app_env_file_2: ./server_tests/empty.env
+            php_firewall_version: ''
+        test_name:
+          - test_aikido_disable
+          - test_allow_traffic_by_countries
+          - test_allowed_ip_for_routes
+          - test_allowed_ip_for_wildcard_route
+          - test_allowed_ip_most_restrictive
+          - test_api_spec
+          - test_block_traffic_by_countries
+          - test_bypassed_ip
+          - test_bypassed_ip_for_geo_blocking
+          - test_bypassed_ip_for_rate_limiting
+          - test_core_went_down
+          - test_demo_apps_generic_tests
+          - test_excluded_user_from_rate_limiting
+          - test_force_protection_off
+          - test_internet_not_available
+          - test_invalid_token
+          - test_logs_sensitive_data
+          - test_no_token_set
+          - test_outbound_domain_blocking
+          - test_path_traversal
+          - test_rate_limiting_group_id_1_minute
+          - test_rate_limiting_retry_after
+          - test_shell_injection
+          - test_sql_injection
+          - test_ssrf
+          - test_ssrf_diffrent_port
+          - test_stored_ssrf
+          - test_stored_ssrf_no_context
+          - test_user_ip_from_proxy
+          - test_user_rate_limiting_1_minute
+          - test_user_rate_limiting_1_minute_enable_disable
+          - test_user_rate_limiting_1_minute_for_wildcard_route
+          - test_user_rate_limiting_1_minute_without_x_forwarded_for
+          - test_wave_attack
     steps:
       - name: Checkout action
-        id: checkout
         uses: actions/checkout@v4
 
       - name: Checkout demo app
         uses: actions/checkout@v4
         with:
-          repository: Aikido-demo-apps/zen-demo-nodejs
+          repository: ${{ matrix.app.repository }}
           path: ./zen-demo
-          ref: dev-testing
+          ref: ${{ matrix.app.ref }}
           submodules: recursive
 
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          app_port: 3000
-          sleep_before_test: 15
-          ignore_failures: true
+      - name: Run Compose test
+        env:
+          APP_ENV_FILE: ${{ matrix.app.app_env_file }}
+          APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
+          APP_PORT: ${{ matrix.app.app_port }}
+          CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
+          DEMO_CONTEXT: ./zen-demo
+          PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
+          SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
+        run: |
+          docker compose \
+            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
+            up --build --exit-code-from test test
 
-  test-python:
-    name: Python Tests (zen-demo-python)
+      - name: Clean up Compose test
+        if: always()
+        env:
+          APP_ENV_FILE: ${{ matrix.app.app_env_file }}
+          APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
+          APP_PORT: ${{ matrix.app.app_port }}
+          DEMO_CONTEXT: ./zen-demo
+          PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
+        run: |
+          docker compose \
+            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
+            down -v --remove-orphans
+
+  control-tests-linux:
+    name: php-control / ${{ matrix.test_name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        test_name:
+          - control_test_detects_attacks_when_started_under_load
+          - control_test_graceful_restart
+          - control_test_graceful_stop
+          - control_test_install_aikido
+          - control_test_kill_agent
+          - control_test_restart
+          - control_test_start_stop
+          - control_test_update_aikido
     steps:
       - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-python
-          path: ./zen-demo
-          ref: gunicorn-threads-1w-4t
-          submodules: recursive
-
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          sleep_before_test: 15
-          max_parallel_tests: 5
-          ignore_failures: true
-
-  test-php:
-    name: PHP Tests (zen-demo-php)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-php
-          path: ./zen-demo
-          ref: dev-testing
-          submodules: recursive
-
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          extra_args:
-            '--env-file=./zen-demo/.env.example -e
-            APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
-          extra_build_args: '--build-arg PHP_FIREWALL_VERSION=1.0.126'
-          sleep_before_test: 20
-          max_parallel_tests: 5
-          ignore_failures: true
-          test_timeout: 900 # 15 minutes
-          config_update_delay: 120 # 2 minutes
-          skip_tests: test_stored_ssrf,test_stored_ssrf_no_context
-
-  test-php-control:
-    name: PHP Control Tests (apache2 - mod_php)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout action
-        id: checkout
         uses: actions/checkout@v4
 
       - name: Checkout demo app
@@ -111,138 +187,29 @@ jobs:
           ref: apache-mod-php-control-server
           submodules: recursive
 
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          extra_args:
-            '--env-file=./zen-demo/.env.example -e
-            APP_KEY=base64:W2v6u6VR4lURkxuMT9xZ6pdhXSt5rxsmWTbd1HGqlIM='
-          sleep_before_test: 20
-          max_parallel_tests: 5
-          ignore_failures: true
-          test_type: control
-
-  test-dotnet:
-    name: Dotnet Tests (zen-demo-dotnet-core)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-dotnet-core
-          path: ./zen-demo
-          ref: main
-          submodules: recursive
-
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          sleep_before_test: 15
-          max_parallel_tests: 5
-          skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec,test_stored_ssrf_no_context,test_stored_ssrf
-          ignore_failures: true
-
-  test-java:
-    name: Java Tests (zen-demo-java)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-java
-          path: ./zen-demo
-          ref: dev-testing
-          submodules: recursive
-
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          sleep_before_test: 15
-          max_parallel_tests: 5
-          ignore_failures: true
-
-  test-ruby:
-    name: Ruby Tests (zen-demo-ruby)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-ruby
-          path: ./zen-demo
-          ref: dev-testing
-          submodules: recursive
-
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          sleep_before_test: 30
-          max_parallel_tests: 5
-          ignore_failures: true
-          extra_args:
-            '-e RAILS_ENV=test -e AIKIDO_CLIENT_IP_HEADER=HTTP_X_FORWARDED_FOR'
-          app_port: 3000
-
-  test-dotnet-framework:
-    name: Dotnet Framework Tests (zen-demo-dotnet-framework)
-    runs-on: windows-latest
-    steps:
-      - name: Checkout action
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Checkout demo app
-        uses: actions/checkout@v4
-        with:
-          repository: Aikido-demo-apps/zen-demo-dotnet-framework
-          path: ./zen-demo
-          ref: main
-          submodules: recursive
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Install Python test dependencies
-        run: python -m pip install -r requirements.txt
-
-      - name: Allow firewall-tester core mock through Windows Firewall
-        shell: pwsh
+      - name: Run Compose control test
+        env:
+          APP_ENV_FILE: ./zen-demo/.env.example
+          APP_ENV_FILE_2: ./server_tests/app_env/php.env
+          APP_PORT: 8080
+          CONFIG_UPDATE_DELAY: 60
+          DEMO_CONTEXT: ./zen-demo
+          PHP_FIREWALL_VERSION: ''
+          SLEEP_BEFORE_TEST: 20
         run: |
-          $ruleName = 'Aikido Firewall Tester Action Core Mock'
-          Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-          New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Action Allow -Profile Any -Protocol TCP -LocalPort 3000 | Out-Null
-          Write-Host "Ensured inbound firewall rule for TCP 3000 on all profiles."
+          docker compose \
+            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
+            up --build --exit-code-from test test
 
-      - name: Test Local Action
-        id: test-action
-        uses: ./
-        with:
-          dockerfile_path: ./zen-demo/Dockerfile
-          sleep_before_test: 15
-          max_parallel_tests: 5
-          app_port: 80
-          ignore_failures: true
-          test_timeout: 900 # 15 minutes
-          skip_tests: test_rate_limiting_group_id_1_minute,test_stored_ssrf_no_context,test_path_traversal,test_bypassed_ip,test_stored_ssrf,test_ssrf
+      - name: Clean up Compose control test
+        if: always()
+        env:
+          APP_ENV_FILE: ./zen-demo/.env.example
+          APP_ENV_FILE_2: ./server_tests/app_env/php.env
+          APP_PORT: 8080
+          DEMO_CONTEXT: ./zen-demo
+          PHP_FIREWALL_VERSION: ''
+        run: |
+          docker compose \
+            -f "server_tests/${{ matrix.test_name }}/compose.yml" \
+            down -v --remove-orphans

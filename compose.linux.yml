@@ -1,0 +1,190 @@
+x-runner-image: &runner-image
+  image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner}
+  build:
+    context: .
+    dockerfile: server_tests/Dockerfile.runner
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -h 127.0.0.1 -p 5432
+      interval: 1s
+      timeout: 5s
+      retries: 180
+
+  core:
+    image: ${CORE_IMAGE:-firewall-tester-action-core}
+    build:
+      context: .
+      dockerfile: ${CORE_DOCKERFILE:-src/coremock/Dockerfile.linux}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O - http://localhost:3000/health >/dev/null
+      interval: 1s
+      timeout: 5s
+      retries: 60
+
+  setup_test:
+    <<: *runner-image
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    environment:
+      TEST_NAME: ${COMPOSE_PROJECT_NAME}
+      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      CORE_URL: http://core:3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+
+        case "$$TEST_NAME" in
+          *[!A-Za-z0-9_]*|""|test|control_test)
+            echo "Invalid TEST_NAME: $$TEST_NAME" >&2
+            exit 1
+            ;;
+          test_*|control_test_*) ;;
+          *)
+            echo "Invalid TEST_NAME: $$TEST_NAME" >&2
+            exit 1
+            ;;
+        esac
+
+        test_dir="/workspace/server_tests/$$TEST_NAME"
+        test -f "$$test_dir/test.py"
+
+        if ! psql -h "$$POSTGRES_HOST" -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -tAc "SELECT 1 FROM pg_database WHERE datname = '$$TEST_NAME'" | grep -q 1; then
+          createdb -h "$$POSTGRES_HOST" -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" "$$TEST_NAME"
+        fi
+
+        curl -fsS \
+          -H "Content-Type: application/json" \
+          --data "{\"token\":\"$$TEST_TOKEN\"}" \
+          "$$CORE_URL/api/runtime/apps" >/dev/null
+
+        if [ -f "$$test_dir/start_config.json" ]; then
+          curl -fsS \
+            -H "Authorization: $$TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary "@$$test_dir/start_config.json" \
+            "$$CORE_URL/api/runtime/config" >/dev/null
+        fi
+
+        if [ -f "$$test_dir/start_firewall.json" ]; then
+          curl -fsS \
+            -H "Authorization: $$TEST_TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary "@$$test_dir/start_firewall.json" \
+            "$$CORE_URL/api/runtime/firewall/lists" >/dev/null
+        fi
+
+  app:
+    image: ${DEMO_IMAGE:-firewall-tester-action-demo-image}
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
+      args:
+        DOTNET_BUILD_ARGS: ${DOTNET_BUILD_ARGS:-}
+        MSBUILD_ARGS: ${MSBUILD_ARGS:-}
+        PHP_FIREWALL_VERSION: ${PHP_FIREWALL_VERSION:-}
+    env_file:
+      - ${APP_ENV_FILE:-./server_tests/empty.env}
+      - ${APP_ENV_FILE_2:-./server_tests/empty.env}
+      - ./server_tests/default.env
+      - ./server_tests/${COMPOSE_PROJECT_NAME}/test.env
+    environment:
+      PORT: ${APP_PORT:-8080}
+      # prettier-ignore
+      DATABASE_URL: "postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/${COMPOSE_PROJECT_NAME}?sslmode=disable"
+    depends_on:
+      setup_test:
+        condition: service_completed_successfully
+    restart: 'no'
+
+  test:
+    <<: *runner-image
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace/server_tests
+    environment:
+      TEST_NAME: ${COMPOSE_PROJECT_NAME}
+      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      TEST_SERVER_HOST: app
+      TEST_CONTROL_SERVER_HOST: app
+      TEST_CORE_HOST: core
+      TEST_DNS_MOCK_URL: ${TEST_DNS_MOCK_URL:-}
+      TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
+      PYTHONPATH: /workspace/server_tests
+      APP_PORT: ${APP_PORT:-8080}
+      CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
+      CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
+      SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+
+        sleep_seconds="$$SLEEP_BEFORE_TEST"
+        if [ -z "$$sleep_seconds" ]; then
+          case "$$TEST_NAME" in
+            test_ssrf|test_ssrf_diffrent_port|test_stored_ssrf|test_stored_ssrf_no_context) sleep_seconds=20 ;;
+            *) sleep_seconds=5 ;;
+          esac
+        fi
+
+        control_server_port="$$CONTROL_SERVER_PORT"
+        if [ -z "$$control_server_port" ]; then
+          case "$$TEST_NAME" in
+            control_test_*) control_server_port=8081 ;;
+          esac
+        fi
+
+        sleep "$$sleep_seconds"
+        if [ -z "$$control_server_port" ]; then
+          python - <<'PY'
+        import os
+        import requests
+        try:
+            requests.get(f"http://{os.environ['TEST_SERVER_HOST']}:{os.environ['APP_PORT']}/", timeout=5)
+        except Exception as e:
+            print(f"Warmup request failed: {e}")
+        PY
+          sleep 1
+        fi
+
+        extra_args=""
+        if [ -n "$$control_server_port" ]; then
+          extra_args="--control_server_port $$control_server_port"
+        fi
+
+        python "/workspace/server_tests/$$TEST_NAME/test.py" \
+          --test_name "$$TEST_NAME" \
+          --server_port "$$APP_PORT" \
+          --token "$$TEST_TOKEN" \
+          --core_port 3000 \
+          --config_update_delay "$$CONFIG_UPDATE_DELAY" \
+          $$extra_args
+    restart: 'no'

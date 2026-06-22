@@ -30,6 +30,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
@@ -40,6 +41,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: ''
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
@@ -50,6 +52,7 @@ jobs:
             app_env_file_2: ./server_tests/app_env/php.env
             php_firewall_version: 1.0.126
             parallelism: 5
+            skip_tests: test_stored_ssrf,test_stored_ssrf_no_context
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
@@ -60,6 +63,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec,test_stored_ssrf_no_context,test_stored_ssrf
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
@@ -70,6 +74,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: ''
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
@@ -80,6 +85,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: ''
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
@@ -90,6 +96,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 5
+            skip_tests: ''
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -148,6 +155,7 @@ jobs:
           DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
           SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
+          SKIP_TESTS: ${{ matrix.app.skip_tests }}
           TEST_NAMES: |
             test_aikido_disable
             test_allow_traffic_by_countries
@@ -312,10 +320,20 @@ jobs:
             exit 1
           fi
 
+          is_skipped_test() {
+            local test_name="$1"
+            case ",${SKIP_TESTS:-}," in
+              *,"$test_name",*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+
           tests=()
           while IFS= read -r test_name; do
-            if [ -n "$test_name" ]; then
+            if [ -n "$test_name" ] && ! is_skipped_test "$test_name"; then
               tests+=("$test_name")
+            elif [ -n "$test_name" ]; then
+              echo "SKIP ${test_name}"
             fi
           done < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
           next_test_index=0

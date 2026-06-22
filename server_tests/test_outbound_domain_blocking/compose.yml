@@ -1,19 +1,55 @@
+x-test-name: &test_name test_outbound_domain_blocking
+x-test-token: &test_token AIK_RUNTIME_1_test_outbound_domain_blocking
+x-app-service: &app_service app_test_outbound_domain_blocking
+x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/test_outbound_domain_blocking?sslmode=disable'
+
 services:
-  app:
+  setup_test_outbound_domain_blocking:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: setup_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+
+  app_test_outbound_domain_blocking:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: app_template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test_token
+      DATABASE_URL: *database_url
     depends_on:
-      mock_server_outbound_domain_blocking:
+      setup_test_outbound_domain_blocking:
+        condition: service_completed_successfully
+      mock_server_outbound_domain_blocking_test_outbound_domain_blocking:
         condition: service_started
     networks:
       - default
-      - outbound_domain_blocking
+      - outbound_domain_blocking_test_outbound_domain_blocking
 
-  mock_server_outbound_domain_blocking:
+  test_outbound_domain_blocking:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: test_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+      TEST_SERVER_HOST: *app_service
+      TEST_CONTROL_SERVER_HOST: *app_service
+    depends_on:
+      app_test_outbound_domain_blocking:
+        condition: service_started
+
+  mock_server_outbound_domain_blocking_test_outbound_domain_blocking:
     image: python:3.13-alpine
     volumes:
-      - ./server_tests/test_outbound_domain_blocking:/test:ro
+      - .:/test:ro
     command: python /test/mock-server.py
     networks:
-      outbound_domain_blocking:
+      outbound_domain_blocking_test_outbound_domain_blocking:
         ipv4_address: 11.22.33.44
         aliases:
           - evil.example.com
@@ -27,7 +63,7 @@ services:
           - xn--mnchen-allowed-gsb.example.com
 
 networks:
-  outbound_domain_blocking:
+  outbound_domain_blocking_test_outbound_domain_blocking:
     ipam:
       config:
         - subnet: 11.22.33.0/24

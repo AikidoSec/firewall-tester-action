@@ -1,4 +1,39 @@
+x-test-name: &test_name test_no_token_set
+x-test-token: &test_token AIK_RUNTIME_1_test_no_token_set
+x-app-service: &app_service app_test_no_token_set
+x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/test_no_token_set?sslmode=disable'
+
 services:
-  app:
+  setup_test_no_token_set:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: setup_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+
+  app_test_no_token_set:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: app_template
+    env_file:
+      - ./test.env
     environment:
       AIKIDO_TOKEN:
+      DATABASE_URL: *database_url
+    depends_on:
+      setup_test_no_token_set:
+        condition: service_completed_successfully
+
+  test_no_token_set:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: test_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+      TEST_SERVER_HOST: *app_service
+      TEST_CONTROL_SERVER_HOST: *app_service
+    depends_on:
+      app_test_no_token_set:
+        condition: service_started

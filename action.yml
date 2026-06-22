@@ -56,17 +56,29 @@ runs:
         set -eu
 
         demo_dockerfile_path="${{ inputs.dockerfile_path }}"
-        export DEMO_CONTEXT="$(dirname "$demo_dockerfile_path")"
+        demo_context="$(dirname "$demo_dockerfile_path")"
+        export DEMO_CONTEXT="$(cd "$demo_context" && pwd)"
         export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
-        export APP_ENV_FILE="${APP_ENV_FILE:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
-        export APP_ENV_FILE_2="${APP_ENV_FILE_2:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
+        if [ -n "$APP_ENV_FILE" ]; then
+          export APP_ENV_FILE="$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")"
+        else
+          export APP_ENV_FILE="$GITHUB_ACTION_PATH/server_tests/empty.env"
+        fi
+        if [ -n "$APP_ENV_FILE_2" ]; then
+          export APP_ENV_FILE_2="$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")"
+        else
+          export APP_ENV_FILE_2="$GITHUB_ACTION_PATH/server_tests/empty.env"
+        fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
         container_os="$(docker info --format '{{.OSType}}')"
+        if [ "$container_os" != "linux" ]; then
+          echo "Compose-native per-test services are currently implemented for Linux containers only." >&2
+          exit 1
+        fi
 
         docker compose \
-          -f "$GITHUB_ACTION_PATH/compose.$container_os.yml" \
-          -f "$GITHUB_ACTION_PATH/server_tests/$TEST_NAME/compose.yml" \
-          up --build --exit-code-from test test
+          -f "$GITHUB_ACTION_PATH/compose.linux.yml" \
+          up --build --exit-code-from "$TEST_NAME" "$TEST_NAME"
 
     - name: Clean up Compose test
       if: always()
@@ -79,14 +91,25 @@ runs:
         TEST_NAME: ${{ inputs.test_name }}
       run: |
         demo_dockerfile_path="${{ inputs.dockerfile_path }}"
-        export DEMO_CONTEXT="$(dirname "$demo_dockerfile_path")"
+        demo_context="$(dirname "$demo_dockerfile_path")"
+        export DEMO_CONTEXT="$(cd "$demo_context" && pwd)"
         export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
-        export APP_ENV_FILE="${APP_ENV_FILE:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
-        export APP_ENV_FILE_2="${APP_ENV_FILE_2:-$GITHUB_ACTION_PATH/server_tests/empty.env}"
+        if [ -n "$APP_ENV_FILE" ]; then
+          export APP_ENV_FILE="$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")"
+        else
+          export APP_ENV_FILE="$GITHUB_ACTION_PATH/server_tests/empty.env"
+        fi
+        if [ -n "$APP_ENV_FILE_2" ]; then
+          export APP_ENV_FILE_2="$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")"
+        else
+          export APP_ENV_FILE_2="$GITHUB_ACTION_PATH/server_tests/empty.env"
+        fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
         container_os="$(docker info --format '{{.OSType}}')"
+        if [ "$container_os" != "linux" ]; then
+          exit 0
+        fi
 
         docker compose \
-          -f "$GITHUB_ACTION_PATH/compose.$container_os.yml" \
-          -f "$GITHUB_ACTION_PATH/server_tests/$TEST_NAME/compose.yml" \
+          -f "$GITHUB_ACTION_PATH/compose.linux.yml" \
           down -v --remove-orphans

@@ -1,0 +1,39 @@
+x-test-name: &test_name control_test_graceful_restart
+x-test-token: &test_token AIK_RUNTIME_1_control_test_graceful_restart
+x-app-service: &app_service app_control_test_graceful_restart
+x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/control_test_graceful_restart?sslmode=disable'
+
+services:
+  setup_control_test_graceful_restart:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: setup_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+
+  app_control_test_graceful_restart:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: app_template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test_token
+      DATABASE_URL: *database_url
+    depends_on:
+      setup_control_test_graceful_restart:
+        condition: service_completed_successfully
+
+  control_test_graceful_restart:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: test_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+      TEST_SERVER_HOST: *app_service
+      TEST_CONTROL_SERVER_HOST: *app_service
+    depends_on:
+      app_control_test_graceful_restart:
+        condition: service_started

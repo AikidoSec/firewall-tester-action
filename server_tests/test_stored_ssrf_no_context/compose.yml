@@ -1,27 +1,59 @@
+x-test-name: &test_name test_stored_ssrf_no_context
+x-test-token: &test_token AIK_RUNTIME_1_test_stored_ssrf_no_context
+x-app-service: &app_service app_test_stored_ssrf_no_context
+x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/test_stored_ssrf_no_context?sslmode=disable'
+
 services:
-  app:
+  setup_test_stored_ssrf_no_context:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: setup_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+
+  app_test_stored_ssrf_no_context:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: app_template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test_token
+      DATABASE_URL: *database_url
     depends_on:
-      dns_mock:
-        condition: service_healthy
+      setup_test_stored_ssrf_no_context:
+        condition: service_completed_successfully
+      dns_mock_test_stored_ssrf_no_context:
+        condition: service_started
     dns:
       - 10.254.253.53
     networks:
       - default
-      - dns_net
+      - dns_net_test_stored_ssrf_no_context
 
-  test:
-    depends_on:
-      dns_mock:
-        condition: service_healthy
-      imds_mock:
-        condition: service_started
+  test_stored_ssrf_no_context:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: test_template
     environment:
-      TEST_DNS_MOCK_URL: http://dns_mock:8053
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+      TEST_SERVER_HOST: *app_service
+      TEST_CONTROL_SERVER_HOST: *app_service
+      TEST_DNS_MOCK_URL: http://dns_mock_test_stored_ssrf_no_context:8053
+    depends_on:
+      app_test_stored_ssrf_no_context:
+        condition: service_started
+      dns_mock_test_stored_ssrf_no_context:
+        condition: service_started
+      imds_mock_test_stored_ssrf_no_context:
+        condition: service_started
 
-  dns_mock:
+  dns_mock_test_stored_ssrf_no_context:
     image: python:3.13-alpine
     volumes:
-      - ./server_tests/dns_mock.py:/dns_mock.py:ro
+      - ../dns_mock.py:/dns_mock.py:ro
     command: python /dns_mock.py
     healthcheck:
       test:
@@ -34,19 +66,19 @@ services:
       retries: 30
     networks:
       default: null
-      dns_net:
+      dns_net_test_stored_ssrf_no_context:
         ipv4_address: 10.254.253.53
 
-  imds_mock:
+  imds_mock_test_stored_ssrf_no_context:
     image: python:3.12-alpine
     depends_on:
-      app:
+      app_test_stored_ssrf_no_context:
         condition: service_started
-    network_mode: service:app
+    network_mode: service:app_test_stored_ssrf_no_context
     cap_add:
       - NET_ADMIN
     volumes:
-      - ./server_tests/test_stored_ssrf_no_context/mock-imds.py:/mock-imds.py:ro
+      - ./mock-imds.py:/mock-imds.py:ro
     command:
       - sh
       - -c
@@ -55,7 +87,7 @@ services:
         python /mock-imds.py 169.254.169.254 100.100.100.200 fd00:ec2::254
 
 networks:
-  dns_net:
+  dns_net_test_stored_ssrf_no_context:
     ipam:
       config:
         - subnet: 10.254.253.0/24

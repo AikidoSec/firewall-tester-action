@@ -29,7 +29,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
@@ -39,7 +39,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
@@ -49,7 +49,7 @@ jobs:
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
             php_firewall_version: 1.0.126
-            parallelism: 4
+            parallelism: 5
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
@@ -59,7 +59,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
@@ -69,7 +69,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
@@ -79,7 +79,7 @@ jobs:
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
@@ -89,7 +89,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
-            parallelism: 4
+            parallelism: 5
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -107,23 +107,41 @@ jobs:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
-          COMPOSE_PROJECT_NAME: test_sql_injection
+          COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
           SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
         run: |
-          docker compose \
-            -f compose.linux.yml \
-            -f server_tests/test_sql_injection/compose.yml \
-            build core app test
+          set -eu
+
+          normalize_file() {
+            local file_path="$1"
+            if [ -z "$file_path" ]; then
+              printf '%s/server_tests/empty.env\n' "$PWD"
+            elif [ "${file_path#/}" != "$file_path" ]; then
+              printf '%s\n' "$file_path"
+            else
+              printf '%s/%s\n' "$PWD" "${file_path#./}"
+            fi
+          }
+
+          export APP_ENV_FILE="$(normalize_file "$APP_ENV_FILE")"
+          export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
+
+          docker compose -f compose.linux.yml build \
+            core \
+            app_test_sql_injection \
+            test_sql_injection
 
       - name: Run Compose tests
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
           APP_PORT: ${{ matrix.app.app_port }}
+          COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           COMPOSE_TEST_PARALLELISM: ${{ matrix.app.parallelism }}
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
           DEMO_CONTEXT: ./zen-demo
@@ -168,50 +186,150 @@ jobs:
         run: |
           set -uo pipefail
 
-          mkdir -p "$RUNNER_TEMP/compose-test-logs"
-          : > "$RUNNER_TEMP/compose-test-failures"
-
-          run_compose_test() {
-            local test_name="$1"
-            local log_file="$RUNNER_TEMP/compose-test-logs/${test_name}.log"
-            local status=0
-
-            echo "START ${test_name}"
-            if COMPOSE_PROJECT_NAME="$test_name" docker compose \
-              -f compose.linux.yml \
-              -f "server_tests/${test_name}/compose.yml" \
-              up --no-build --exit-code-from test test > "$log_file" 2>&1; then
-              status=0
+          normalize_file() {
+            local file_path="$1"
+            if [ -z "$file_path" ]; then
+              printf '%s/server_tests/empty.env\n' "$PWD"
+            elif [ "${file_path#/}" != "$file_path" ]; then
+              printf '%s\n' "$file_path"
             else
-              status=$?
-            fi
-
-            COMPOSE_PROJECT_NAME="$test_name" docker compose \
-              -f compose.linux.yml \
-              -f "server_tests/${test_name}/compose.yml" \
-              down -v --remove-orphans >> "$log_file" 2>&1 || true
-
-            if [ "$status" -eq 0 ]; then
-              echo "PASS ${test_name}"
-            else
-              echo "FAIL ${test_name}"
-              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              echo "::group::${test_name} log"
-              cat "$log_file"
-              echo "::endgroup::"
+              printf '%s/%s\n' "$PWD" "${file_path#./}"
             fi
           }
 
-          export -f run_compose_test
-          export RUNNER_TEMP
+          export APP_ENV_FILE="$(normalize_file "$APP_ENV_FILE")"
+          export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          printf '%s\n' $TEST_NAMES | xargs -r -n1 -P "$COMPOSE_TEST_PARALLELISM" bash -c 'run_compose_test "$1"' _
+          compose=(docker compose -f compose.linux.yml)
+          mkdir -p "$RUNNER_TEMP/compose-test-logs"
+          : > "$RUNNER_TEMP/compose-test-failures"
+
+          "${compose[@]}" up --no-build -d --wait core postgres
+          all_services="$(${compose[@]} config --services)"
+
+          related_services() {
+            local test_name="$1"
+            printf '%s\n' "$all_services" | awk -v t="$test_name" '
+              $0 == t || $0 == "app_" t || $0 == "setup_" t || $0 ~ "_" t "$"
+            '
+          }
+
+          cleanup_tests() {
+            local services=()
+            local service
+            declare -A seen=()
+            for test_name in "$@"; do
+              while IFS= read -r service; do
+                if [ -n "$service" ] && [ -z "${seen[$service]+x}" ]; then
+                  services+=("$service")
+                  seen[$service]=1
+                fi
+              done < <(related_services "$test_name")
+            done
+
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" stop "${services[@]}" >/dev/null 2>&1 || true
+              "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
+            fi
+          }
+
+          run_batch() {
+            local batch=("$@")
+            local batch_name
+            batch_name="$(IFS=_; printf '%s' "${batch[*]}")"
+            local batch_log="$RUNNER_TEMP/compose-test-logs/batch-${batch_name}.log"
+
+            for test_name in "${batch[@]}"; do
+              echo "START ${test_name}"
+            done
+
+            if ! "${compose[@]}" up --no-build -d "${batch[@]}" > "$batch_log" 2>&1; then
+              echo "FAIL batch ${batch_name}"
+              echo "::group::batch ${batch_name} startup log"
+              cat "$batch_log"
+              echo "::endgroup::"
+              for test_name in "${batch[@]}"; do
+                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              done
+              cleanup_tests "${batch[@]}"
+              return
+            fi
+
+            "${compose[@]}" wait "${batch[@]}" >> "$batch_log" 2>&1 || true
+
+            for test_name in "${batch[@]}"; do
+              local container_id
+              local status=1
+              container_id="$(${compose[@]} ps -a -q "$test_name" 2>/dev/null | tail -n 1)"
+              if [ -n "$container_id" ]; then
+                status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+              fi
+
+              if [ "$status" = "0" ]; then
+                echo "PASS ${test_name}"
+              else
+                echo "FAIL ${test_name}"
+                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+                mapfile -t services < <(related_services "$test_name")
+                echo "::group::${test_name} log"
+                if [ "${#services[@]}" -gt 0 ]; then
+                  "${compose[@]}" logs --no-color "${services[@]}" || true
+                else
+                  cat "$batch_log"
+                fi
+                echo "::endgroup::"
+              fi
+            done
+
+            cleanup_tests "${batch[@]}"
+          }
+
+          mapfile -t tests < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          batch=()
+          for test_name in "${tests[@]}"; do
+            batch+=("$test_name")
+            if [ "${#batch[@]}" -ge "$COMPOSE_TEST_PARALLELISM" ]; then
+              run_batch "${batch[@]}"
+              batch=()
+            fi
+          done
+          if [ "${#batch[@]}" -gt 0 ]; then
+            run_batch "${batch[@]}"
+          fi
 
           if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
             echo "Failed tests:"
-            sort "$RUNNER_TEMP/compose-test-failures"
+            sort -u "$RUNNER_TEMP/compose-test-failures"
             exit 1
           fi
+
+      - name: Clean up Compose project
+        if: always()
+        env:
+          APP_ENV_FILE: ${{ matrix.app.app_env_file }}
+          APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
+          APP_PORT: ${{ matrix.app.app_port }}
+          COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
+          DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
+          PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
+        run: |
+          normalize_file() {
+            local file_path="$1"
+            if [ -z "$file_path" ]; then
+              printf '%s/server_tests/empty.env\n' "$PWD"
+            elif [ "${file_path#/}" != "$file_path" ]; then
+              printf '%s\n' "$file_path"
+            else
+              printf '%s/%s\n' "$PWD" "${file_path#./}"
+            fi
+          }
+
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
+          export APP_ENV_FILE="$(normalize_file "$APP_ENV_FILE")"
+          export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
+          docker compose -f compose.linux.yml down -v --remove-orphans
 
   control-tests-linux:
     name: php-control
@@ -234,24 +352,30 @@ jobs:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
-          COMPOSE_PROJECT_NAME: control_test_restart
+          COMPOSE_PROJECT_NAME: php-control
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
           SLEEP_BEFORE_TEST: 20
         run: |
-          docker compose \
-            -f compose.linux.yml \
-            -f server_tests/control_test_restart/compose.yml \
-            build core app test
+          set -eu
+          export APP_ENV_FILE="$PWD/zen-demo/.env.example"
+          export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
+
+          docker compose -f compose.linux.yml build \
+            core \
+            app_control_test_restart \
+            control_test_restart
 
       - name: Run Compose control tests
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
           APP_PORT: 8080
-          COMPOSE_TEST_PARALLELISM: 4
+          COMPOSE_PROJECT_NAME: php-control
+          COMPOSE_TEST_PARALLELISM: 5
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control
@@ -269,47 +393,125 @@ jobs:
         run: |
           set -uo pipefail
 
+          export APP_ENV_FILE="$PWD/zen-demo/.env.example"
+          export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
+
+          compose=(docker compose -f compose.linux.yml)
           mkdir -p "$RUNNER_TEMP/compose-test-logs"
           : > "$RUNNER_TEMP/compose-test-failures"
 
-          run_compose_test() {
+          "${compose[@]}" up --no-build -d --wait core postgres
+          all_services="$(${compose[@]} config --services)"
+
+          related_services() {
             local test_name="$1"
-            local log_file="$RUNNER_TEMP/compose-test-logs/${test_name}.log"
-            local status=0
+            printf '%s\n' "$all_services" | awk -v t="$test_name" '
+              $0 == t || $0 == "app_" t || $0 == "setup_" t || $0 ~ "_" t "$"
+            '
+          }
 
-            echo "START ${test_name}"
-            if COMPOSE_PROJECT_NAME="$test_name" docker compose \
-              -f compose.linux.yml \
-              -f "server_tests/${test_name}/compose.yml" \
-              up --no-build --exit-code-from test test > "$log_file" 2>&1; then
-              status=0
-            else
-              status=$?
-            fi
+          cleanup_tests() {
+            local services=()
+            local service
+            declare -A seen=()
+            for test_name in "$@"; do
+              while IFS= read -r service; do
+                if [ -n "$service" ] && [ -z "${seen[$service]+x}" ]; then
+                  services+=("$service")
+                  seen[$service]=1
+                fi
+              done < <(related_services "$test_name")
+            done
 
-            COMPOSE_PROJECT_NAME="$test_name" docker compose \
-              -f compose.linux.yml \
-              -f "server_tests/${test_name}/compose.yml" \
-              down -v --remove-orphans >> "$log_file" 2>&1 || true
-
-            if [ "$status" -eq 0 ]; then
-              echo "PASS ${test_name}"
-            else
-              echo "FAIL ${test_name}"
-              printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-              echo "::group::${test_name} log"
-              cat "$log_file"
-              echo "::endgroup::"
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" stop "${services[@]}" >/dev/null 2>&1 || true
+              "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
             fi
           }
 
-          export -f run_compose_test
-          export RUNNER_TEMP
+          run_batch() {
+            local batch=("$@")
+            local batch_name
+            batch_name="$(IFS=_; printf '%s' "${batch[*]}")"
+            local batch_log="$RUNNER_TEMP/compose-test-logs/batch-${batch_name}.log"
 
-          printf '%s\n' $TEST_NAMES | xargs -r -n1 -P "$COMPOSE_TEST_PARALLELISM" bash -c 'run_compose_test "$1"' _
+            for test_name in "${batch[@]}"; do
+              echo "START ${test_name}"
+            done
+
+            if ! "${compose[@]}" up --no-build -d "${batch[@]}" > "$batch_log" 2>&1; then
+              echo "FAIL batch ${batch_name}"
+              echo "::group::batch ${batch_name} startup log"
+              cat "$batch_log"
+              echo "::endgroup::"
+              for test_name in "${batch[@]}"; do
+                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+              done
+              cleanup_tests "${batch[@]}"
+              return
+            fi
+
+            "${compose[@]}" wait "${batch[@]}" >> "$batch_log" 2>&1 || true
+
+            for test_name in "${batch[@]}"; do
+              local container_id
+              local status=1
+              container_id="$(${compose[@]} ps -a -q "$test_name" 2>/dev/null | tail -n 1)"
+              if [ -n "$container_id" ]; then
+                status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+              fi
+
+              if [ "$status" = "0" ]; then
+                echo "PASS ${test_name}"
+              else
+                echo "FAIL ${test_name}"
+                printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+                mapfile -t services < <(related_services "$test_name")
+                echo "::group::${test_name} log"
+                if [ "${#services[@]}" -gt 0 ]; then
+                  "${compose[@]}" logs --no-color "${services[@]}" || true
+                else
+                  cat "$batch_log"
+                fi
+                echo "::endgroup::"
+              fi
+            done
+
+            cleanup_tests "${batch[@]}"
+          }
+
+          mapfile -t tests < <(printf '%s\n' "$TEST_NAMES" | sed '/^[[:space:]]*$/d')
+          batch=()
+          for test_name in "${tests[@]}"; do
+            batch+=("$test_name")
+            if [ "${#batch[@]}" -ge "$COMPOSE_TEST_PARALLELISM" ]; then
+              run_batch "${batch[@]}"
+              batch=()
+            fi
+          done
+          if [ "${#batch[@]}" -gt 0 ]; then
+            run_batch "${batch[@]}"
+          fi
 
           if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
             echo "Failed tests:"
-            sort "$RUNNER_TEMP/compose-test-failures"
+            sort -u "$RUNNER_TEMP/compose-test-failures"
             exit 1
           fi
+
+      - name: Clean up Compose project
+        if: always()
+        env:
+          APP_ENV_FILE: ./zen-demo/.env.example
+          APP_ENV_FILE_2: ./server_tests/app_env/php.env
+          APP_PORT: 8080
+          COMPOSE_PROJECT_NAME: php-control
+          DEMO_CONTEXT: ./zen-demo
+          DEMO_IMAGE: firewall-tester-action-demo-php-control
+          PHP_FIREWALL_VERSION: ''
+        run: |
+          export APP_ENV_FILE="$PWD/zen-demo/.env.example"
+          export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
+          export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
+          docker compose -f compose.linux.yml down -v --remove-orphans

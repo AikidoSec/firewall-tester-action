@@ -1,26 +1,59 @@
+x-test-name: &test_name test_logs_sensitive_data
+x-test-token: &test_token AIK_RUNTIME_1_test_logs_sensitive_data
+x-app-service: &app_service app_test_logs_sensitive_data
+x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/test_logs_sensitive_data?sslmode=disable'
+
 services:
-  app:
+  setup_test_logs_sensitive_data:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: setup_template
+    environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+
+  app_test_logs_sensitive_data:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: app_template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test_token
+      DATABASE_URL: *database_url
     depends_on:
-      log_collector:
-        condition: service_healthy
+      setup_test_logs_sensitive_data:
+        condition: service_completed_successfully
+      log_collector_test_logs_sensitive_data:
+        condition: service_started
     logging:
       driver: syslog
       options:
         syslog-address: tcp://${SYSLOG_COLLECTOR_HOST:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}
         tag: '{{.Name}}'
 
-  test:
+  test_logs_sensitive_data:
+    extends:
+      file: ../compose.templates.linux.yml
+      service: test_template
     environment:
+      TEST_NAME: *test_name
+      TEST_TOKEN: *test_token
+      TEST_SERVER_HOST: *app_service
+      TEST_CONTROL_SERVER_HOST: *app_service
       TEST_APP_LOG_FILE: ${TEST_LOG_DIR:-/logs}/test_logs_sensitive_data.log
+    depends_on:
+      app_test_logs_sensitive_data:
+        condition: service_started
     volumes:
       - test_logs_sensitive_data_logs:${TEST_LOG_DIR:-/logs}:ro
 
-  log_collector:
+  log_collector_test_logs_sensitive_data:
     image: python:3.13-alpine
     environment:
       SYSLOG_COLLECTOR_LOG_FILE: /logs/test_logs_sensitive_data.log
     volumes:
-      - ./server_tests/syslog_collector.py:/syslog_collector.py:ro
+      - ../syslog_collector.py:/syslog_collector.py:ro
       - test_logs_sensitive_data_logs:/logs
     ports:
       - '${SYSLOG_COLLECTOR_BIND_ADDRESS:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}:5514'

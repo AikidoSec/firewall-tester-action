@@ -63,7 +63,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             php_firewall_version: ''
             parallelism: 50
-            skip_tests: test_wave_attack,test_rate_limiting_group_id_1_minute,test_ssrf,test_api_spec,test_stored_ssrf_no_context,test_stored_ssrf
+            skip_tests: ''
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing

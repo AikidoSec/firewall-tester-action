@@ -14,7 +14,7 @@ permissions:
 jobs:
   windows-mixed-compose-smoke:
     name: Windows mixed Compose smoke
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 30
     steps:
       - name: Checkout action
@@ -30,7 +30,13 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $compose = @('docker', 'compose', '-f', 'compose.mixed-windows-smoke.yml')
+
+          function Invoke-Compose {
+            docker compose -f compose.mixed-windows-smoke.yml @args
+            if ($LASTEXITCODE -ne 0) {
+              throw "docker compose failed: $args"
+            }
+          }
 
           function Invoke-Probe {
             param(
@@ -38,12 +44,9 @@ jobs:
               [string[]] $Services
             )
 
-            & $compose down -v --remove-orphans
-            & $compose up --pull always --exit-code-from $ExitCodeFrom @Services
-            if ($LASTEXITCODE -ne 0) {
-              throw "Mixed Compose probe failed: $ExitCodeFrom"
-            }
-            & $compose down -v --remove-orphans
+            Invoke-Compose down -v --remove-orphans
+            Invoke-Compose up --pull always --exit-code-from $ExitCodeFrom @Services
+            Invoke-Compose down -v --remove-orphans
           }
 
           try {
@@ -51,7 +54,7 @@ jobs:
             Invoke-Probe -ExitCodeFrom 'linux_to_win_probe' -Services @('linux_to_win_probe')
             Invoke-Probe -ExitCodeFrom 'win_loopback_probe' -Services @('win_loopback_probe', 'loopback_sidecar')
           } finally {
-            & $compose down -v --remove-orphans
+            docker compose -f compose.mixed-windows-smoke.yml down -v --remove-orphans
           }
 
   server-tests-linux:

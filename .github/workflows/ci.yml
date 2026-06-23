@@ -12,6 +12,48 @@ permissions:
   contents: read
 
 jobs:
+  windows-mixed-compose-smoke:
+    name: Windows mixed Compose smoke
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout action
+        uses: actions/checkout@v4
+
+      - name: Show Docker environment
+        shell: pwsh
+        run: |
+          docker version
+          docker info
+
+      - name: Run mixed Compose smoke probes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compose = @('docker', 'compose', '-f', 'compose.mixed-windows-smoke.yml')
+
+          function Invoke-Probe {
+            param(
+              [string] $ExitCodeFrom,
+              [string[]] $Services
+            )
+
+            & $compose down -v --remove-orphans
+            & $compose up --pull always --exit-code-from $ExitCodeFrom @Services
+            if ($LASTEXITCODE -ne 0) {
+              throw "Mixed Compose probe failed: $ExitCodeFrom"
+            }
+            & $compose down -v --remove-orphans
+          }
+
+          try {
+            Invoke-Probe -ExitCodeFrom 'win_to_linux_probe' -Services @('win_to_linux_probe')
+            Invoke-Probe -ExitCodeFrom 'linux_to_win_probe' -Services @('linux_to_win_probe')
+            Invoke-Probe -ExitCodeFrom 'win_loopback_probe' -Services @('win_loopback_probe', 'loopback_sidecar')
+          } finally {
+            & $compose down -v --remove-orphans
+          }
+
   server-tests-linux:
     name: ${{ matrix.app.name }}
     runs-on: ubuntu-latest

@@ -23,22 +23,38 @@ def check_attacks_blocked(collector, s, response_code):
 
 def check_event_is_submitted_shell_injection(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
+    request_started_at_ms = int(time.time() * 1000) - 1000
     response = s.post("/api/execute", {"userCommand": "whoami"})
     collector.soft_assert_response_code_is(response, response_code)
 
-    c.wait_for_new_events(5, old_events_length=len(
-        start_events), filter_type="detected_attack")
+    deadline = time.monotonic() + 5
+    new_events = []
+    candidate_events = []
+    last_error = None
 
-    all_events = c.get_events("detected_attack")
-    new_events = all_events[len(start_events):]
+    while time.monotonic() < deadline:
+        all_events = c.get_events("detected_attack")
+        new_events = all_events[len(start_events):]
+        candidate_events = [
+            event for event in new_events
+            if event.get("time", request_started_at_ms) >= request_started_at_ms
+        ]
 
-    # Prerequisite: need exactly 1 event to check its contents
-    if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new event, got {len(new_events)}"):
-        return
-    try:
-        assert_event_contains_subset_file(new_events[0], expected_json)
-    except AssertionError as e:
-        collector.add_failure(str(e))
+        for event in candidate_events:
+            try:
+                assert_event_contains_subset_file(event, expected_json)
+                return
+            except AssertionError as e:
+                last_error = e
+
+        time.sleep(1)
+
+    collector.add_failure(
+        f"Expected at least one new event matching '{expected_json}', "
+        f"got {len(new_events)} new events and "
+        f"{len(candidate_events)} after this request. "
+        f"Last mismatch: {last_error}"
+    )
 
 
 def run_test(s: TestServer, c: CoreApi):

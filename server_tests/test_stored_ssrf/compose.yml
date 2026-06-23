@@ -25,12 +25,15 @@ services:
       setup_test_stored_ssrf:
         condition: service_completed_successfully
       dns_mock_test_stored_ssrf:
-        condition: service_started
+        condition: service_healthy
     dns:
       - 10.254.254.53
     networks:
       - default
       - dns_net_test_stored_ssrf
+      - imds_aws
+      - imds_alibaba
+      - imds_aws_ipv6
 
   test_stored_ssrf:
     extends:
@@ -46,10 +49,11 @@ services:
       app_test_stored_ssrf:
         condition: service_started
       dns_mock_test_stored_ssrf:
-        condition: service_started
-      imds_mock_test_stored_ssrf:
-        condition: service_started
+        condition: service_healthy
+      imds_mock:
+        condition: service_healthy
 
+  # DNS responder with mutable per-test records for stored SSRF hostnames.
   dns_mock_test_stored_ssrf:
     image: python:3.13-alpine
     volumes:
@@ -68,23 +72,6 @@ services:
       default: null
       dns_net_test_stored_ssrf:
         ipv4_address: 10.254.254.53
-
-  imds_mock_test_stored_ssrf:
-    image: python:3.12-alpine
-    depends_on:
-      app_test_stored_ssrf:
-        condition: service_started
-    network_mode: service:app_test_stored_ssrf
-    cap_add:
-      - NET_ADMIN
-    volumes:
-      - ./mock-imds.py:/mock-imds.py:ro
-    command:
-      - sh
-      - -c
-      - |
-        apk add --no-cache iproute2
-        python /mock-imds.py 169.254.169.254 100.100.100.200 fd00:ec2::254
 
 networks:
   dns_net_test_stored_ssrf:

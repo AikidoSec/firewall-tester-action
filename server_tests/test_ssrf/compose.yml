@@ -24,6 +24,11 @@ services:
     depends_on:
       setup_test_ssrf:
         condition: service_completed_successfully
+    networks:
+      - default
+      - imds_aws
+      - imds_alibaba
+      - imds_aws_ipv6
 
   test_ssrf:
     extends:
@@ -38,33 +43,29 @@ services:
       app_test_ssrf:
         condition: service_started
       ssrf_mock_4000_test_ssrf:
-        condition: service_started
-      imds_mock_test_ssrf:
-        condition: service_started
+        condition: service_healthy
+      imds_mock:
+        condition: service_healthy
 
+  # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf_mock_4000_test_ssrf:
-    image: alpine:3.20
+    image: python:3.13-alpine
     depends_on:
       app_test_ssrf:
         condition: service_started
     network_mode: service:app_test_ssrf
     volumes:
-      - ./mock-4000.sh:/mock-4000.sh:ro
-    command: sh /mock-4000.sh
-
-  imds_mock_test_ssrf:
-    image: python:3.12-alpine
-    depends_on:
-      app_test_ssrf:
-        condition: service_started
-    network_mode: service:app_test_ssrf
-    cap_add:
-      - NET_ADMIN
-    volumes:
-      - ./mock-imds.py:/mock-imds.py:ro
-    command:
-      - sh
-      - -c
-      - |
-        apk add --no-cache iproute2
-        python /mock-imds.py 169.254.169.254 100.100.100.200 fd00:ec2::254
+      - ../mock_http_server.py:/mock_http_server.py:ro
+    command: python /mock_http_server.py
+    environment:
+      HOST: 127.0.0.1
+      PORT: 4000
+      READY_FILE: /tmp/ssrf-mock-ready
+      RESPONSE_BODY: '{"status":"ok"}'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -f /tmp/ssrf-mock-ready
+      interval: 1s
+      timeout: 5s
+      retries: 60

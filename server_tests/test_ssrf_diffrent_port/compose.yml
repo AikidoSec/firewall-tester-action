@@ -38,14 +38,27 @@ services:
       app_test_ssrf_diffrent_port:
         condition: service_started
       ssrf_mock_4000_test_ssrf_diffrent_port:
-        condition: service_started
+        condition: service_healthy
 
+  # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf_mock_4000_test_ssrf_diffrent_port:
-    image: alpine:3.20
+    image: python:3.13-alpine
     depends_on:
       app_test_ssrf_diffrent_port:
         condition: service_started
     network_mode: service:app_test_ssrf_diffrent_port
     volumes:
-      - ./mock-4000.sh:/mock-4000.sh:ro
-    command: sh /mock-4000.sh
+      - ../mock_http_server.py:/mock_http_server.py:ro
+    command: python /mock_http_server.py
+    environment:
+      HOST: 127.0.0.1
+      PORT: 4000
+      READY_FILE: /tmp/ssrf-mock-ready
+      RESPONSE_BODY: '{"status":"ok"}'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -f /tmp/ssrf-mock-ready
+      interval: 1s
+      timeout: 5s
+      retries: 60

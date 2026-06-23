@@ -43,6 +43,7 @@ include:
   - ./server_tests/test_wave_attack/compose.yml
 
 services:
+  # PostgreSQL database image shared by tests; each test uses its own database.
   postgres:
     image: ${POSTGRES_IMAGE:-postgres}
     environment:
@@ -57,6 +58,7 @@ services:
       timeout: 5s
       retries: 180
 
+  # Core mock API image used by agents to fetch config and submit events.
   core:
     image: ${CORE_IMAGE:-firewall-tester-action-core}
     build:
@@ -70,6 +72,7 @@ services:
       timeout: 5s
       retries: 60
 
+  # Demo app image build target; tests run per-test app services from this image.
   demo_app_image:
     extends:
       file: ./server_tests/compose.templates.linux.yml
@@ -77,9 +80,51 @@ services:
     profiles:
       - build
 
+  # Python test runner image build target used by setup and test services.
   test_runner_image:
     extends:
       file: ./server_tests/compose.templates.linux.yml
       service: test_template
     profiles:
       - build
+
+  # IMDS responder for fixed metadata IPs used by SSRF tests.
+  imds_mock:
+    image: python:3.13-alpine
+    volumes:
+      - ./server_tests/mock_http_server.py:/mock_http_server.py:ro
+    command: python /mock_http_server.py
+    environment:
+      PORT: 80
+      READY_FILE: /tmp/ssrf-imds-ready
+      RESPONSE_BODY: '{"Code": "Success"}'
+      ENABLE_IPV6: 1
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -f /tmp/ssrf-imds-ready
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    networks:
+      imds_aws:
+        ipv4_address: 169.254.169.254
+      imds_alibaba:
+        ipv4_address: 100.100.100.200
+      imds_aws_ipv6:
+        ipv6_address: fd00:ec2::254
+
+networks:
+  imds_aws:
+    ipam:
+      config:
+        - subnet: 169.254.0.0/16
+  imds_alibaba:
+    ipam:
+      config:
+        - subnet: 100.100.100.0/24
+  imds_aws_ipv6:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: fd00:ec2::/112

@@ -48,8 +48,8 @@ services:
         read_only: true
     working_dir: C:\workspace
     environment:
-      TEST_NAME: ${COMPOSE_PROJECT_NAME}
-      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      TEST_NAME: ${TEST_NAME:-${COMPOSE_PROJECT_NAME}}
+      TEST_TOKEN: AIK_RUNTIME_1_${TEST_NAME:-${COMPOSE_PROJECT_NAME}}
       CORE_URL: http://core:3000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -109,11 +109,12 @@ services:
       - ${APP_ENV_FILE:-./server_tests/empty.env}
       - ${APP_ENV_FILE_2:-./server_tests/empty.env}
       - ./server_tests/default.env
-      - ./server_tests/${COMPOSE_PROJECT_NAME}/test.env
+      - ./server_tests/${TEST_NAME:-${COMPOSE_PROJECT_NAME}}/test.env
     environment:
       PORT: ${APP_PORT:-8080}
+      AIKIDO_TOKEN: ${APP_AIKIDO_TOKEN-AIK_RUNTIME_1_${TEST_NAME:-${COMPOSE_PROJECT_NAME}}}
       # prettier-ignore
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${COMPOSE_PROJECT_NAME}?sslmode=disable"
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${TEST_NAME:-${COMPOSE_PROJECT_NAME}}?sslmode=disable"
     depends_on:
       setup_test:
         condition: service_completed_successfully
@@ -131,8 +132,8 @@ services:
         read_only: true
     working_dir: C:\workspace\server_tests
     environment:
-      TEST_NAME: ${COMPOSE_PROJECT_NAME}
-      TEST_TOKEN: AIK_RUNTIME_1_${COMPOSE_PROJECT_NAME}
+      TEST_NAME: ${TEST_NAME:-${COMPOSE_PROJECT_NAME}}
+      TEST_TOKEN: AIK_RUNTIME_1_${TEST_NAME:-${COMPOSE_PROJECT_NAME}}
       TEST_SERVER_HOST: app
       TEST_CONTROL_SERVER_HOST: app
       TEST_CORE_HOST: core

@@ -50,30 +50,49 @@ runs:
       run: |
         set -eu
 
-        demo_dockerfile_path="${{ inputs.dockerfile_path }}"
-        demo_context="$(dirname "$demo_dockerfile_path")"
-        export DEMO_CONTEXT="$(cd "$demo_context" && pwd)"
-        export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
-        if [ -n "$APP_ENV_FILE" ]; then
-          export APP_ENV_FILE="$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")"
-        else
-          export APP_ENV_FILE="$GITHUB_ACTION_PATH/server_tests/empty.env"
-        fi
-        if [ -n "$APP_ENV_FILE_2" ]; then
-          export APP_ENV_FILE_2="$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")"
-        else
-          export APP_ENV_FILE_2="$GITHUB_ACTION_PATH/server_tests/empty.env"
-        fi
-        export COMPOSE_PROJECT_NAME="$TEST_NAME"
         container_os="$(docker info --format '{{.OSType}}')"
-        if [ "$container_os" != "linux" ]; then
-          echo "Compose-native per-test services are currently implemented for Linux containers only." >&2
-          exit 1
+        if [ "$container_os" = "windows" ]; then
+          compose_file="$GITHUB_ACTION_PATH/compose.windows.yml"
+          test_service="test"
+        else
+          compose_file="$GITHUB_ACTION_PATH/compose.linux.yml"
+          test_service="$TEST_NAME"
         fi
 
+        compose_path() {
+          local path="$1"
+          if [ "$container_os" = "windows" ] && command -v cygpath >/dev/null 2>&1; then
+            cygpath -w "$path"
+          else
+            printf '%s\n' "$path"
+          fi
+        }
+
+        demo_dockerfile_path="${{ inputs.dockerfile_path }}"
+        demo_context="$(dirname "$demo_dockerfile_path")"
+        export DEMO_CONTEXT="$(compose_path "$(cd "$demo_context" && pwd)")"
+        export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
+        if [ -n "$APP_ENV_FILE" ]; then
+          export APP_ENV_FILE="$(compose_path "$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")")"
+        else
+          export APP_ENV_FILE="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
+        fi
+        if [ -n "$APP_ENV_FILE_2" ]; then
+          export APP_ENV_FILE_2="$(compose_path "$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")")"
+        else
+          export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
+        fi
+        export COMPOSE_PROJECT_NAME="$TEST_NAME"
+
+        case "$TEST_NAME" in
+          test_invalid_token) export APP_AIKIDO_TOKEN="AIK_RUNTIME_1_1_INVALID" ;;
+          test_no_token_set) export APP_AIKIDO_TOKEN="" ;;
+          *) export APP_AIKIDO_TOKEN="AIK_RUNTIME_1_${TEST_NAME}" ;;
+        esac
+
         docker compose \
-          -f "$GITHUB_ACTION_PATH/compose.linux.yml" \
-          up --build --exit-code-from "$TEST_NAME" "$TEST_NAME"
+          -f "$compose_file" \
+          up --build --exit-code-from "$test_service" "$test_service"
 
     - name: Clean up Compose test
       if: always()
@@ -85,26 +104,38 @@ runs:
         PHP_FIREWALL_VERSION: ${{ inputs.php_firewall_version }}
         TEST_NAME: ${{ inputs.test_name }}
       run: |
-        demo_dockerfile_path="${{ inputs.dockerfile_path }}"
-        demo_context="$(dirname "$demo_dockerfile_path")"
-        export DEMO_CONTEXT="$(cd "$demo_context" && pwd)"
-        export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
-        if [ -n "$APP_ENV_FILE" ]; then
-          export APP_ENV_FILE="$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")"
-        else
-          export APP_ENV_FILE="$GITHUB_ACTION_PATH/server_tests/empty.env"
-        fi
-        if [ -n "$APP_ENV_FILE_2" ]; then
-          export APP_ENV_FILE_2="$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")"
-        else
-          export APP_ENV_FILE_2="$GITHUB_ACTION_PATH/server_tests/empty.env"
-        fi
-        export COMPOSE_PROJECT_NAME="$TEST_NAME"
         container_os="$(docker info --format '{{.OSType}}')"
-        if [ "$container_os" != "linux" ]; then
-          exit 0
+        if [ "$container_os" = "windows" ]; then
+          compose_file="$GITHUB_ACTION_PATH/compose.windows.yml"
+        else
+          compose_file="$GITHUB_ACTION_PATH/compose.linux.yml"
         fi
 
+        compose_path() {
+          local path="$1"
+          if [ "$container_os" = "windows" ] && command -v cygpath >/dev/null 2>&1; then
+            cygpath -w "$path"
+          else
+            printf '%s\n' "$path"
+          fi
+        }
+
+        demo_dockerfile_path="${{ inputs.dockerfile_path }}"
+        demo_context="$(dirname "$demo_dockerfile_path")"
+        export DEMO_CONTEXT="$(compose_path "$(cd "$demo_context" && pwd)")"
+        export DEMO_DOCKERFILE="$(basename "$demo_dockerfile_path")"
+        if [ -n "$APP_ENV_FILE" ]; then
+          export APP_ENV_FILE="$(compose_path "$(cd "$(dirname "$APP_ENV_FILE")" && pwd)/$(basename "$APP_ENV_FILE")")"
+        else
+          export APP_ENV_FILE="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
+        fi
+        if [ -n "$APP_ENV_FILE_2" ]; then
+          export APP_ENV_FILE_2="$(compose_path "$(cd "$(dirname "$APP_ENV_FILE_2")" && pwd)/$(basename "$APP_ENV_FILE_2")")"
+        else
+          export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
+        fi
+        export COMPOSE_PROJECT_NAME="$TEST_NAME"
+
         docker compose \
-          -f "$GITHUB_ACTION_PATH/compose.linux.yml" \
+          -f "$compose_file" \
           down -v --remove-orphans

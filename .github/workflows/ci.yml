@@ -57,7 +57,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
-            sleep_before_test: 15
+            sleep_before_test: 0
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env

@@ -143,30 +143,17 @@ services:
       APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
-      SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-}
     command:
       - powershell
       - -NoProfile
       - -Command
       - |
         $$ErrorActionPreference = 'Stop'
-        $$sleepSeconds = $$env:SLEEP_BEFORE_TEST
-        if (-not $$sleepSeconds) {
-          switch ($$env:TEST_NAME) {
-            'test_ssrf' { $$sleepSeconds = 20; break }
-            'test_ssrf_diffrent_port' { $$sleepSeconds = 20; break }
-            'test_stored_ssrf' { $$sleepSeconds = 20; break }
-            'test_stored_ssrf_no_context' { $$sleepSeconds = 20; break }
-            default { $$sleepSeconds = 5 }
-          }
-        }
 
         $$controlServerPort = $$env:CONTROL_SERVER_PORT
         if (-not $$controlServerPort -and $$env:TEST_NAME.StartsWith('control_test_')) {
           $$controlServerPort = '8081'
         }
-
-        Start-Sleep -Seconds ([int]$$sleepSeconds)
 
         if (-not $$controlServerPort) {
           $$appReadyDeadline = (Get-Date).AddSeconds([int]$$env:APP_READY_TIMEOUT)
@@ -186,7 +173,6 @@ services:
           if (-not $$appReady) {
             throw "App did not become reachable at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/. Last error: $$lastWarmupError"
           }
-          Start-Sleep -Seconds 1
         }
 
         $$extraArgs = @()

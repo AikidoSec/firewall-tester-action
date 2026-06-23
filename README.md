@@ -39,7 +39,6 @@ matrix, with one Compose test per matrix job.
 | `test_name`            | Test directory under `server_tests`, such as `test_sql_injection` |
 | `app_port`             | Port exposed by the application during Docker runtime             |
 | `config_update_delay`  | Delay in seconds after runtime config updates                     |
-| `sleep_before_test`    | Seconds to wait before starting the test                          |
 | `app_env_file`         | Optional env file passed to the application service               |
 | `app_env_file_2`       | Optional second env file passed to the application service        |
 | `php_firewall_version` | Optional PHP firewall package version build arg                   |
@@ -55,15 +54,15 @@ git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 Run a single test directly with Docker Compose:
 
 ```sh
-COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo APP_PORT=3000 SLEEP_BEFORE_TEST=15 \
-  docker compose -f compose.linux.yml -f server_tests/test_sql_injection/compose.yml \
-  up --build --exit-code-from test test
+COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo APP_PORT=3000 \
+  docker compose -f compose.linux.yml \
+  up --build --exit-code-from test_sql_injection test_sql_injection
 ```
 
 Clean up after a run:
 
 ```sh
 COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo APP_PORT=3000 \
-  docker compose -f compose.linux.yml -f server_tests/test_sql_injection/compose.yml \
+  docker compose -f compose.linux.yml \
   down -v --remove-orphans
 ```

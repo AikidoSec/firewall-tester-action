@@ -99,20 +99,11 @@ services:
       APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
-      SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-}
     command:
       - sh
       - -c
       - |
         set -eu
-
-        sleep_seconds="$$SLEEP_BEFORE_TEST"
-        if [ -z "$$sleep_seconds" ]; then
-          case "$$TEST_NAME" in
-            test_ssrf|test_ssrf_diffrent_port|test_stored_ssrf|test_stored_ssrf_no_context) sleep_seconds=20 ;;
-            *) sleep_seconds=5 ;;
-          esac
-        fi
 
         control_server_port="$$CONTROL_SERVER_PORT"
         if [ -z "$$control_server_port" ]; then
@@ -121,7 +112,6 @@ services:
           esac
         fi
 
-        sleep "$$sleep_seconds"
         if [ -z "$$control_server_port" ]; then
           python - <<'PY'
         import os
@@ -142,7 +132,6 @@ services:
         else:
             raise SystemExit(f"App did not become reachable at {url}: {last_error}")
         PY
-          sleep 1
         fi
 
         extra_args=""

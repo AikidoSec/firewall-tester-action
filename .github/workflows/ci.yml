@@ -24,7 +24,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-nodejs
             ref: dev-testing
             app_port: 3000
-            sleep_before_test: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -35,7 +34,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
             app_port: 8080
-            sleep_before_test: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -46,7 +44,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
             app_port: 8080
-            sleep_before_test: 20
             config_update_delay: 120
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
@@ -57,7 +54,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
-            sleep_before_test: 0
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -68,7 +64,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
             app_port: 8080
-            sleep_before_test: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -79,7 +74,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
             app_port: 3000
-            sleep_before_test: 30
             config_update_delay: 60
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
@@ -90,7 +84,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
             app_port: 3000
-            sleep_before_test: 20
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -119,7 +112,6 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
-          SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
         run: |
           set -eu
 
@@ -154,7 +146,6 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
-          SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
           SKIP_TESTS: ${{ matrix.app.skip_tests }}
           TEST_NAMES: |
             test_aikido_disable
@@ -428,7 +419,6 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
-          SLEEP_BEFORE_TEST: 20
         run: |
           set -eu
           export APP_ENV_FILE="$PWD/zen-demo/.env.example"
@@ -451,7 +441,6 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
-          SLEEP_BEFORE_TEST: 20
           TEST_NAMES: |
             control_test_detects_attacks_when_started_under_load
             control_test_graceful_restart

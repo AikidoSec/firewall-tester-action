@@ -103,7 +103,7 @@ services:
       dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
       args:
         DOTNET_BUILD_ARGS: ${DOTNET_BUILD_ARGS:-}
-        MSBUILD_ARGS: ${MSBUILD_ARGS:-}
+        MSBUILD_ARGS: ${MSBUILD_ARGS:-/nologo}
         PHP_FIREWALL_VERSION: ${PHP_FIREWALL_VERSION:-}
     env_file:
       - ${APP_ENV_FILE:-./server_tests/empty.env}

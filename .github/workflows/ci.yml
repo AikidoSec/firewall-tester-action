@@ -418,6 +418,21 @@ jobs:
           ref: main
           submodules: recursive
 
+      - name: Start Docker
+        shell: pwsh
+        run: |
+          Start-Service docker -ErrorAction SilentlyContinue
+
+          for ($i = 0; $i -lt 60; $i++) {
+            docker version
+            if ($LASTEXITCODE -eq 0) {
+              exit 0
+            }
+            Start-Sleep -Seconds 2
+          }
+
+          throw 'Docker daemon did not become ready.'
+
       - name: Build Compose images
         shell: pwsh
         env:

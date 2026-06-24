@@ -441,18 +441,20 @@ jobs:
           APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
+          COMPOSE_OS: windows
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-dotnet-framework
-          TEST_NAME: test_sql_injection
         run: |
           $ErrorActionPreference = 'Stop'
           $env:APP_ENV_FILE = (Resolve-Path $env:APP_ENV_FILE).Path
           $env:APP_ENV_FILE_2 = (Resolve-Path $env:APP_ENV_FILE_2).Path
           $env:DEMO_CONTEXT = (Resolve-Path $env:DEMO_CONTEXT).Path
-          $env:APP_AIKIDO_TOKEN = "AIK_RUNTIME_1_$env:TEST_NAME"
 
-          docker compose -f compose.windows.yml build core app test
+          docker compose -f compose.windows.yml --profile build build `
+            core `
+            demo_app_image `
+            test_runner_image
 
       - name: Run Compose tests
         shell: pwsh
@@ -462,6 +464,7 @@ jobs:
           APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
+          COMPOSE_OS: windows
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-dotnet-framework
@@ -561,22 +564,6 @@ jobs:
             return [int]($exitCode | Select-Object -First 1)
           }
 
-          function Wait-ServiceRunning {
-            param([string] $ServiceName, [int] $TimeoutSeconds)
-            $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-            while ((Get-Date) -lt $deadline) {
-              $state = Get-ServiceState $ServiceName
-              if ($state -eq 'running') {
-                return $true
-              }
-              if ($state -eq 'exited' -or $state -eq 'dead') {
-                return $false
-              }
-              Start-Sleep -Seconds 2
-            }
-            return $false
-          }
-
           function Wait-ServiceExited {
             param([string] $ServiceName, [int] $TimeoutSeconds)
             $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -594,7 +581,7 @@ jobs:
             param([string] $TestName)
             Write-Host "::group::$TestName compose state"
             Invoke-Compose ps -a
-            foreach ($serviceName in @('setup_test', 'app', 'test')) {
+            foreach ($serviceName in @("setup_$TestName", "app_$TestName", $TestName)) {
               $containerId = Get-ServiceContainerId $serviceName
               if ($containerId) {
                 Write-Host "$serviceName container: $containerId state=$(Get-ServiceState $serviceName) exit=$(Get-ServiceExitCode $serviceName)"
@@ -605,23 +592,14 @@ jobs:
             Write-Host "::endgroup::"
 
             Write-Host "::group::$TestName logs"
-            Invoke-Compose logs --no-color setup_test app test
+            Invoke-Compose logs --no-color "setup_$TestName" "app_$TestName" $TestName
             Write-Host "::endgroup::"
           }
 
-          function Set-TestEnvironment {
-            param([string] $TestName)
-            $env:TEST_NAME = $TestName
-            switch ($TestName) {
-              'test_invalid_token' { $env:APP_AIKIDO_TOKEN = 'AIK_RUNTIME_1_1_INVALID' }
-              'test_no_token_set' { $env:APP_AIKIDO_TOKEN = '' }
-              default { $env:APP_AIKIDO_TOKEN = "AIK_RUNTIME_1_$TestName" }
-            }
-          }
-
           function Cleanup-Test {
-            Invoke-Compose kill setup_test app test
-            Invoke-Compose rm -f -v setup_test app test
+            param([string] $TestName)
+            Invoke-Compose kill "setup_$TestName" "app_$TestName" $TestName
+            Invoke-Compose rm -f -v "setup_$TestName" "app_$TestName" $TestName
           }
 
           try {
@@ -637,46 +615,20 @@ jobs:
                 continue
               }
 
-              Set-TestEnvironment $testName
               Write-Host "START $testName"
-              Cleanup-Test
+              Cleanup-Test $testName
 
               $failed = $false
-              Invoke-Compose up --no-build -d setup_test
+              Invoke-Compose up --no-build -d $testName
               if ($script:LastComposeExitCode -ne 0) {
-                Write-Host "setup_test failed to start for $testName"
+                Write-Host "$testName failed to start"
                 $failed = $true
-              } elseif (-not (Wait-ServiceExited setup_test 300)) {
-                Write-Host "setup_test timed out for $testName"
-                $failed = $true
-              } elseif ((Get-ServiceExitCode setup_test) -ne 0) {
-                Write-Host "setup_test exited with $(Get-ServiceExitCode setup_test) for $testName"
+              } elseif (-not (Wait-ServiceExited $testName ([int] $env:WINDOWS_TEST_TIMEOUT_SECONDS))) {
+                Write-Host "$testName timed out after $env:WINDOWS_TEST_TIMEOUT_SECONDS seconds"
                 $failed = $true
               }
 
-              if (-not $failed) {
-                Invoke-Compose up --no-build -d --no-deps app
-                if ($script:LastComposeExitCode -ne 0) {
-                  Write-Host "app failed to start for $testName"
-                  $failed = $true
-                } elseif (-not (Wait-ServiceRunning app 180)) {
-                  Write-Host "app did not enter running state for $testName"
-                  $failed = $true
-                }
-              }
-
-              if (-not $failed) {
-                Invoke-Compose up --no-build -d --no-deps test
-                if ($script:LastComposeExitCode -ne 0) {
-                  Write-Host "test failed to start for $testName"
-                  $failed = $true
-                } elseif (-not (Wait-ServiceExited test ([int] $env:WINDOWS_TEST_TIMEOUT_SECONDS))) {
-                  Write-Host "test timed out after $env:WINDOWS_TEST_TIMEOUT_SECONDS seconds for $testName"
-                  $failed = $true
-                }
-              }
-
-              $testExitCode = Get-ServiceExitCode test
+              $testExitCode = Get-ServiceExitCode $testName
               if (-not $failed -and $testExitCode -eq 0) {
                 Write-Host "PASS $testName"
               } else {
@@ -684,7 +636,7 @@ jobs:
                 $failures += $testName
                 Write-TestDiagnostics $testName
               }
-              Cleanup-Test
+              Cleanup-Test $testName
             }
           } finally {
             docker compose -f compose.windows.yml down -v --remove-orphans

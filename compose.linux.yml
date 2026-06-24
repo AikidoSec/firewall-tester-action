@@ -47,9 +47,9 @@ services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres}
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-myuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
-      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: mydb
     healthcheck:
       test:
         - CMD-SHELL

@@ -16,54 +16,12 @@ services:
       CORE_URL: http://core:3000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-myuser}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-mysecretpassword}
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecretpassword
+      PGPASSWORD: mysecretpassword
     command:
       - sh
-      - -c
-      - |
-        set -eu
-
-        case "$$TEST_NAME" in
-          *[!A-Za-z0-9_]*|""|test|control_test)
-            echo "Invalid TEST_NAME: $$TEST_NAME" >&2
-            exit 1
-            ;;
-          test_*|control_test_*) ;;
-          *)
-            echo "Invalid TEST_NAME: $$TEST_NAME" >&2
-            exit 1
-            ;;
-        esac
-
-        test_dir="/workspace/server_tests/$$TEST_NAME"
-        test -f "$$test_dir/test.py"
-
-        if ! psql -h "$$POSTGRES_HOST" -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$TEST_NAME'" | grep -q 1; then
-          createdb -h "$$POSTGRES_HOST" -p "$$POSTGRES_PORT" -U "$$POSTGRES_USER" "$$TEST_NAME"
-        fi
-
-        curl -fsS \
-          -H "Content-Type: application/json" \
-          --data "{\"token\":\"$$TEST_TOKEN\"}" \
-          "$$CORE_URL/api/runtime/apps" >/dev/null
-
-        if [ -f "$$test_dir/start_config.json" ]; then
-          curl -fsS \
-            -H "Authorization: $$TEST_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary "@$$test_dir/start_config.json" \
-            "$$CORE_URL/api/runtime/config" >/dev/null
-        fi
-
-        if [ -f "$$test_dir/start_firewall.json" ]; then
-          curl -fsS \
-            -H "Authorization: $$TEST_TOKEN" \
-            -H "Content-Type: application/json" \
-            --data-binary "@$$test_dir/start_firewall.json" \
-            "$$CORE_URL/api/runtime/firewall/lists" >/dev/null
-        fi
+      - /workspace/server_tests/setup.linux.sh
 
   app_template:
     image: ${DEMO_IMAGE:-firewall-tester-action-demo-image}
@@ -79,6 +37,8 @@ services:
       - ${APP_ENV_FILE_2:-./empty.env}
       - ./default.env
     environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecretpassword
       PORT: ${APP_PORT:-8080}
     restart: 'no'
 

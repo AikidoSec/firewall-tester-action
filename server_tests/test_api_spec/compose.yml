@@ -1,12 +1,12 @@
 x-test-name: &test_name test_api_spec
 x-test-token: &test_token AIK_RUNTIME_1_test_api_spec
 x-app-service: &app_service app_test_api_spec
-x-database-url: &database_url 'postgres://${POSTGRES_USER:-myuser}:${POSTGRES_PASSWORD:-mysecretpassword}@postgres:5432/test_api_spec?sslmode=disable'
+x-database-name: &database_name test_api_spec
 
 services:
   setup_test_api_spec:
     extends:
-      file: ../compose.templates.linux.yml
+      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
       service: setup_template
     environment:
       TEST_NAME: *test_name
@@ -14,20 +14,21 @@ services:
 
   app_test_api_spec:
     extends:
-      file: ../compose.templates.linux.yml
+      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
       service: app_template
     env_file:
       - ./test.env
     environment:
       AIKIDO_TOKEN: *test_token
-      DATABASE_URL: *database_url
+      DATABASE_NAME: *database_name
+      DATABASE_URL: '${DATABASE_URL_PREFIX:-postgres://myuser:mysecretpassword@postgres:5432/}test_api_spec${DATABASE_URL_SUFFIX:-?sslmode=disable}'
     depends_on:
       setup_test_api_spec:
         condition: service_completed_successfully
 
   test_api_spec:
     extends:
-      file: ../compose.templates.linux.yml
+      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
       service: test_template
     environment:
       TEST_NAME: *test_name

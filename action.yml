@@ -53,11 +53,10 @@ runs:
         container_os="$(docker info --format '{{.OSType}}')"
         if [ "$container_os" = "windows" ]; then
           compose_file="$GITHUB_ACTION_PATH/compose.windows.yml"
-          test_service="test"
         else
           compose_file="$GITHUB_ACTION_PATH/compose.linux.yml"
-          test_service="$TEST_NAME"
         fi
+        test_service="$TEST_NAME"
 
         compose_path() {
           local path="$1"
@@ -83,12 +82,7 @@ runs:
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
-
-        case "$TEST_NAME" in
-          test_invalid_token) export APP_AIKIDO_TOKEN="AIK_RUNTIME_1_1_INVALID" ;;
-          test_no_token_set) export APP_AIKIDO_TOKEN="" ;;
-          *) export APP_AIKIDO_TOKEN="AIK_RUNTIME_1_${TEST_NAME}" ;;
-        esac
+        export COMPOSE_OS="$container_os"
 
         docker compose \
           -f "$compose_file" \
@@ -135,6 +129,7 @@ runs:
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
+        export COMPOSE_OS="$container_os"
 
         docker compose \
           -f "$compose_file" \

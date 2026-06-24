@@ -1,0 +1,123 @@
+services:
+  setup_template:
+    image: ${POSTGRES_IMAGE:-sokigo/postgresql-windows:15.15-2022}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ..
+        target: C:\workspace
+        read_only: true
+    working_dir: C:\workspace
+    environment:
+      CORE_URL: http://core:3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecretpassword
+    entrypoint:
+      - cmd
+      - /D
+      - /S
+      - /C
+    command:
+      - C:\workspace\server_tests\setup.windows.cmd
+
+  app_template:
+    image: ${DEMO_IMAGE:-firewall-tester-action-demo-image-windows}
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
+      args:
+        DOTNET_BUILD_ARGS: ${DOTNET_BUILD_ARGS:-}
+        MSBUILD_ARGS: ${MSBUILD_ARGS:-/nologo}
+        PHP_FIREWALL_VERSION: ${PHP_FIREWALL_VERSION:-}
+    env_file:
+      - ${APP_ENV_FILE:-./empty.env}
+      - ${APP_ENV_FILE_2:-./empty.env}
+      - ./default.env
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mysecretpassword
+      PORT: ${APP_PORT:-8080}
+    restart: 'no'
+
+  test_template:
+    image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner-windows}
+    build:
+      context: ..
+      dockerfile: server_tests/Dockerfile.runner.windows
+    volumes:
+      - type: bind
+        source: ..
+        target: C:\workspace
+        read_only: true
+    working_dir: C:\workspace\server_tests
+    environment:
+      TEST_CORE_HOST: core
+      TEST_DNS_MOCK_URL: ${TEST_DNS_MOCK_URL:-}
+      TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
+      PYTHONPATH: C:\workspace\server_tests
+      APP_PORT: ${APP_PORT:-8080}
+      APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
+      APP_CONFIG_READY_DELAY: ${APP_CONFIG_READY_DELAY:-0}
+      CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
+      CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
+    command:
+      - powershell
+      - -NoProfile
+      - -Command
+      - |
+        $$ErrorActionPreference = 'Stop'
+
+        $$controlServerPort = $$env:CONTROL_SERVER_PORT
+        if (-not $$controlServerPort -and $$env:TEST_NAME.StartsWith('control_test_')) {
+          $$controlServerPort = '8081'
+        }
+
+        if (-not $$controlServerPort) {
+          $$appReadyDeadline = (Get-Date).AddSeconds([int]$$env:APP_READY_TIMEOUT)
+          $$appReady = $$false
+          $$lastWarmupError = ''
+          while ((Get-Date) -lt $$appReadyDeadline) {
+            try {
+              Invoke-WebRequest -UseBasicParsing "http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/" -TimeoutSec 5 | Out-Null
+              $$appReady = $$true
+              break
+            } catch {
+              if ($$_.Exception.Response) {
+                $$appReady = $$true
+                break
+              }
+              $$lastWarmupError = $$_.Exception.Message
+              Write-Host "Waiting for app at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/: $$lastWarmupError"
+              Start-Sleep -Seconds 2
+            }
+          }
+          if (-not $$appReady) {
+            throw "App did not become reachable at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/. Last error: $$lastWarmupError"
+          }
+
+          if ([int]$$env:APP_CONFIG_READY_DELAY -gt 0) {
+            Start-Sleep -Seconds ([int]$$env:APP_CONFIG_READY_DELAY)
+          }
+        }
+
+        $$extraArgs = @()
+        if ($$controlServerPort) {
+          $$extraArgs += '--control_server_port'
+          $$extraArgs += $$controlServerPort
+        }
+
+        & python "C:\workspace\server_tests\$$env:TEST_NAME\test.py" `
+          --test_name $$env:TEST_NAME `
+          --server_port $$env:APP_PORT `
+          --token $$env:TEST_TOKEN `
+          --core_port 3000 `
+          --config_update_delay $$env:CONFIG_UPDATE_DELAY `
+          @extraArgs
+        if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
+    restart: 'no'

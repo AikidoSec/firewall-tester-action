@@ -50,6 +50,13 @@ def check_shell_injection_command_get(collector, s, command):
         response, 200, f"shell injection GET /api/execute/{repr(command)} , response: {repr(response.text)[:100]}")
 
 
+def check_not_shell_injection_command_post(collector, s, command, user_input):
+    response = s.post("/api/execute", {"userCommand": command})
+    collector.soft_assert(
+        "Zen has blocked a shell injection" not in response.text,
+        f"false positive shell injection POST /api/execute command={repr(command)} user_input={repr(user_input)}, response: {repr(response.text)[:100]}")
+
+
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
@@ -228,6 +235,52 @@ def run_test(s: TestServer, c: CoreApi):
     for command in commands:
         check_shell_injection_command_post(collector, s, command)
         check_shell_injection_command_get(collector, s, command)
+
+    not_injections = [
+        # Paths with spaces, properly single-quoted
+        ("ls '/var/a b/c'", "a b"),
+        ("cat '/home/user/my file.txt'", "my file.txt"),
+
+        # Special shell chars safely enclosed in single quotes
+        ("echo '|'", "|"),
+        ("echo ';'", ";"),
+        ("echo '&&'", "&&"),
+        ("echo '||'", "||"),
+        ("echo '>'", ">"),
+        ("echo '>>'", ">>"),
+
+        # Dangerous-looking strings that are safely single-quoted
+        ("echo '; rm -rf /'", "; rm -rf /"),
+        ("echo '&& echo malicious'", "&& echo malicious"),
+        ("echo '$(echo)'", "$(echo)"),
+        ("echo '$USER'", "$USER"),
+        ("echo '`whoami`'", "`whoami`"),
+        ("echo '|| cat /etc/passwd'", "|| cat /etc/passwd"),
+
+        # Safe commands within single quotes
+        ("echo 'safe command'", "safe command"),
+        ("echo 'text; more text'", "text; more text"),
+        ("echo 'line1\\nline2'", "line1\\nline2"),
+        ("echo 'data > file.txt'", "data > file.txt"),
+        ("echo 'find | grep'", "find | grep"),
+
+        # Domain names and email addresses (common false-positive sources)
+        ("binary --domain www.example.com", "www.example.com"),
+        ("echo john.doe@acme.com", "john.doe@acme.com"),
+
+        # Comma-separated lists
+        ("command -tags php,laravel,drupal,symfony -stats ", "php,laravel,drupal,symfony"),
+
+        # Dangerous keyword appearing as part of a longer word (not a command)
+        ("echo sleepwithme", "sleepwithme"),
+        ("echo rm-rf", "rm-rf"),
+        ("ls /files/rm.txt", "rm.txt"),
+
+        ("ls ~/path", "path"),
+    ]
+
+    for command, user_input in not_injections:
+        check_not_shell_injection_command_post(collector, s, command, user_input)
 
     collector.raise_if_failures()
 

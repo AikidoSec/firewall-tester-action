@@ -22,6 +22,13 @@ inputs:
     description: Delay in seconds after runtime config updates
     required: false
     default: '60'
+  sleep_before_test:
+    description:
+      Delay in seconds before starting the test after the app starts or becomes
+      reachable. This preserves the old runner behavior while the agent fetches
+      startup config.
+    required: false
+    default: '1'
   app_env_file:
     description: Optional env file passed to the application service
     required: false
@@ -46,6 +53,7 @@ runs:
         APP_PORT: ${{ inputs.app_port }}
         CONFIG_UPDATE_DELAY: ${{ inputs.config_update_delay }}
         PHP_FIREWALL_VERSION: ${{ inputs.php_firewall_version }}
+        SLEEP_BEFORE_TEST: ${{ inputs.sleep_before_test }}
         TEST_NAME: ${{ inputs.test_name }}
       run: |
         set -eu

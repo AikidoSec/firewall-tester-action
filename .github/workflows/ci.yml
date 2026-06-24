@@ -24,7 +24,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-nodejs
             ref: dev-testing
             app_port: 3000
-            app_config_ready_delay: 15
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -35,7 +35,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
             app_port: 8080
-            app_config_ready_delay: 15
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -46,7 +46,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
             app_port: 8080
-            app_config_ready_delay: 20
+            sleep_before_test: 10
             config_update_delay: 120
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
@@ -57,7 +57,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
-            app_config_ready_delay: 15
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -68,7 +68,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
             app_port: 8080
-            app_config_ready_delay: 15
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -79,7 +79,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
             app_port: 3000
-            app_config_ready_delay: 30
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
@@ -90,7 +90,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
             app_port: 3000
-            app_config_ready_delay: 15
+            sleep_before_test: 10
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -113,7 +113,6 @@ jobs:
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
-          APP_CONFIG_READY_DELAY: ${{ matrix.app.app_config_ready_delay }}
           APP_PORT: ${{ matrix.app.app_port }}
           COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
@@ -147,7 +146,6 @@ jobs:
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
-          APP_CONFIG_READY_DELAY: ${{ matrix.app.app_config_ready_delay }}
           APP_PORT: ${{ matrix.app.app_port }}
           COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           COMPOSE_TEST_PARALLELISM: ${{ matrix.app.parallelism }}
@@ -155,6 +153,7 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-${{ matrix.app.name }}
           PHP_FIREWALL_VERSION: ${{ matrix.app.php_firewall_version }}
+          SLEEP_BEFORE_TEST: ${{ matrix.app.sleep_before_test }}
           SKIP_TESTS: ${{ matrix.app.skip_tests }}
           TEST_NAMES: |
             test_aikido_disable
@@ -438,7 +437,6 @@ jobs:
         env:
           APP_ENV_FILE: ./server_tests/empty.env
           APP_ENV_FILE_2: ./server_tests/empty.env
-          APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
           COMPOSE_OS: windows
@@ -461,13 +459,14 @@ jobs:
         env:
           APP_ENV_FILE: ./server_tests/empty.env
           APP_ENV_FILE_2: ./server_tests/empty.env
-          APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
           COMPOSE_OS: windows
+          COMPOSE_TEST_PARALLELISM: 50
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-dotnet-framework
+          SLEEP_BEFORE_TEST: 10
           TEST_NAMES: |
             test_aikido_disable
             test_allow_traffic_by_countries
@@ -504,7 +503,6 @@ jobs:
             test_user_rate_limiting_1_minute_without_x_forwarded_for
             test_wave_attack
           SKIP_TESTS: test_bypassed_ip,test_logs_sensitive_data,test_outbound_domain_blocking,test_path_traversal,test_rate_limiting_group_id_1_minute,test_ssrf,test_ssrf_diffrent_port,test_stored_ssrf,test_stored_ssrf_no_context
-          WINDOWS_TEST_TIMEOUT_SECONDS: 600
         run: |
           $ErrorActionPreference = 'Continue'
           $env:APP_ENV_FILE = (Resolve-Path $env:APP_ENV_FILE).Path
@@ -512,7 +510,11 @@ jobs:
           $env:DEMO_CONTEXT = (Resolve-Path $env:DEMO_CONTEXT).Path
 
           $compose = @('docker', 'compose', '-f', 'compose.windows.yml')
-          $failures = @()
+          $logDir = Join-Path $env:RUNNER_TEMP 'compose-test-logs'
+          New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+          $failuresFile = Join-Path $env:RUNNER_TEMP 'compose-test-failures'
+          Set-Content -Path $failuresFile -Value ''
+
           $skipped = @{}
           foreach ($testName in ($env:SKIP_TESTS -split ',')) {
             if ($testName) {
@@ -564,42 +566,76 @@ jobs:
             return [int]($exitCode | Select-Object -First 1)
           }
 
-          function Wait-ServiceExited {
-            param([string] $ServiceName, [int] $TimeoutSeconds)
-            $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-            while ((Get-Date) -lt $deadline) {
-              $state = Get-ServiceState $ServiceName
-              if ($state -eq 'exited' -or $state -eq 'dead') {
-                return $true
-              }
-              Start-Sleep -Seconds 2
-            }
-            return $false
-          }
-
-          function Write-TestDiagnostics {
+          function Get-RelatedServices {
             param([string] $TestName)
-            Write-Host "::group::$TestName compose state"
-            Invoke-Compose ps -a
-            foreach ($serviceName in @("setup_$TestName", "app_$TestName", $TestName)) {
-              $containerId = Get-ServiceContainerId $serviceName
-              if ($containerId) {
-                Write-Host "$serviceName container: $containerId state=$(Get-ServiceState $serviceName) exit=$(Get-ServiceExitCode $serviceName)"
-              } else {
-                Write-Host "$serviceName container: missing"
-              }
+            $script:AllServices | Where-Object {
+              $_ -eq $TestName -or
+              $_ -eq "app_$TestName" -or
+              $_ -eq "setup_$TestName" -or
+              $_ -like "*_$TestName"
             }
-            Write-Host "::endgroup::"
-
-            Write-Host "::group::$TestName logs"
-            Invoke-Compose logs --no-color "setup_$TestName" "app_$TestName" $TestName
-            Write-Host "::endgroup::"
           }
 
           function Cleanup-Test {
             param([string] $TestName)
-            Invoke-Compose kill "setup_$TestName" "app_$TestName" $TestName
-            Invoke-Compose rm -f -v "setup_$TestName" "app_$TestName" $TestName
+            $services = @(Get-RelatedServices $TestName | Where-Object { $_ })
+            if ($services.Count -gt 0) {
+              $exe = $compose[0]
+              $composeArgs = $compose[1..($compose.Length - 1)]
+              & $exe @composeArgs kill @services *> $null
+              & $exe @composeArgs rm -f -v @services *> $null
+            }
+          }
+
+          function Write-TestLogs {
+            param([string] $TestName, [string] $GroupName)
+            $services = @(Get-RelatedServices $TestName | Where-Object { $_ })
+            Write-Host "::group::$GroupName"
+            if ($services.Count -gt 0) {
+              Invoke-Compose logs --no-color @services
+            }
+            Write-Host "::endgroup::"
+          }
+
+          function Start-Test {
+            param([string] $TestName)
+            $startLog = Join-Path $logDir "$TestName.start.log"
+
+            Write-Host "START $TestName"
+            $exe = $compose[0]
+            $composeArgs = $compose[1..($compose.Length - 1)]
+            & $exe @composeArgs up --no-build -d $TestName *> $startLog
+            if ($LASTEXITCODE -eq 0) {
+              $script:RunningTests += $TestName
+              return
+            }
+
+            Write-Host "FAIL $TestName"
+            Add-Content -Path $failuresFile -Value $TestName
+            Write-Host "::group::$TestName startup log"
+            Get-Content $startLog
+            Write-TestLogs $TestName "$TestName log"
+            Cleanup-Test $TestName
+          }
+
+          function Test-Finished {
+            param([string] $TestName)
+            $state = Get-ServiceState $TestName
+            return $state -eq 'exited' -or $state -eq 'dead'
+          }
+
+          function Collect-Test {
+            param([string] $TestName)
+            $testExitCode = Get-ServiceExitCode $TestName
+            if ($testExitCode -eq 0) {
+              Write-Host "PASS $TestName"
+            } else {
+              Write-Host "FAIL $TestName"
+              Add-Content -Path $failuresFile -Value $TestName
+              Write-TestLogs $TestName "$TestName log"
+            }
+
+            Cleanup-Test $TestName
           }
 
           try {
@@ -608,40 +644,54 @@ jobs:
               throw 'Failed to start shared Windows Compose infrastructure'
             }
 
-            $tests = $env:TEST_NAMES -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-            foreach ($testName in $tests) {
+            if (-not ($env:COMPOSE_TEST_PARALLELISM -match '^[1-9][0-9]*$')) {
+              throw 'COMPOSE_TEST_PARALLELISM must be a positive integer'
+            }
+            $parallelism = [int] $env:COMPOSE_TEST_PARALLELISM
+            $script:AllServices = Invoke-Compose config --services
+
+            $tests = @()
+            foreach ($testName in ($env:TEST_NAMES -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
               if ($skipped.ContainsKey($testName)) {
                 Write-Host "SKIP $testName"
                 continue
               }
+              $tests += $testName
+            }
 
-              Write-Host "START $testName"
-              Cleanup-Test $testName
-
-              $failed = $false
-              Invoke-Compose up --no-build -d $testName
-              if ($script:LastComposeExitCode -ne 0) {
-                Write-Host "$testName failed to start"
-                $failed = $true
-              } elseif (-not (Wait-ServiceExited $testName ([int] $env:WINDOWS_TEST_TIMEOUT_SECONDS))) {
-                Write-Host "$testName timed out after $env:WINDOWS_TEST_TIMEOUT_SECONDS seconds"
-                $failed = $true
+            $nextTestIndex = 0
+            $script:RunningTests = @()
+            while ($nextTestIndex -lt $tests.Count -or $script:RunningTests.Count -gt 0) {
+              while ($script:RunningTests.Count -lt $parallelism -and $nextTestIndex -lt $tests.Count) {
+                Start-Test $($tests[$nextTestIndex])
+                $nextTestIndex += 1
               }
 
-              $testExitCode = Get-ServiceExitCode $testName
-              if (-not $failed -and $testExitCode -eq 0) {
-                Write-Host "PASS $testName"
-              } else {
-                Write-Host "FAIL $testName"
-                $failures += $testName
-                Write-TestDiagnostics $testName
+              if ($script:RunningTests.Count -eq 0) {
+                continue
               }
-              Cleanup-Test $testName
+
+              $nextRunningTests = @()
+              $completedAny = $false
+              foreach ($testName in $script:RunningTests) {
+                if (Test-Finished $testName) {
+                  Collect-Test $testName
+                  $completedAny = $true
+                } else {
+                  $nextRunningTests += $testName
+                }
+              }
+              $script:RunningTests = $nextRunningTests
+
+              if (-not $completedAny) {
+                Start-Sleep -Seconds 2
+              }
             }
           } finally {
             docker compose -f compose.windows.yml down -v --remove-orphans
           }
 
+          $failures = Get-Content $failuresFile | Where-Object { $_ }
           if ($failures.Count -gt 0) {
             Write-Host 'Failed tests:'
             $failures | Sort-Object -Unique | ForEach-Object { Write-Host $_ }
@@ -668,7 +718,6 @@ jobs:
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
-          APP_CONFIG_READY_DELAY: 20
           APP_PORT: 8080
           COMPOSE_PROJECT_NAME: php-control
           CONFIG_UPDATE_DELAY: 60
@@ -690,7 +739,6 @@ jobs:
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
-          APP_CONFIG_READY_DELAY: 20
           APP_PORT: 8080
           COMPOSE_PROJECT_NAME: php-control
           COMPOSE_TEST_PARALLELISM: 50
@@ -698,6 +746,7 @@ jobs:
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-php-control
           PHP_FIREWALL_VERSION: ''
+          SLEEP_BEFORE_TEST: 10
           TEST_NAMES: |
             control_test_detects_attacks_when_started_under_load
             control_test_graceful_restart

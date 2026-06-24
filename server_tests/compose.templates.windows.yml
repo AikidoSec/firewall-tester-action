@@ -63,7 +63,7 @@ services:
       PYTHONPATH: C:\workspace\server_tests
       APP_PORT: ${APP_PORT:-8080}
       APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
-      APP_CONFIG_READY_DELAY: ${APP_CONFIG_READY_DELAY:-0}
+      SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-0}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
     command:
@@ -101,9 +101,12 @@ services:
             throw "App did not become reachable at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/. Last error: $$lastWarmupError"
           }
 
-          if ([int]$$env:APP_CONFIG_READY_DELAY -gt 0) {
-            Start-Sleep -Seconds ([int]$$env:APP_CONFIG_READY_DELAY)
-          }
+        }
+
+        # Keep the old runner's sleep_before_test behavior: the app can be started
+        # or HTTP-ready before the agent has fetched startup config from core.
+        if ([int]$$env:SLEEP_BEFORE_TEST -gt 0) {
+          Start-Sleep -Seconds ([int]$$env:SLEEP_BEFORE_TEST)
         }
 
         $$extraArgs = @()

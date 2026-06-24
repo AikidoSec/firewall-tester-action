@@ -48,8 +48,8 @@ services:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - type: bind
-        source: ../mock_http_server.py
-        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+        source: ..
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
         read_only: true
     command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:

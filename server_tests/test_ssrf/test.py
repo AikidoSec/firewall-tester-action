@@ -1,6 +1,10 @@
 from testlib import *
 from core_api import CoreApi
 import itertools
+import os
+
+
+SKIP_IPV6_SSRF = os.environ.get("SKIP_IPV6_SSRF", "0") == "1"
 
 '''
 1. Sets up a simple config and env AIKIDO_BLOCK=1
@@ -184,6 +188,9 @@ def run_test(s: TestServer, c: CoreApi):
 
     for i in range(128):
         ips.append(f"http://127.0.0.1:4000" + chr(i) + "/")
+
+    if SKIP_IPV6_SSRF:
+        ips = [ip for ip in ips if "://[" not in ip]
 
     for ip in ips:
         check_ssrf(collector, s, "/api/request", ip)

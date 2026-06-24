@@ -43,29 +43,15 @@ services:
 
   # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf_mock_4000_test_ssrf_diffrent_port:
-    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: loopback_mock_template
     depends_on:
       app_test_ssrf_diffrent_port:
         condition: service_started
     network_mode: service:app_test_ssrf_diffrent_port
-    volumes:
-      - type: bind
-        source: ../mock_http_server.py
-        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
-        read_only: true
-    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:
       HOST: 127.0.0.1
       PORT: 4000
       READY_FILE: /tmp/ssrf-mock-ready
       RESPONSE_BODY: '{"status":"ok"}'
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE'])
-          else 1)
-      interval: 1s
-      timeout: 5s
-      retries: 60

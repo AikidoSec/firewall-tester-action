@@ -30,6 +30,7 @@ services:
 
   app_template:
     image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
+    isolation: process
     build:
       context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
       dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
@@ -45,6 +46,57 @@ services:
       POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
       PORT: ${APP_PORT:-8080}
+    restart: 'no'
+
+  # IMDS responder for fixed IPv4 metadata IPs used by SSRF tests.
+  imds_mock_template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    isolation: process
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    environment:
+      PORT: 80
+      READY_FILE: /tmp/ssrf-imds-ready
+      RESPONSE_BODY: '{"Code": "Success"}'
+      ENABLE_IPV6: 0
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE']) else 1)
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    networks:
+      imds_aws:
+        ipv4_address: 169.254.169.254
+      imds_alibaba:
+        ipv4_address: 100.100.100.200
+
+  loopback_mock_template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    isolation: process
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE'])
+          else 1)
+      interval: 1s
+      timeout: 5s
+      retries: 60
     restart: 'no'
 
   test_template:
@@ -68,6 +120,7 @@ services:
       SLEEP_BEFORE_TEST: ${SLEEP_BEFORE_TEST:-0}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
+      SKIP_IPV6_SSRF: ${SKIP_IPV6_SSRF:-0}
     command:
       - powershell
       - -NoProfile

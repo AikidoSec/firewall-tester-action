@@ -34,6 +34,7 @@ Test Steps:
 '''
 
 DNS_MOCK_URL = os.environ.get("TEST_DNS_MOCK_URL")
+SKIP_IPV6_SSRF = os.environ.get("SKIP_IPV6_SSRF", "0") == "1"
 
 
 def set_dns_mapping(ip: str, hostname: str):
@@ -131,7 +132,8 @@ def run_test(s: TestServer, c: CoreApi):
         #  "fd00:ec2:0:0:0:0::254"
     ]
 
-    for ip in IDMS_IPS_V4 + IDMS_IPS_V6:
+    imds_ips = IDMS_IPS_V4 if SKIP_IPV6_SSRF else IDMS_IPS_V4 + IDMS_IPS_V6
+    for ip in imds_ips:
         set_dns_mapping(ip, "evil-stored-ssrf-hostname")
         check_stored_ssrf(collector, s, ip)
 

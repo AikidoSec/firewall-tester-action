@@ -88,36 +88,10 @@ services:
     profiles:
       - build
 
-  # IMDS responder for fixed metadata IPs used by SSRF tests.
   imds_mock:
-    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
-    volumes:
-      - type: bind
-        source: ./server_tests/mock_http_server.py
-        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
-        read_only: true
-    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
-    environment:
-      PORT: 80
-      READY_FILE: /tmp/ssrf-imds-ready
-      RESPONSE_BODY: '{"Code": "Success"}'
-      ENABLE_IPV6: 1
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE']) else 1)
-      interval: 1s
-      timeout: 5s
-      retries: 60
-    networks:
-      imds_aws:
-        ipv4_address: 169.254.169.254
-      imds_alibaba:
-        ipv4_address: 100.100.100.200
-      imds_aws_ipv6:
-        ipv6_address: fd00:ec2::254
+    extends:
+      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: imds_mock_template
 
 networks:
   imds_aws:
@@ -129,7 +103,7 @@ networks:
       config:
         - subnet: 100.100.100.0/24
   imds_aws_ipv6:
-    enable_ipv6: true
+    enable_ipv6: ${IMDS_AWS_IPV6_ENABLE:?Set IMDS_AWS_IPV6_ENABLE}
     ipam:
       config:
-        - subnet: fd00:ec2::/112
+        - subnet: ${IMDS_AWS_IPV6_SUBNET:?Set IMDS_AWS_IPV6_SUBNET}

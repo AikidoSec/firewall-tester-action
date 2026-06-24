@@ -165,6 +165,10 @@ services:
               $$appReady = $$true
               break
             } catch {
+              if ($$_.Exception.Response) {
+                $$appReady = $$true
+                break
+              }
               $$lastWarmupError = $$_.Exception.Message
               Write-Host "Waiting for app at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/: $$lastWarmupError"
               Start-Sleep -Seconds 2

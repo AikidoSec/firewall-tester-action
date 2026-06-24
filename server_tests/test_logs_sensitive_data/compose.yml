@@ -42,23 +42,31 @@ services:
       TEST_TOKEN: *test_token
       TEST_SERVER_HOST: *app_service
       TEST_CONTROL_SERVER_HOST: *app_service
-      TEST_APP_LOG_FILE: ${TEST_LOG_DIR:-/logs}/test_logs_sensitive_data.log
+      TEST_APP_LOG_FILE: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test_logs_sensitive_data.log
     depends_on:
       app_test_logs_sensitive_data:
         condition: service_started
     volumes:
-      - test_logs_sensitive_data_logs:${TEST_LOG_DIR:-/logs}:ro
+      - type: volume
+        source: test_logs_sensitive_data_logs
+        target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
+        read_only: true
 
   log_collector_test_logs_sensitive_data:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     environment:
-      SYSLOG_COLLECTOR_LOG_FILE: /logs/test_logs_sensitive_data.log
+      SYSLOG_COLLECTOR_LOG_FILE: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test_logs_sensitive_data.log
     volumes:
-      - ../syslog_collector.py:/syslog_collector.py:ro
-      - test_logs_sensitive_data_logs:/logs
+      - type: bind
+        source: ../syslog_collector.py
+        target: ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
+        read_only: true
+      - type: volume
+        source: test_logs_sensitive_data_logs
+        target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
     ports:
       - '${SYSLOG_COLLECTOR_BIND_ADDRESS:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}:5514'
-    command: python /syslog_collector.py
+    command: python ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
     healthcheck:
       test:
         - CMD-SHELL

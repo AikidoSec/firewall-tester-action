@@ -47,8 +47,13 @@ services:
   mock_server_outbound_domain_blocking_test_outbound_domain_blocking:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
-      - .:/test:ro
-    command: python /test/mock-server.py
+      - type: bind
+        source: ../mock_http_server.py
+        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+        read_only: true
+    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    environment:
+      RESPONSE_BODY: '{"status":"ok"}'
     networks:
       outbound_domain_blocking_test_outbound_domain_blocking:
         ipv4_address: 11.22.33.44

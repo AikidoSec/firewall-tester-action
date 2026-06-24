@@ -92,8 +92,11 @@ services:
   imds_mock:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
-      - ./server_tests/mock_http_server.py:/mock_http_server.py:ro
-    command: python /mock_http_server.py
+      - type: bind
+        source: ./server_tests/mock_http_server.py
+        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+        read_only: true
+    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:
       PORT: 80
       READY_FILE: /tmp/ssrf-imds-ready

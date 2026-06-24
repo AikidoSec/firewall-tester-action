@@ -56,8 +56,11 @@ services:
         condition: service_started
     network_mode: service:app_test_ssrf
     volumes:
-      - ../mock_http_server.py:/mock_http_server.py:ro
-    command: python /mock_http_server.py
+      - type: bind
+        source: ../mock_http_server.py
+        target: ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+        read_only: true
+    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:
       HOST: 127.0.0.1
       PORT: 4000

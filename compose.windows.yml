@@ -56,45 +56,44 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
     entrypoint:
-      - powershell
-      - -NoProfile
-      - -Command
+      - cmd
+      - /S
+      - /C
     command:
       - |
-        $$ErrorActionPreference = 'Stop'
+        set "TEST_DIR=C:\workspace\server_tests\%TEST_NAME%"
 
-        if (-not $$env:TEST_NAME -or $$env:TEST_NAME -notmatch '^(test|control_test)_[A-Za-z0-9_]+$') {
-          throw "Invalid TEST_NAME: $$env:TEST_NAME"
-        }
+        echo %TEST_NAME% | findstr /R "^test_[A-Za-z0-9_]*$ ^control_test_[A-Za-z0-9_]*$" >nul
+        if errorlevel 1 (
+          echo Invalid TEST_NAME: %TEST_NAME%
+          exit /b 1
+        )
 
-        $$testDir = "C:\workspace\server_tests\$$env:TEST_NAME"
-        if (-not (Test-Path "$$testDir\test.py")) {
-          throw "Unknown test: $$env:TEST_NAME"
-        }
+        if not exist "%TEST_DIR%\test.py" (
+          echo Unknown test: %TEST_NAME%
+          exit /b 1
+        )
 
-        $$exists = (& psql -h $$env:POSTGRES_HOST -p $$env:POSTGRES_PORT -U $$env:POSTGRES_USER -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$$env:TEST_NAME'") -join ''
-        if ($$exists.Trim() -ne '1') {
-          & createdb -h $$env:POSTGRES_HOST -p $$env:POSTGRES_PORT -U $$env:POSTGRES_USER $$env:TEST_NAME
-          if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }
-        }
+        set "DB_EXISTS="
+        for /f "delims=" %A in ('psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'"') do set "DB_EXISTS=%A"
+        if not "%DB_EXISTS%"=="1" (
+          createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% %TEST_NAME%
+          if errorlevel 1 exit /b 1
+        )
 
-        $$jsonHeaders = @{ 'Content-Type' = 'application/json' }
-        Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/apps" -Headers $$jsonHeaders -Body (@{ token = $$env:TEST_TOKEN } | ConvertTo-Json) | Out-Null
+        > "%TEMP%\app.json" echo {"token":"%TEST_TOKEN%"}
+        curl.exe -fsS -X POST "%CORE_URL%/api/runtime/apps" -H "Content-Type: application/json" --data-binary "@%TEMP%\app.json"
+        if errorlevel 1 exit /b 1
 
-        $$authHeaders = @{
-          'Authorization' = $$env:TEST_TOKEN
-          'Content-Type' = 'application/json'
-        }
+        if exist "%TEST_DIR%\start_config.json" (
+          curl.exe -fsS -X POST "%CORE_URL%/api/runtime/config" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_config.json"
+          if errorlevel 1 exit /b 1
+        )
 
-        $$startConfig = "$$testDir\start_config.json"
-        if (Test-Path $$startConfig) {
-          Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/config" -Headers $$authHeaders -Body (Get-Content -Raw $$startConfig) | Out-Null
-        }
-
-        $$startFirewall = "$$testDir\start_firewall.json"
-        if (Test-Path $$startFirewall) {
-          Invoke-RestMethod -Method Post -Uri "$$env:CORE_URL/api/runtime/firewall/lists" -Headers $$authHeaders -Body (Get-Content -Raw $$startFirewall) | Out-Null
-        }
+        if exist "%TEST_DIR%\start_firewall.json" (
+          curl.exe -fsS -X POST "%CORE_URL%/api/runtime/firewall/lists" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_firewall.json"
+          if errorlevel 1 exit /b 1
+        )
 
   app:
     image: ${DEMO_IMAGE:-firewall-tester-action-demo-image-windows}

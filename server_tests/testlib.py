@@ -25,10 +25,10 @@ def get_session(port):
     return _sessions[port]
 
 
-def get_raw_connection(port, host=TEST_SERVER_HOST):
+def get_raw_connection(port, host=TEST_SERVER_HOST, timeout=100):
     key = (host, port)
     if key not in _raw_connections:
-        _raw_connections[key] = http.client.HTTPConnection(host, port)
+        _raw_connections[key] = http.client.HTTPConnection(host, port, timeout=timeout)
     return _raw_connections[key]
 
 
@@ -42,7 +42,7 @@ def wrap_raw_response(raw_response, port, route, host=TEST_SERVER_HOST):
     return response
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET", host=TEST_SERVER_HOST):
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET", host=TEST_SERVER_HOST, timeout=100):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
@@ -50,12 +50,12 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     for attempt in range(3):
         try:
             if raw:
-                conn = get_raw_connection(port, host)
+                conn = get_raw_connection(port, host, timeout)
                 conn.request(method, route, headers=headers)
                 raw_response = conn.getresponse()
                 r = wrap_raw_response(raw_response, port, route, host)
             else:
-                r = get_session(port).get(f"http://{host}:{port}{route}", headers=headers)
+                r = get_session(port).get(f"http://{host}:{port}{route}", headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
@@ -235,11 +235,11 @@ class TestServer:
         self.port = port
         self.token = token
 
-    def get(self, route="", headers={}, benchmark=False):
-        return localhost_get_request(self.port, route, headers, benchmark)
+    def get(self, route="", headers={}, benchmark=False, timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, timeout=timeout)
 
-    def get_raw(self, route="", headers={}, benchmark=False, method="GET"):
-        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method)
+    def get_raw(self, route="", headers={}, benchmark=False, method="GET", timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method, timeout=timeout)
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)

@@ -475,6 +475,7 @@ jobs:
             test_user_rate_limiting_1_minute_without_x_forwarded_for
             test_wave_attack
           SKIP_TESTS: test_bypassed_ip,test_logs_sensitive_data,test_outbound_domain_blocking,test_path_traversal,test_rate_limiting_group_id_1_minute,test_ssrf,test_ssrf_diffrent_port,test_stored_ssrf,test_stored_ssrf_no_context
+          WINDOWS_TEST_TIMEOUT_SECONDS: 600
         run: |
           $ErrorActionPreference = 'Continue'
           $env:APP_ENV_FILE = (Resolve-Path $env:APP_ENV_FILE).Path
@@ -494,7 +495,92 @@ jobs:
             $exe = $compose[0]
             $composeArgs = $compose[1..($compose.Length - 1)]
             & $exe @composeArgs @args
-            return $LASTEXITCODE
+            $script:LastComposeExitCode = $LASTEXITCODE
+          }
+
+          function Get-ServiceContainerId {
+            param([string] $ServiceName)
+            $exe = $compose[0]
+            $composeArgs = $compose[1..($compose.Length - 1)]
+            $ids = & $exe @composeArgs ps -a -q $ServiceName 2>$null
+            if ($LASTEXITCODE -ne 0 -or -not $ids) {
+              return ''
+            }
+            return ($ids | Select-Object -Last 1)
+          }
+
+          function Get-ServiceState {
+            param([string] $ServiceName)
+            $containerId = Get-ServiceContainerId $ServiceName
+            if (-not $containerId) {
+              return 'missing'
+            }
+            $state = docker inspect -f '{{.State.Status}}' $containerId 2>$null
+            if ($LASTEXITCODE -ne 0 -or -not $state) {
+              return 'missing'
+            }
+            return ($state | Select-Object -First 1)
+          }
+
+          function Get-ServiceExitCode {
+            param([string] $ServiceName)
+            $containerId = Get-ServiceContainerId $ServiceName
+            if (-not $containerId) {
+              return 1
+            }
+            $exitCode = docker inspect -f '{{.State.ExitCode}}' $containerId 2>$null
+            if ($LASTEXITCODE -ne 0 -or -not $exitCode) {
+              return 1
+            }
+            return [int]($exitCode | Select-Object -First 1)
+          }
+
+          function Wait-ServiceRunning {
+            param([string] $ServiceName, [int] $TimeoutSeconds)
+            $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+            while ((Get-Date) -lt $deadline) {
+              $state = Get-ServiceState $ServiceName
+              if ($state -eq 'running') {
+                return $true
+              }
+              if ($state -eq 'exited' -or $state -eq 'dead') {
+                return $false
+              }
+              Start-Sleep -Seconds 2
+            }
+            return $false
+          }
+
+          function Wait-ServiceExited {
+            param([string] $ServiceName, [int] $TimeoutSeconds)
+            $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+            while ((Get-Date) -lt $deadline) {
+              $state = Get-ServiceState $ServiceName
+              if ($state -eq 'exited' -or $state -eq 'dead') {
+                return $true
+              }
+              Start-Sleep -Seconds 2
+            }
+            return $false
+          }
+
+          function Write-TestDiagnostics {
+            param([string] $TestName)
+            Write-Host "::group::$TestName compose state"
+            Invoke-Compose ps -a
+            foreach ($serviceName in @('setup_test', 'app', 'test')) {
+              $containerId = Get-ServiceContainerId $serviceName
+              if ($containerId) {
+                Write-Host "$serviceName container: $containerId state=$(Get-ServiceState $serviceName) exit=$(Get-ServiceExitCode $serviceName)"
+              } else {
+                Write-Host "$serviceName container: missing"
+              }
+            }
+            Write-Host "::endgroup::"
+
+            Write-Host "::group::$TestName logs"
+            Invoke-Compose logs --no-color setup_test app test
+            Write-Host "::endgroup::"
           }
 
           function Set-TestEnvironment {
@@ -508,13 +594,13 @@ jobs:
           }
 
           function Cleanup-Test {
-            $null = Invoke-Compose kill setup_test app test
-            $null = Invoke-Compose rm -f -v setup_test app test
+            Invoke-Compose kill setup_test app test
+            Invoke-Compose rm -f -v setup_test app test
           }
 
           try {
-            $infraExitCode = Invoke-Compose up --no-build -d --wait core postgres
-            if ($infraExitCode -ne 0) {
+            Invoke-Compose up --no-build -d --wait core postgres
+            if ($script:LastComposeExitCode -ne 0) {
               throw 'Failed to start shared Windows Compose infrastructure'
             }
 
@@ -527,13 +613,50 @@ jobs:
 
               Set-TestEnvironment $testName
               Write-Host "START $testName"
-              $testExitCode = Invoke-Compose up --no-build --exit-code-from test test
-              if ($testExitCode -eq 0) {
+              Cleanup-Test
+
+              $failed = $false
+              Invoke-Compose up --no-build -d setup_test
+              if ($script:LastComposeExitCode -ne 0) {
+                Write-Host "setup_test failed to start for $testName"
+                $failed = $true
+              } elseif (-not (Wait-ServiceExited setup_test 300)) {
+                Write-Host "setup_test timed out for $testName"
+                $failed = $true
+              } elseif ((Get-ServiceExitCode setup_test) -ne 0) {
+                Write-Host "setup_test exited with $(Get-ServiceExitCode setup_test) for $testName"
+                $failed = $true
+              }
+
+              if (-not $failed) {
+                Invoke-Compose up --no-build -d --no-deps app
+                if ($script:LastComposeExitCode -ne 0) {
+                  Write-Host "app failed to start for $testName"
+                  $failed = $true
+                } elseif (-not (Wait-ServiceRunning app 180)) {
+                  Write-Host "app did not enter running state for $testName"
+                  $failed = $true
+                }
+              }
+
+              if (-not $failed) {
+                Invoke-Compose up --no-build -d --no-deps test
+                if ($script:LastComposeExitCode -ne 0) {
+                  Write-Host "test failed to start for $testName"
+                  $failed = $true
+                } elseif (-not (Wait-ServiceExited test ([int] $env:WINDOWS_TEST_TIMEOUT_SECONDS))) {
+                  Write-Host "test timed out after $env:WINDOWS_TEST_TIMEOUT_SECONDS seconds for $testName"
+                  $failed = $true
+                }
+              }
+
+              $testExitCode = Get-ServiceExitCode test
+              if (-not $failed -and $testExitCode -eq 0) {
                 Write-Host "PASS $testName"
               } else {
                 Write-Host "FAIL $testName"
                 $failures += $testName
-                $null = Invoke-Compose logs --no-color setup_test app test
+                Write-TestDiagnostics $testName
               }
               Cleanup-Test
             }

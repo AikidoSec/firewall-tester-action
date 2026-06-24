@@ -97,6 +97,7 @@ services:
       PYTHONPATH: /workspace/server_tests
       APP_PORT: ${APP_PORT:-8080}
       APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
+      APP_CONFIG_READY_DELAY: ${APP_CONFIG_READY_DELAY:-0}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
     command:
@@ -132,6 +133,10 @@ services:
         else:
             raise SystemExit(f"App did not become reachable at {url}: {last_error}")
         PY
+
+          if [ "$$APP_CONFIG_READY_DELAY" -gt 0 ]; then
+            sleep "$$APP_CONFIG_READY_DELAY"
+          fi
         fi
 
         extra_args=""

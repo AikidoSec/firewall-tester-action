@@ -24,6 +24,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-nodejs
             ref: dev-testing
             app_port: 3000
+            app_config_ready_delay: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -34,6 +35,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-python
             ref: gunicorn-threads-1w-4t
             app_port: 8080
+            app_config_ready_delay: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -44,6 +46,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
             app_port: 8080
+            app_config_ready_delay: 20
             config_update_delay: 120
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
@@ -54,6 +57,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
+            app_config_ready_delay: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -64,6 +68,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-java
             ref: dev-testing
             app_port: 8080
+            app_config_ready_delay: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -74,6 +79,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: dev-testing
             app_port: 3000
+            app_config_ready_delay: 30
             config_update_delay: 60
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
@@ -84,6 +90,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
             app_port: 3000
+            app_config_ready_delay: 15
             config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
@@ -106,6 +113,7 @@ jobs:
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
+          APP_CONFIG_READY_DELAY: ${{ matrix.app.app_config_ready_delay }}
           APP_PORT: ${{ matrix.app.app_port }}
           COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           CONFIG_UPDATE_DELAY: ${{ matrix.app.config_update_delay }}
@@ -139,6 +147,7 @@ jobs:
         env:
           APP_ENV_FILE: ${{ matrix.app.app_env_file }}
           APP_ENV_FILE_2: ${{ matrix.app.app_env_file_2 }}
+          APP_CONFIG_READY_DELAY: ${{ matrix.app.app_config_ready_delay }}
           APP_PORT: ${{ matrix.app.app_port }}
           COMPOSE_PROJECT_NAME: ${{ matrix.app.name }}
           COMPOSE_TEST_PARALLELISM: ${{ matrix.app.parallelism }}
@@ -414,6 +423,7 @@ jobs:
         env:
           APP_ENV_FILE: ./server_tests/empty.env
           APP_ENV_FILE_2: ./server_tests/empty.env
+          APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
           CONFIG_UPDATE_DELAY: 60
@@ -434,6 +444,7 @@ jobs:
         env:
           APP_ENV_FILE: ./server_tests/empty.env
           APP_ENV_FILE_2: ./server_tests/empty.env
+          APP_CONFIG_READY_DELAY: 15
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
           CONFIG_UPDATE_DELAY: 60
@@ -690,6 +701,7 @@ jobs:
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
+          APP_CONFIG_READY_DELAY: 20
           APP_PORT: 8080
           COMPOSE_PROJECT_NAME: php-control
           CONFIG_UPDATE_DELAY: 60
@@ -711,6 +723,7 @@ jobs:
         env:
           APP_ENV_FILE: ./zen-demo/.env.example
           APP_ENV_FILE_2: ./server_tests/app_env/php.env
+          APP_CONFIG_READY_DELAY: 20
           APP_PORT: 8080
           COMPOSE_PROJECT_NAME: php-control
           COMPOSE_TEST_PARALLELISM: 50

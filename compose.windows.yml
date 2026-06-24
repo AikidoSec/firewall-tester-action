@@ -74,11 +74,16 @@ services:
           exit /b 1
         )
 
-        set "DB_EXISTS="
-        for /f "delims=" %A in ('psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'"') do set "DB_EXISTS=%A"
-        if not "%DB_EXISTS%"=="1" (
-          createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% %TEST_NAME%
+        createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% %TEST_NAME%
+        if errorlevel 1 (
+          psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'" | findstr /R "1" >nul
           if errorlevel 1 exit /b 1
+        )
+
+        psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_USER% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'" | findstr /R "1" >nul
+        if errorlevel 1 (
+          echo Database was not created: %TEST_NAME%
+          exit /b 1
         )
 
         > "%TEMP%\app.json" echo {"token":"%TEST_TOKEN%"}
@@ -141,6 +146,7 @@ services:
       PYTHONPATH: C:\workspace\server_tests
       APP_PORT: ${APP_PORT:-8080}
       APP_READY_TIMEOUT: ${APP_READY_TIMEOUT:-120}
+      APP_CONFIG_READY_DELAY: ${APP_CONFIG_READY_DELAY:-0}
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
     command:
@@ -176,6 +182,10 @@ services:
           }
           if (-not $$appReady) {
             throw "App did not become reachable at http://$$env:TEST_SERVER_HOST`:$$env:APP_PORT/. Last error: $$lastWarmupError"
+          }
+
+          if ([int]$$env:APP_CONFIG_READY_DELAY -gt 0) {
+            Start-Sleep -Seconds ([int]$$env:APP_CONFIG_READY_DELAY)
           }
         }
 

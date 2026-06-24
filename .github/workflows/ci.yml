@@ -137,7 +137,7 @@ jobs:
           export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          docker compose -f compose.linux.yml --profile build build \
+          docker compose --env-file compose.linux.env -f compose.yml --profile build build \
             core \
             demo_app_image \
             test_runner_image
@@ -208,7 +208,7 @@ jobs:
           export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          compose=(docker compose -f compose.linux.yml)
+          compose=(docker compose --env-file compose.linux.env -f compose.yml)
           mkdir -p "$RUNNER_TEMP/compose-test-logs"
           : > "$RUNNER_TEMP/compose-test-failures"
 
@@ -399,7 +399,7 @@ jobs:
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
           export APP_ENV_FILE="$(normalize_file "$APP_ENV_FILE")"
           export APP_ENV_FILE_2="$(normalize_file "$APP_ENV_FILE_2")"
-          docker compose -f compose.linux.yml down -v --remove-orphans
+          docker compose --env-file compose.linux.env -f compose.yml down -v --remove-orphans
 
   server-tests-windows:
     name: dotnet-framework
@@ -439,7 +439,6 @@ jobs:
           APP_ENV_FILE_2: ./server_tests/empty.env
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
-          COMPOSE_OS: windows
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
           DEMO_IMAGE: firewall-tester-action-demo-dotnet-framework
@@ -449,7 +448,7 @@ jobs:
           $env:APP_ENV_FILE_2 = (Resolve-Path $env:APP_ENV_FILE_2).Path
           $env:DEMO_CONTEXT = (Resolve-Path $env:DEMO_CONTEXT).Path
 
-          docker compose -f compose.windows.yml --profile build build `
+          docker compose --env-file compose.windows.env -f compose.yml --profile build build `
             core `
             demo_app_image `
             test_runner_image
@@ -461,7 +460,6 @@ jobs:
           APP_ENV_FILE_2: ./server_tests/empty.env
           APP_PORT: 80
           COMPOSE_PROJECT_NAME: dotnet-framework
-          COMPOSE_OS: windows
           COMPOSE_TEST_PARALLELISM: 50
           CONFIG_UPDATE_DELAY: 60
           DEMO_CONTEXT: ./zen-demo
@@ -502,14 +500,14 @@ jobs:
             test_user_rate_limiting_1_minute_for_wildcard_route
             test_user_rate_limiting_1_minute_without_x_forwarded_for
             test_wave_attack
-          SKIP_TESTS: test_bypassed_ip,test_logs_sensitive_data,test_outbound_domain_blocking,test_path_traversal,test_rate_limiting_group_id_1_minute,test_ssrf,test_ssrf_diffrent_port,test_stored_ssrf,test_stored_ssrf_no_context
+          SKIP_TESTS: test_ssrf_diffrent_port
         run: |
           $ErrorActionPreference = 'Continue'
           $env:APP_ENV_FILE = (Resolve-Path $env:APP_ENV_FILE).Path
           $env:APP_ENV_FILE_2 = (Resolve-Path $env:APP_ENV_FILE_2).Path
           $env:DEMO_CONTEXT = (Resolve-Path $env:DEMO_CONTEXT).Path
 
-          $compose = @('docker', 'compose', '-f', 'compose.windows.yml')
+          $compose = @('docker', 'compose', '--env-file', 'compose.windows.env', '-f', 'compose.yml')
           $logDir = Join-Path $env:RUNNER_TEMP 'compose-test-logs'
           New-Item -ItemType Directory -Force -Path $logDir | Out-Null
           $failuresFile = Join-Path $env:RUNNER_TEMP 'compose-test-failures'
@@ -688,7 +686,7 @@ jobs:
               }
             }
           } finally {
-            docker compose -f compose.windows.yml down -v --remove-orphans
+            docker compose --env-file compose.windows.env -f compose.yml down -v --remove-orphans
           }
 
           $failures = Get-Content $failuresFile | Where-Object { $_ }
@@ -730,7 +728,7 @@ jobs:
           export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          docker compose -f compose.linux.yml --profile build build \
+          docker compose --env-file compose.linux.env -f compose.yml --profile build build \
             core \
             demo_app_image \
             test_runner_image
@@ -763,7 +761,7 @@ jobs:
           export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
 
-          compose=(docker compose -f compose.linux.yml)
+          compose=(docker compose --env-file compose.linux.env -f compose.yml)
           mkdir -p "$RUNNER_TEMP/compose-test-logs"
           : > "$RUNNER_TEMP/compose-test-failures"
 
@@ -933,4 +931,4 @@ jobs:
           export APP_ENV_FILE="$PWD/zen-demo/.env.example"
           export APP_ENV_FILE_2="$PWD/server_tests/app_env/php.env"
           export DEMO_CONTEXT="$(cd "$DEMO_CONTEXT" && pwd)"
-          docker compose -f compose.linux.yml down -v --remove-orphans
+          docker compose --env-file compose.linux.env -f compose.yml down -v --remove-orphans

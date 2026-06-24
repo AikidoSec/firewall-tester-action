@@ -53,6 +53,7 @@ def create_servers():
 
 def main():
     servers = create_servers()
+    os.makedirs(os.path.dirname(os.path.abspath(READY_FILE)), exist_ok=True)
     with open(READY_FILE, "w", encoding="utf-8") as ready:
         ready.write("ready\n")
 

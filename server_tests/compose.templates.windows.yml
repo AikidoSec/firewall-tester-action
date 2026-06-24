@@ -1,6 +1,6 @@
 services:
   setup_template:
-    image: ${POSTGRES_IMAGE:-sokigo/postgresql-windows:15.15-2022}
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE}
     depends_on:
       postgres:
         condition: service_healthy
@@ -16,8 +16,10 @@ services:
       CORE_URL: http://core:3000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_ADMIN_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
     entrypoint:
       - cmd
       - /D
@@ -27,7 +29,7 @@ services:
       - C:\workspace\server_tests\setup.windows.cmd
 
   app_template:
-    image: ${DEMO_IMAGE:-firewall-tester-action-demo-image-windows}
+    image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     build:
       context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
       dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
@@ -40,13 +42,13 @@ services:
       - ${APP_ENV_FILE_2:-./empty.env}
       - ./default.env
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
       PORT: ${APP_PORT:-8080}
     restart: 'no'
 
   test_template:
-    image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner-windows}
+    image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
       dockerfile: server_tests/Dockerfile.runner.windows

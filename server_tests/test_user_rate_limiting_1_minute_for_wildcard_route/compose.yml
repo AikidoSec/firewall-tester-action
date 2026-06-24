@@ -6,7 +6,7 @@ x-database-name: &database_name test_user_rate_limiting_1_minute_for_wildcard_ro
 services:
   setup_test_user_rate_limiting_1_minute_for_wildcard_route:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: setup_template
     environment:
       TEST_NAME: *test_name
@@ -14,21 +14,21 @@ services:
 
   app_test_user_rate_limiting_1_minute_for_wildcard_route:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app_template
     env_file:
       - ./test.env
     environment:
       AIKIDO_TOKEN: *test_token
       DATABASE_NAME: *database_name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:-postgres://myuser:mysecretpassword@postgres:5432/}test_user_rate_limiting_1_minute_for_wildcard_route${DATABASE_URL_SUFFIX:-?sslmode=disable}'
+      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test_user_rate_limiting_1_minute_for_wildcard_route${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
     depends_on:
       setup_test_user_rate_limiting_1_minute_for_wildcard_route:
         condition: service_completed_successfully
 
   test_user_rate_limiting_1_minute_for_wildcard_route:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: test_template
     environment:
       TEST_NAME: *test_name

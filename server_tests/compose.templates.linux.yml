@@ -1,6 +1,6 @@
 services:
   setup_template:
-    image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner}
+    image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
       dockerfile: server_tests/Dockerfile.runner
@@ -16,15 +16,15 @@ services:
       CORE_URL: http://core:3000
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mysecretpassword
-      PGPASSWORD: mysecretpassword
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
     command:
       - sh
       - /workspace/server_tests/setup.linux.sh
 
   app_template:
-    image: ${DEMO_IMAGE:-firewall-tester-action-demo-image}
+    image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     build:
       context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
       dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
@@ -37,13 +37,13 @@ services:
       - ${APP_ENV_FILE_2:-./empty.env}
       - ./default.env
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
       PORT: ${APP_PORT:-8080}
     restart: 'no'
 
   test_template:
-    image: ${TEST_RUNNER_IMAGE:-firewall-tester-action-test-runner}
+    image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
       dockerfile: server_tests/Dockerfile.runner

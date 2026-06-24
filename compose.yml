@@ -45,29 +45,29 @@ include:
 services:
   # PostgreSQL database image shared by tests; each test uses its own database.
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres}
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE}
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mysecretpassword
-      POSTGRES_DB: mydb
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U "$$POSTGRES_USER" -h 127.0.0.1 -p 5432
+        - pg_isready -U ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER} -h 127.0.0.1 -p 5432
       interval: 1s
       timeout: 5s
       retries: 180
 
   # Core mock API image used by agents to fetch config and submit events.
   core:
-    image: ${CORE_IMAGE:-firewall-tester-action-core}
+    image: ${CORE_IMAGE:?Set CORE_IMAGE}
     build:
       context: .
-      dockerfile: ${CORE_DOCKERFILE:-src/coremock/Dockerfile.linux}
+      dockerfile: ${CORE_DOCKERFILE:?Set CORE_DOCKERFILE}
     healthcheck:
       test:
         - CMD-SHELL
-        - wget -q -O - http://localhost:3000/health >/dev/null
+        - node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 1s
       timeout: 5s
       retries: 60
@@ -75,7 +75,7 @@ services:
   # Demo app image build target; tests run per-test app services from this image.
   demo_app_image:
     extends:
-      file: ./server_tests/compose.templates.linux.yml
+      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app_template
     profiles:
       - build
@@ -83,14 +83,14 @@ services:
   # Python test runner image build target used by setup and test services.
   test_runner_image:
     extends:
-      file: ./server_tests/compose.templates.linux.yml
+      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: test_template
     profiles:
       - build
 
   # IMDS responder for fixed metadata IPs used by SSRF tests.
   imds_mock:
-    image: python:3.13-alpine
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - ./server_tests/mock_http_server.py:/mock_http_server.py:ro
     command: python /mock_http_server.py
@@ -101,8 +101,10 @@ services:
       ENABLE_IPV6: 1
     healthcheck:
       test:
-        - CMD-SHELL
-        - test -f /tmp/ssrf-imds-ready
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE']) else 1)
       interval: 1s
       timeout: 5s
       retries: 60

@@ -43,14 +43,14 @@ if not "%POSTGRES_PASSWORD:'=%"=="%POSTGRES_PASSWORD%" (
   exit /b 1
 )
 
-set "PGPASSWORD=postgres"
+set "PGPASSWORD=%POSTGRES_ADMIN_PASSWORD%"
 
 echo Preparing database role %POSTGRES_USER%
-psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '%POSTGRES_USER%'" | findstr /R "1" >nul
+psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_ADMIN_USER% -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '%POSTGRES_USER%'" | findstr /R "1" >nul
 if errorlevel 1 (
-  psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE %POSTGRES_USER% WITH LOGIN PASSWORD '%POSTGRES_PASSWORD%'"
+  psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_ADMIN_USER% -d postgres -v ON_ERROR_STOP=1 -c "CREATE ROLE %POSTGRES_USER% WITH LOGIN PASSWORD '%POSTGRES_PASSWORD%'"
 ) else (
-  psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE %POSTGRES_USER% WITH LOGIN PASSWORD '%POSTGRES_PASSWORD%'"
+  psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_ADMIN_USER% -d postgres -v ON_ERROR_STOP=1 -c "ALTER ROLE %POSTGRES_USER% WITH LOGIN PASSWORD '%POSTGRES_PASSWORD%'"
 )
 if errorlevel 1 (
   echo Failed to prepare database role: %POSTGRES_USER%
@@ -58,7 +58,7 @@ if errorlevel 1 (
 )
 
 echo Preparing database for %TEST_NAME%
-createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -O %POSTGRES_USER% %TEST_NAME%
+createdb -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_ADMIN_USER% -O %POSTGRES_USER% %TEST_NAME%
 if errorlevel 1 (
   call :check_database_exists
   if errorlevel 1 exit /b 1
@@ -104,7 +104,7 @@ echo Setup completed for %TEST_NAME%
 exit /b 0
 
 :check_database_exists
-psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'" | findstr /R "1" >nul
+psql -h %POSTGRES_HOST% -p %POSTGRES_PORT% -U %POSTGRES_ADMIN_USER% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '%TEST_NAME%'" | findstr /R "1" >nul
 if errorlevel 1 (
   echo Database was not created: %TEST_NAME%
   exit /b 1

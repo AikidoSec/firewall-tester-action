@@ -9,14 +9,14 @@ directly with Docker Compose.
 
 ## Key Changes
 
-- Use `compose.linux.yml` and `compose.windows.yml` for shared platform
-  infrastructure.
+- Use root `compose.yml` with `compose.linux.env` or `compose.windows.env` for
+  shared platform infrastructure.
 - Each test directory has its own `compose.yml`; `TEST_NAME` and `TEST_TOKEN`
   are derived from Compose's project name.
-- Each test is runnable directly, naming only the test file:
-  - `DEMO_CONTEXT=../zen-demo-nodejs APP_PORT=3000 docker compose -f server_tests/test_sql_injection/compose.yml up --build --exit-code-from test test`
-- Windows container mode selects the Windows base:
-  - `CONTAINER_OS=windows DEMO_CONTEXT=../zen-demo-dotnet-framework APP_PORT=80 docker compose -f server_tests/test_sql_injection/compose.yml up --build --exit-code-from test test`
+- Each test is runnable directly, naming only the test service:
+  - `DEMO_CONTEXT=../zen-demo-nodejs DEMO_IMAGE=firewall-tester-action-demo-nodejs APP_PORT=3000 docker compose --env-file compose.linux.env -f compose.yml up --build --exit-code-from test_sql_injection test_sql_injection`
+- Windows container mode selects the Windows env file:
+  - `DEMO_CONTEXT=../zen-demo-dotnet-framework DEMO_IMAGE=firewall-tester-action-demo-dotnet-framework APP_PORT=80 docker compose --env-file compose.windows.env -f compose.yml up --build --exit-code-from test_sql_injection test_sql_injection`
 - Do not add `suite_all`, `suite_server`, or other suite aggregator services
   yet.
 - Do not add GitHub Actions matrix changes yet.

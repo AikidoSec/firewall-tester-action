@@ -60,10 +60,11 @@ runs:
 
         container_os="$(docker info --format '{{.OSType}}')"
         if [ "$container_os" = "windows" ]; then
-          compose_file="$GITHUB_ACTION_PATH/compose.windows.yml"
+          compose_env_file="$GITHUB_ACTION_PATH/compose.windows.env"
         else
-          compose_file="$GITHUB_ACTION_PATH/compose.linux.yml"
+          compose_env_file="$GITHUB_ACTION_PATH/compose.linux.env"
         fi
+        compose_file="$GITHUB_ACTION_PATH/compose.yml"
         test_service="$TEST_NAME"
 
         compose_path() {
@@ -90,9 +91,10 @@ runs:
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
-        export COMPOSE_OS="$container_os"
+        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$TEST_NAME}"
 
         docker compose \
+          --env-file "$compose_env_file" \
           -f "$compose_file" \
           up --build --exit-code-from "$test_service" "$test_service"
 
@@ -108,10 +110,11 @@ runs:
       run: |
         container_os="$(docker info --format '{{.OSType}}')"
         if [ "$container_os" = "windows" ]; then
-          compose_file="$GITHUB_ACTION_PATH/compose.windows.yml"
+          compose_env_file="$GITHUB_ACTION_PATH/compose.windows.env"
         else
-          compose_file="$GITHUB_ACTION_PATH/compose.linux.yml"
+          compose_env_file="$GITHUB_ACTION_PATH/compose.linux.env"
         fi
+        compose_file="$GITHUB_ACTION_PATH/compose.yml"
 
         compose_path() {
           local path="$1"
@@ -137,8 +140,9 @@ runs:
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
         export COMPOSE_PROJECT_NAME="$TEST_NAME"
-        export COMPOSE_OS="$container_os"
+        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$TEST_NAME}"
 
         docker compose \
+          --env-file "$compose_env_file" \
           -f "$compose_file" \
           down -v --remove-orphans

@@ -6,7 +6,7 @@ x-database-name: &database_name test_logs_sensitive_data
 services:
   setup_test_logs_sensitive_data:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: setup_template
     environment:
       TEST_NAME: *test_name
@@ -14,14 +14,14 @@ services:
 
   app_test_logs_sensitive_data:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app_template
     env_file:
       - ./test.env
     environment:
       AIKIDO_TOKEN: *test_token
       DATABASE_NAME: *database_name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:-postgres://myuser:mysecretpassword@postgres:5432/}test_logs_sensitive_data${DATABASE_URL_SUFFIX:-?sslmode=disable}'
+      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test_logs_sensitive_data${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
     depends_on:
       setup_test_logs_sensitive_data:
         condition: service_completed_successfully
@@ -35,7 +35,7 @@ services:
 
   test_logs_sensitive_data:
     extends:
-      file: ../compose.templates.${COMPOSE_OS:-linux}.yml
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: test_template
     environment:
       TEST_NAME: *test_name
@@ -50,7 +50,7 @@ services:
       - test_logs_sensitive_data_logs:${TEST_LOG_DIR:-/logs}:ro
 
   log_collector_test_logs_sensitive_data:
-    image: python:3.13-alpine
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     environment:
       SYSLOG_COLLECTOR_LOG_FILE: /logs/test_logs_sensitive_data.log
     volumes:

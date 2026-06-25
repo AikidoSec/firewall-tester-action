@@ -65,7 +65,7 @@ services:
         source: test_logs_sensitive_data_logs
         target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
     ports:
-      - '${SYSLOG_COLLECTOR_BIND_ADDRESS:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}:5514'
+      - '${SYSLOG_COLLECTOR_PORT:-5514}:5514'
     command: python ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
     healthcheck:
       test:

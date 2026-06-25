@@ -57,6 +57,9 @@ services:
       interval: 1s
       timeout: 5s
       retries: 180
+    networks:
+      default:
+        ipv4_address: ${POSTGRES_HOST_IPV4:?Set POSTGRES_HOST_IPV4}
 
   # Core mock API image used by agents to fetch config and submit events.
   core:
@@ -71,6 +74,9 @@ services:
       interval: 1s
       timeout: 5s
       retries: 60
+    networks:
+      default:
+        ipv4_address: ${CORE_HOST_IPV4:?Set CORE_HOST_IPV4}
 
   # Demo app image build target; tests run per-test app services from this image.
   demo_app_image:
@@ -94,6 +100,10 @@ services:
       service: imds_mock_template
 
 networks:
+  default:
+    ipam:
+      config:
+        - subnet: ${DEFAULT_NETWORK_SUBNET:?Set DEFAULT_NETWORK_SUBNET}
   imds_aws:
     ipam:
       config:

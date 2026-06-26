@@ -96,50 +96,6 @@ def run_test(s: TestServer, c: CoreApi):
         "/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/etc/passwd",
         "/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/etc/passwd",
         "%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd",
-        # tilde expansion - current user (files)
-        "~/.ssh/id_rsa",
-        "~/.ssh/authorized_keys",
-        "~/.bash_history",
-        "~/secrets/key.txt",
-        "%7E/.ssh/id_rsa",
-        "%7e/.ssh/id_rsa",
-        "%257E/.ssh/id_rsa",
-        "%257e/.ssh/id_rsa",
-        # tilde expansion - current user (directories)
-        "~",
-        "~/",
-        "~/.ssh",
-        "~/.ssh/",
-        "%7E",
-        "%7E/",
-        "%7e",
-        "%7e/",
-        "%257E",
-        "%257E/",
-        "%257e",
-        "%257e/",
-        # tilde expansion - named user (files)
-        "~root/.ssh/id_rsa",
-        "~root/.ssh/authorized_keys",
-        "~root/.bash_history",
-        "~root/secrets/key.txt",
-        "%7Eroot/.ssh/id_rsa",
-        "%7eroot/.bash_history",
-        "%257Eroot/.ssh/id_rsa",
-        "%257eroot/.bash_history",
-        # tilde expansion - named user (directories)
-        "~root",
-        "~root/",
-        "~root/.ssh",
-        "~root/.ssh/",
-        "%7Eroot",
-        "%7Eroot/",
-        "%257Eroot",
-        "%257Eroot/",
-        "%7eroot",
-        "%7eroot/",
-        "%257eroot",
-        "%257eroot/",
     ]
 
     for path in paths:
@@ -176,6 +132,68 @@ def run_test(s: TestServer, c: CoreApi):
             # encoded first value
             f"path=%2E%2E%2Fsecrets%2Fkey.txt&path={path}",
 
+        ]
+
+        for variant in variants:
+            check_path_traversal(collector, "/api/read?" + variant)
+            check_path_traversal(collector, "/api/read2?" + variant)
+
+    tilde_paths = [
+        # current user
+        "~",
+        "~/",
+        "~/secrets/key.txt",
+
+        # current user - encoded ~
+        "%7E",
+        "%7E/",
+        "%7E/secrets/key.txt",
+
+        "%7e",
+        "%7e/",
+        "%7e/secrets/key.txt",
+
+        # current user - double-encoded ~
+        "%257E",
+        "%257E/",
+        "%257E/secrets/key.txt",
+
+        "%257e",
+        "%257e/",
+        "%257e/secrets/key.txt",
+
+        # named user
+        "~root",
+        "~root/",
+        "~root/secrets/key.txt",
+
+        # named user - encoded ~
+        "%7Eroot",
+        "%7Eroot/",
+        "%7Eroot/secrets/key.txt",
+
+        "%7eroot",
+        "%7eroot/",
+        "%7eroot/secrets/key.txt",
+
+        # named user - double-encoded ~
+        "%257Eroot",
+        "%257Eroot/",
+        "%257Eroot/secrets/key.txt",
+
+        "%257eroot",
+        "%257eroot/",
+        "%257eroot/secrets/key.txt",
+    ]
+
+    for path in tilde_paths:
+        variants = [
+            f"path={path}",
+            f"path={path}&path=",
+            f"path=&path={path}",
+            f"path[]={path}",
+            f"path[0]={path}&path[1]=",
+            f"path[]={path}&path[]=",
         ]
 
         for variant in variants:

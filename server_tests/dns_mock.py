@@ -110,7 +110,10 @@ def run_dns_server() -> None:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as dns_socket:
         dns_socket.bind(("0.0.0.0", DNS_PORT))
         while True:
-            packet, address = dns_socket.recvfrom(4096)
+            try:
+                packet, address = dns_socket.recvfrom(4096)
+            except ConnectionResetError:
+                continue
             try:
                 response = handle_dns_query(packet)
                 dns_socket.sendto(response, address)

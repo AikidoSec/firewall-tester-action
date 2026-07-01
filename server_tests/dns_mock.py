@@ -1,15 +1,32 @@
 import ipaddress
 import json
+import os
 import socket
 import struct
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
-UPSTREAM_DNS = ("127.0.0.11", 53)
+def get_upstream_dns() -> tuple[str, int] | None:
+    upstream = os.environ.get("DNS_MOCK_UPSTREAM")
+    if upstream == "":
+        return None
+    if upstream:
+        host, separator, port = upstream.rpartition(":")
+        if not separator:
+            return upstream, 53
+        return host, int(port)
+
+    # 127.0.0.11 is Docker's embedded DNS on Linux. Windows containers use the
+    # network gateway as DNS, and forwarding to 127.0.0.11 stalls DNS handling.
+    return None if os.name == "nt" else ("127.0.0.11", 53)
+
+
+UPSTREAM_DNS = get_upstream_dns()
 HTTP_PORT = 8053
 DNS_PORT = 53
 TTL_SECONDS = 1
+UPSTREAM_TIMEOUT_SECONDS = 1
 
 records = {
     "metadata.google.internal": "169.254.169.254",
@@ -80,8 +97,11 @@ def servfail_packet(packet: bytes) -> bytes:
 
 
 def forward_to_upstream(packet: bytes) -> bytes:
+    if UPSTREAM_DNS is None:
+        raise RuntimeError("No upstream DNS configured")
+
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as upstream:
-        upstream.settimeout(5)
+        upstream.settimeout(UPSTREAM_TIMEOUT_SECONDS)
         upstream.sendto(packet, UPSTREAM_DNS)
         response, _ = upstream.recvfrom(4096)
         return response
@@ -91,14 +111,17 @@ def handle_dns_query(packet: bytes) -> bytes:
     try:
         qname, question_end = read_qname(packet, 12)
         qtype = struct.unpack("!H", packet[question_end:question_end + 2])[0]
-
-        with records_lock:
-            ip = records.get(qname)
-
-        if ip is not None:
-            return answer_packet(packet, ip, qtype, question_end)
     except Exception:
-        pass
+        return servfail_packet(packet)
+
+    with records_lock:
+        ip = records.get(qname)
+
+    if ip is not None:
+        return answer_packet(packet, ip, qtype, question_end)
+
+    if UPSTREAM_DNS is None:
+        return answer_packet(packet, None, qtype, question_end)
 
     try:
         return forward_to_upstream(packet)
@@ -114,11 +137,19 @@ def run_dns_server() -> None:
                 packet, address = dns_socket.recvfrom(4096)
             except ConnectionResetError:
                 continue
-            try:
-                response = handle_dns_query(packet)
-                dns_socket.sendto(response, address)
-            except Exception:
-                pass
+            threading.Thread(
+                target=send_dns_response,
+                args=(dns_socket, packet, address),
+                daemon=True,
+            ).start()
+
+
+def send_dns_response(dns_socket: socket.socket, packet: bytes, address) -> None:
+    try:
+        response = handle_dns_query(packet)
+        dns_socket.sendto(response, address)
+    except Exception:
+        pass
 
 
 class Handler(BaseHTTPRequestHandler):

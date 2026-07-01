@@ -25,16 +25,15 @@ services:
     depends_on:
       setup_test_stored_ssrf:
         condition: service_completed_successfully
-      dns_mock_test_stored_ssrf:
-        condition: service_healthy
     dns:
-      - 10.254.254.53
+      - 127.0.0.1
     networks:
-      - default
-      - dns_net_test_stored_ssrf
-      - imds_aws
-      - imds_alibaba
-      - imds_aws_ipv6
+      default: null
+      imds_aws:
+        ipv4_address: ${IMDS_AWS_APP_IPV4:?Set IMDS_AWS_APP_IPV4}
+      imds_alibaba:
+        ipv4_address: ${IMDS_ALIBABA_APP_IPV4:?Set IMDS_ALIBABA_APP_IPV4}
+      imds_aws_ipv6: null
 
   test_stored_ssrf:
     extends:
@@ -45,7 +44,7 @@ services:
       TEST_TOKEN: *test_token
       TEST_SERVER_HOST: *app_service
       TEST_CONTROL_SERVER_HOST: *app_service
-      TEST_DNS_MOCK_URL: http://dns_mock_test_stored_ssrf:8053
+      TEST_DNS_MOCK_URL: http://app_test_stored_ssrf:8053
     depends_on:
       app_test_stored_ssrf:
         condition: service_started
@@ -57,6 +56,7 @@ services:
   # DNS responder with mutable per-test records for stored SSRF hostnames.
   dns_mock_test_stored_ssrf:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    isolation: process
     volumes:
       - type: bind
         source: ..
@@ -72,13 +72,7 @@ services:
       interval: 1s
       timeout: 5s
       retries: 30
-    networks:
-      default: null
-      dns_net_test_stored_ssrf:
-        ipv4_address: 10.254.254.53
-
-networks:
-  dns_net_test_stored_ssrf:
-    ipam:
-      config:
-        - subnet: 10.254.254.0/24
+    depends_on:
+      app_test_stored_ssrf:
+        condition: service_started
+    network_mode: service:app_test_stored_ssrf

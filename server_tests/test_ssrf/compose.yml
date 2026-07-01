@@ -26,10 +26,12 @@ services:
       setup_test_ssrf:
         condition: service_completed_successfully
     networks:
-      - default
-      - imds_aws
-      - imds_alibaba
-      - imds_aws_ipv6
+      default: null
+      imds_aws:
+        ipv4_address: ${IMDS_AWS_APP_IPV4:?Set IMDS_AWS_APP_IPV4}
+      imds_alibaba:
+        ipv4_address: ${IMDS_ALIBABA_APP_IPV4:?Set IMDS_ALIBABA_APP_IPV4}
+      imds_aws_ipv6: null
 
   test_ssrf:
     extends:

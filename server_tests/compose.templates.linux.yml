@@ -102,7 +102,7 @@ services:
       - ..:/workspace:ro
     working_dir: /workspace/server_tests
     environment:
-      TEST_CORE_HOST: ${CORE_HOST_IPV4:?Set CORE_HOST_IPV4}
+      TEST_CORE_HOST: ${CORE_HOST:?Set CORE_HOST}
       TEST_DNS_MOCK_URL: ${TEST_DNS_MOCK_URL:-}
       TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
       PYTHONPATH: /workspace/server_tests

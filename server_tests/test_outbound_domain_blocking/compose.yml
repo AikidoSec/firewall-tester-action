@@ -22,6 +22,8 @@ services:
       AIKIDO_TOKEN: *test_token
       DATABASE_NAME: *database_name
       DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test_outbound_domain_blocking${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+      APP_HOSTS_ENTRIES: >-
+        11.22.33.44 böse.example.com|11.22.33.44 münchen.example.com|11.22.33.44 münchen-allowed.example.com
     depends_on:
       setup_test_outbound_domain_blocking:
         condition: service_completed_successfully
@@ -64,6 +66,9 @@ services:
           - safe.example.com
           - another-unknown.example.com
           - unknown.example.com
+          - böse.example.com
+          - münchen.example.com
+          - münchen-allowed.example.com
           - xn--bse-sna.example.com
           - xn--mnchen-3ya.example.com
           - xn--mnchen-allowed-gsb.example.com

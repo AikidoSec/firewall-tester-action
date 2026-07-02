@@ -46,6 +46,19 @@ services:
       POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
       PORT: ${APP_PORT:-8080}
+    entrypoint:
+      - powershell
+      - -NoProfile
+      - -Command
+      - |
+        if ($$env:APP_HOSTS_ENTRIES) {
+          $$hostsPath = "$$env:SystemRoot\System32\drivers\etc\hosts"
+          $$env:APP_HOSTS_ENTRIES -split '\|' | Where-Object { $$_.Trim() } | ForEach-Object {
+            Add-Content -Path $$hostsPath -Value $$_
+          }
+        }
+        & C:\ServiceMonitor.exe w3svc
+        exit $$LASTEXITCODE
     restart: 'no'
 
   # IMDS responder for fixed IPv4 metadata IPs used by SSRF tests.
@@ -111,7 +124,7 @@ services:
         read_only: true
     working_dir: C:\workspace\server_tests
     environment:
-      TEST_CORE_HOST: ${CORE_HOST_IPV4:?Set CORE_HOST_IPV4}
+      TEST_CORE_HOST: ${CORE_HOST:?Set CORE_HOST}
       TEST_DNS_MOCK_URL: ${TEST_DNS_MOCK_URL:-}
       TEST_APP_LOG_FILE: ${TEST_APP_LOG_FILE:-}
       PYTHONPATH: C:\workspace\server_tests

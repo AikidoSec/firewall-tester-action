@@ -56,7 +56,6 @@ services:
   # DNS responder with mutable per-test records for stored SSRF hostnames.
   dns_mock_test_stored_ssrf:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
-    isolation: process
     volumes:
       - type: bind
         source: ..

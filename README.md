@@ -25,6 +25,8 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
+          build_args: |
+            AGENT_VERSION=1.2.3
           skip_tests: test_stored_ssrf
 ```
 
@@ -39,6 +41,7 @@ repository runs all Linux demo apps through a GitHub matrix.
 | `test_name`            | Optional single test directory under `server_tests`               |
 | `run_tests`            | Optional comma-separated list of tests to run                     |
 | `skip_tests`           | Optional comma-separated list of tests to skip                    |
+| `build_args`           | Optional newline-separated Docker build args for the demo image   |
 | `app_port`             | Port exposed by the application during Docker runtime             |
 | `config_update_delay`  | Delay in seconds after runtime config updates                     |
 | `app_env_file`         | Optional env file passed to the application service               |
@@ -53,20 +56,21 @@ Clone a demo app into `./zen-demo`:
 git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 ```
 
-Run a single test directly with Docker Compose:
+Run the same Compose path used by the action:
 
-```sh
-COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo \
-  DEMO_IMAGE=firewall-tester-action-demo-nodejs APP_PORT=3000 \
-  docker compose --env-file compose.linux.env -f compose.yml \
-  up --build --exit-code-from test_sql_injection test_sql_injection
+```powershell
+.\scripts\run-compose-tests.ps1 `
+  -DockerfilePath .\zen-demo\Dockerfile `
+  -AppPort 3000 `
+  -TestName test_sql_injection
 ```
 
-Clean up after a run:
+The PowerShell wrapper calls Git Bash. You can also call the bash script
+directly:
 
 ```sh
-COMPOSE_PROJECT_NAME=test_sql_injection DEMO_CONTEXT=./zen-demo \
-  DEMO_IMAGE=firewall-tester-action-demo-nodejs APP_PORT=3000 \
-  docker compose --env-file compose.linux.env -f compose.yml \
-  down -v --remove-orphans
+DOCKERFILE_PATH=./zen-demo/Dockerfile \
+APP_PORT=3000 \
+TEST_NAME=test_sql_injection \
+bash ./scripts/run-compose-tests.sh
 ```

@@ -28,10 +28,6 @@ services:
     build:
       context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
       dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
-      args:
-        DOTNET_BUILD_ARGS: ${DOTNET_BUILD_ARGS:-}
-        MSBUILD_ARGS: ${MSBUILD_ARGS:-}
-        PHP_FIREWALL_VERSION: ${PHP_FIREWALL_VERSION:-}
     env_file:
       - ${APP_ENV_FILE:-./empty.env}
       - ${APP_ENV_FILE_2:-./empty.env}

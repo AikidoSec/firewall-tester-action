@@ -93,6 +93,25 @@ services:
       retries: 60
     restart: 'no'
 
+  dns_mock_template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command: python ${PYTHON_DNS_MOCK_PATH:?Set PYTHON_DNS_MOCK_PATH}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8053/health', timeout=1).read()
+      interval: 1s
+      timeout: 5s
+      retries: 30
+    restart: 'no'
+
   test_template:
     image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:

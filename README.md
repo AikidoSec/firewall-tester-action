@@ -6,7 +6,7 @@ mock core, Postgres, the demo app, and the Python test runner for that test.
 
 ## Usage
 
-Run one test with the composite action:
+Run the full server test suite with the composite action:
 
 ```yaml
 jobs:
@@ -24,24 +24,26 @@ jobs:
       - uses: AikidoSec/firewall-tester-action@v1
         with:
           dockerfile_path: ./zen-demo/Dockerfile
-          test_name: test_sql_injection
           app_port: 3000
+          skip_tests: test_stored_ssrf
 ```
 
-The CI workflow in this repository runs all Linux demo apps through a GitHub
-matrix, with one Compose test per matrix job.
+Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
+repository runs all Linux demo apps through a GitHub matrix.
 
 ## Inputs
 
 | Name                   | Description                                                       |
 | ---------------------- | ----------------------------------------------------------------- |
 | `dockerfile_path`      | Path to the Dockerfile with the Aikido agent installed            |
-| `test_name`            | Test directory under `server_tests`, such as `test_sql_injection` |
+| `test_name`            | Optional single test directory under `server_tests`               |
+| `run_tests`            | Optional comma-separated list of tests to run                     |
+| `skip_tests`           | Optional comma-separated list of tests to skip                    |
 | `app_port`             | Port exposed by the application during Docker runtime             |
 | `config_update_delay`  | Delay in seconds after runtime config updates                     |
 | `app_env_file`         | Optional env file passed to the application service               |
 | `app_env_file_2`       | Optional second env file passed to the application service        |
-| `php_firewall_version` | Optional PHP firewall package version build arg                   |
+| `max_parallel_tests`   | Maximum number of Compose tests to run in parallel                |
 
 ## Running Locally
 

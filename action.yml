@@ -1,5 +1,5 @@
 name: Aikido Firewall Tester
-description: Run one Aikido firewall tester Compose test
+description: Run Aikido firewall tester Compose tests
 author: AikidoSec
 
 branding:
@@ -12,12 +12,27 @@ inputs:
     required: true
   test_name:
     description:
-      The server_tests directory to run, for example test_sql_injection
-    required: true
+      Optional single server_tests directory to run, for example test_sql_injection
+    required: false
+    default: ''
+  run_tests:
+    description:
+      Optional comma-separated list of test names to run. If omitted, all tests
+      for the selected test type are run.
+    required: false
+    default: ''
+  skip_tests:
+    description: Optional comma-separated list of test names to skip.
+    required: false
+    default: ''
   app_port:
     description: The port exposed by the application during Docker runtime
     required: false
     default: '8080'
+  max_parallel_tests:
+    description: Maximum number of Compose tests to run in parallel.
+    required: false
+    default: '10'
   config_update_delay:
     description: Delay in seconds after runtime config updates
     required: false
@@ -37,26 +52,29 @@ inputs:
     description: Optional second env file passed to the application service
     required: false
     default: ''
-  php_firewall_version:
-    description: Optional PHP firewall package version build arg
+  test_type:
+    description: Test suite to run when test_name/run_tests are not set.
     required: false
-    default: ''
+    default: 'server'
 
 runs:
   using: composite
   steps:
-    - name: Run Compose test
+    - name: Run Compose tests
       shell: bash
       env:
         APP_ENV_FILE: ${{ inputs.app_env_file }}
         APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
         APP_PORT: ${{ inputs.app_port }}
         CONFIG_UPDATE_DELAY: ${{ inputs.config_update_delay }}
-        PHP_FIREWALL_VERSION: ${{ inputs.php_firewall_version }}
+        MAX_PARALLEL_TESTS: ${{ inputs.max_parallel_tests }}
+        RUN_TESTS: ${{ inputs.run_tests }}
         SLEEP_BEFORE_TEST: ${{ inputs.sleep_before_test }}
+        SKIP_TESTS: ${{ inputs.skip_tests }}
         TEST_NAME: ${{ inputs.test_name }}
+        TEST_TYPE: ${{ inputs.test_type }}
       run: |
-        set -eu
+        set -euo pipefail
 
         container_os="$(docker info --format '{{.OSType}}')"
         if [ "$container_os" = "windows" ]; then
@@ -65,7 +83,6 @@ runs:
           compose_env_file="$GITHUB_ACTION_PATH/compose.linux.env"
         fi
         compose_file="$GITHUB_ACTION_PATH/compose.yml"
-        test_service="$TEST_NAME"
 
         compose_path() {
           local path="$1"
@@ -90,22 +107,233 @@ runs:
         else
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
-        export COMPOSE_PROJECT_NAME="$TEST_NAME"
-        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$TEST_NAME}"
 
-        docker compose \
-          --env-file "$compose_env_file" \
-          -f "$compose_file" \
-          up --build --exit-code-from "$test_service" "$test_service"
+        if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+          if [ -n "$TEST_NAME" ]; then
+            export COMPOSE_PROJECT_NAME="$TEST_NAME"
+          else
+            export COMPOSE_PROJECT_NAME="firewall-tester-action"
+          fi
+        fi
+        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$COMPOSE_PROJECT_NAME}"
 
-    - name: Clean up Compose test
+        compose=(docker compose --env-file "$compose_env_file" -f "$compose_file")
+        mkdir -p "$RUNNER_TEMP/compose-test-logs"
+        : > "$RUNNER_TEMP/compose-test-failures"
+
+        "${compose[@]}" --profile build build \
+          core \
+          demo_app_image \
+          test_runner_image
+
+        "${compose[@]}" up --no-build -d --wait core postgres
+        all_services="$("${compose[@]}" config --services)"
+
+        related_services() {
+          local test_name="$1"
+          printf '%s\n' "$all_services" | awk -v t="$test_name" '
+            $0 == t || $0 == "app_" t || $0 == "setup_" t || $0 ~ "_" t "$"
+          '
+        }
+
+        cleanup_tests() {
+          local services=()
+          local service
+          local test_name
+          for test_name in "$@"; do
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
+              fi
+            done < <(related_services "$test_name")
+          done
+
+          if [ "${#services[@]}" -gt 0 ]; then
+            "${compose[@]}" kill "${services[@]}" >/dev/null 2>&1 || true
+            "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
+          fi
+        }
+
+        test_container_id() {
+          local test_name="$1"
+          "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
+        }
+
+        start_test() {
+          local test_name="$1"
+          local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
+          local services=()
+          local service
+
+          echo "START ${test_name}"
+          if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
+            running_tests+=("$test_name")
+            return
+          fi
+
+          echo "FAIL ${test_name}"
+          printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+          echo "::group::${test_name} startup log"
+          cat "$start_log"
+          while IFS= read -r service; do
+            if [ -n "$service" ]; then
+              services+=("$service")
+            fi
+          done < <(related_services "$test_name")
+          if [ "${#services[@]}" -gt 0 ]; then
+            "${compose[@]}" logs --no-color "${services[@]}" || true
+          fi
+          echo "::endgroup::"
+          cleanup_tests "$test_name"
+        }
+
+        test_finished() {
+          local test_name="$1"
+          local container_id
+          local state
+          container_id="$(test_container_id "$test_name")"
+          if [ -z "$container_id" ]; then
+            return 1
+          fi
+
+          state="$(docker inspect -f '{{.State.Status}}' "$container_id" 2>/dev/null || echo missing)"
+          [ "$state" = "exited" ] || [ "$state" = "dead" ]
+        }
+
+        collect_test() {
+          local test_name="$1"
+          local container_id
+          local status=1
+          local services=()
+          local service
+          container_id="$(test_container_id "$test_name")"
+          if [ -n "$container_id" ]; then
+            status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
+          fi
+
+          if [ "$status" = "0" ]; then
+            echo "PASS ${test_name}"
+          else
+            echo "FAIL ${test_name}"
+            printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
+            while IFS= read -r service; do
+              if [ -n "$service" ]; then
+                services+=("$service")
+              fi
+            done < <(related_services "$test_name")
+            echo "::group::${test_name} log"
+            if [ "${#services[@]}" -gt 0 ]; then
+              "${compose[@]}" logs --no-color "${services[@]}" || true
+            fi
+            echo "::endgroup::"
+          fi
+
+          cleanup_tests "$test_name"
+        }
+
+        trim() {
+          local value="$1"
+          value="${value#"${value%%[![:space:]]*}"}"
+          value="${value%"${value##*[![:space:]]}"}"
+          printf '%s\n' "$value"
+        }
+
+        is_skipped_test() {
+          local test_name="$1"
+          local skipped
+          IFS=',' read -ra skipped <<< "${SKIP_TESTS:-}"
+          for skipped_test in "${skipped[@]}"; do
+            skipped_test="$(trim "$skipped_test")"
+            if [ "$skipped_test" = "$test_name" ]; then
+              return 0
+            fi
+          done
+          return 1
+        }
+
+        add_test_if_selected() {
+          local test_name="$1"
+          if is_skipped_test "$test_name"; then
+            echo "SKIP ${test_name}"
+            return
+          fi
+          tests+=("$test_name")
+        }
+
+        tests=()
+        if [ -n "$TEST_NAME" ]; then
+          add_test_if_selected "$TEST_NAME"
+        elif [ -n "$RUN_TESTS" ]; then
+          IFS=',' read -ra requested_tests <<< "$RUN_TESTS"
+          for requested_test in "${requested_tests[@]}"; do
+            requested_test="$(trim "$requested_test")"
+            if [ -n "$requested_test" ]; then
+              add_test_if_selected "$requested_test"
+            fi
+          done
+        else
+          while IFS= read -r test_name; do
+            case "$TEST_TYPE:$test_name" in
+              server:test_runner_image)
+                ;;
+              control:control_test_*|server:test_*)
+                add_test_if_selected "$test_name"
+                ;;
+            esac
+          done < <(printf '%s\n' "$all_services" | sort)
+        fi
+
+        if ! [[ "${MAX_PARALLEL_TESTS:-}" =~ ^[1-9][0-9]*$ ]]; then
+          echo "max_parallel_tests must be a positive integer" >&2
+          exit 1
+        fi
+
+        next_test_index=0
+        running_tests=()
+
+        while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
+          while [ "${#running_tests[@]}" -lt "$MAX_PARALLEL_TESTS" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
+            start_test "${tests[$next_test_index]}"
+            next_test_index=$((next_test_index + 1))
+          done
+
+          if [ "${#running_tests[@]}" -eq 0 ]; then
+            continue
+          fi
+
+          next_running_tests=()
+          completed_any=0
+          for test_name in "${running_tests[@]}"; do
+            if test_finished "$test_name"; then
+              collect_test "$test_name"
+              completed_any=1
+            else
+              next_running_tests+=("$test_name")
+            fi
+          done
+          running_tests=()
+          if [ "${#next_running_tests[@]}" -gt 0 ]; then
+            running_tests=("${next_running_tests[@]}")
+          fi
+
+          if [ "$completed_any" -eq 0 ]; then
+            sleep 2
+          fi
+        done
+
+        if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
+          echo "Failed tests:"
+          sort -u "$RUNNER_TEMP/compose-test-failures"
+          exit 1
+        fi
+
+    - name: Clean up Compose tests
       if: always()
       shell: bash
       env:
         APP_ENV_FILE: ${{ inputs.app_env_file }}
         APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
         APP_PORT: ${{ inputs.app_port }}
-        PHP_FIREWALL_VERSION: ${{ inputs.php_firewall_version }}
         TEST_NAME: ${{ inputs.test_name }}
       run: |
         container_os="$(docker info --format '{{.OSType}}')"
@@ -139,8 +367,15 @@ runs:
         else
           export APP_ENV_FILE_2="$(compose_path "$GITHUB_ACTION_PATH/server_tests/empty.env")"
         fi
-        export COMPOSE_PROJECT_NAME="$TEST_NAME"
-        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$TEST_NAME}"
+
+        if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
+          if [ -n "$TEST_NAME" ]; then
+            export COMPOSE_PROJECT_NAME="$TEST_NAME"
+          else
+            export COMPOSE_PROJECT_NAME="firewall-tester-action"
+          fi
+        fi
+        export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$COMPOSE_PROJECT_NAME}"
 
         docker compose \
           --env-file "$compose_env_file" \

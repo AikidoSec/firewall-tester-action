@@ -120,6 +120,114 @@ cleanup_compose_project
 "${compose[@]}" up --no-build -d --wait core postgres
 all_services="$("${compose[@]}" config --services)"
 
+summary_order=()
+declare -A test_started_at=()
+declare -A summary_status=()
+declare -A summary_duration=()
+declare -A summary_error=()
+
+record_selected_test() {
+  local test_name="$1"
+  summary_order+=("$test_name")
+}
+
+duration_for_test() {
+  local test_name="$1"
+  local started_at="${test_started_at[$test_name]:-}"
+  if [ -z "$started_at" ]; then
+    printf 'N/A\n'
+    return
+  fi
+
+  printf '%ss\n' "$(($(date +%s) - started_at))"
+}
+
+record_test_result() {
+  local test_name="$1"
+  local status="$2"
+  local duration="$3"
+  local error_message="${4:-}"
+
+  summary_status["$test_name"]="$status"
+  summary_duration["$test_name"]="$duration"
+  summary_error["$test_name"]="$error_message"
+}
+
+markdown_escape() {
+  local value="$1"
+  value="${value//$'\r'/}"
+  value="${value//$'\n'/<br>}"
+  value="${value//|/\\|}"
+  printf '%s\n' "$value"
+}
+
+write_test_summary() {
+  local total=0
+  local passed=0
+  local failed=0
+  local skipped=0
+  local test_name
+  local status
+  local duration
+  local error_message
+
+  for test_name in "${summary_order[@]}"; do
+    total=$((total + 1))
+    status="${summary_status[$test_name]:-UNKNOWN}"
+    case "$status" in
+      PASS) passed=$((passed + 1)) ;;
+      FAIL) failed=$((failed + 1)) ;;
+      SKIP) skipped=$((skipped + 1)) ;;
+    esac
+  done
+
+  echo
+  echo "Test Results Summary"
+  echo "===================="
+  echo "Total Tests: $total"
+  echo "Passed: $passed"
+  echo "Skipped: $skipped"
+  echo "Failed: $failed"
+  echo
+  echo "Detailed Results:"
+  printf '%-45s %-8s %-10s %s\n' "Test" "Status" "Duration" "Error"
+  for test_name in "${summary_order[@]}"; do
+    status="${summary_status[$test_name]:-UNKNOWN}"
+    duration="${summary_duration[$test_name]:-N/A}"
+    error_message="${summary_error[$test_name]:-}"
+    printf '%-45s %-8s %-10s %s\n' "$test_name" "$status" "$duration" "$error_message"
+  done
+
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    {
+      echo "## Test Results Summary"
+      echo
+      echo "### Overview"
+      echo
+      echo "- **Total Tests:** $total"
+      echo "- **Passed:** $passed"
+      echo "- **Skipped:** $skipped"
+      echo "- **Failed:** $failed"
+      echo
+      echo "### Detailed Results"
+      echo
+      echo "| Test | Status | Duration | Error Message |"
+      echo "|------|--------|----------|---------------|"
+      for test_name in "${summary_order[@]}"; do
+        status="${summary_status[$test_name]:-UNKNOWN}"
+        duration="${summary_duration[$test_name]:-N/A}"
+        error_message="${summary_error[$test_name]:-}"
+        printf '| %s | %s | %s | %s |\n' \
+          "$(markdown_escape "$test_name")" \
+          "$(markdown_escape "$status")" \
+          "$(markdown_escape "$duration")" \
+          "$(markdown_escape "$error_message")"
+      done
+      echo
+    } >> "$GITHUB_STEP_SUMMARY"
+  fi
+}
+
 related_services() {
   local test_name="$1"
   printf '%s\n' "$all_services" | awk -v t="$test_name" '
@@ -157,12 +265,14 @@ start_test() {
   local service
 
   echo "START ${test_name}"
+  test_started_at["$test_name"]="$(date +%s)"
   if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
     running_tests+=("$test_name")
     return
   fi
 
   echo "FAIL ${test_name}"
+  record_test_result "$test_name" "FAIL" "$(duration_for_test "$test_name")" "Startup failed"
   printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
   echo "::group::${test_name} startup log"
   cat "$start_log"
@@ -204,8 +314,10 @@ collect_test() {
 
   if [ "$status" = "0" ]; then
     echo "PASS ${test_name}"
+    record_test_result "$test_name" "PASS" "$(duration_for_test "$test_name")"
   else
     echo "FAIL ${test_name}"
+    record_test_result "$test_name" "FAIL" "$(duration_for_test "$test_name")" "Exit code $status"
     printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
     while IFS= read -r service; do
       if [ -n "$service" ]; then
@@ -238,8 +350,10 @@ is_skipped_test() {
 
 add_test_if_selected() {
   local test_name="$1"
+  record_selected_test "$test_name"
   if is_skipped_test "$test_name"; then
     echo "SKIP ${test_name}"
+    record_test_result "$test_name" "SKIP" "N/A" "Skipped"
     return
   fi
   tests+=("$test_name")
@@ -306,6 +420,8 @@ while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 
     sleep 2
   fi
 done
+
+write_test_summary
 
 if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
   echo "Failed tests:"

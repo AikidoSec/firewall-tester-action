@@ -12,7 +12,7 @@ inputs:
     required: true
   test_name:
     description:
-      Optional single server_tests directory to run, for example test_sql_injection
+      Optional single server_tests directory to run, for example test-sql-injection
     required: false
     default: ''
   run_tests:

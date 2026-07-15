@@ -1,0 +1,57 @@
+x-test-name: &test-name test-ssrf-diffrent-port
+x-test-token: &test-token AIK_RUNTIME_1_test-ssrf-diffrent-port
+x-app-service: &app-service app-test-ssrf-diffrent-port
+x-database-name: &database-name test-ssrf-diffrent-port
+
+services:
+  setup-test-ssrf-diffrent-port:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: setup-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+
+  app-test-ssrf-diffrent-port:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test-token
+      DATABASE_NAME: *database-name
+      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-ssrf-diffrent-port${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+    depends_on:
+      setup-test-ssrf-diffrent-port:
+        condition: service_completed_successfully
+
+  test-ssrf-diffrent-port:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: test-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+      TEST_SERVER_HOST: *app-service
+      TEST_CONTROL_SERVER_HOST: *app-service
+    depends_on:
+      app-test-ssrf-diffrent-port:
+        condition: service_started
+      ssrf-mock-4000-test-ssrf-diffrent-port:
+        condition: service_healthy
+
+  # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
+  ssrf-mock-4000-test-ssrf-diffrent-port:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: loopback-mock-template
+    depends_on:
+      app-test-ssrf-diffrent-port:
+        condition: service_started
+    network_mode: service:app-test-ssrf-diffrent-port
+    environment:
+      HOST: 127.0.0.1
+      PORT: 4000
+      READY_FILE: /tmp/ssrf-mock-ready
+      RESPONSE_BODY: '{"status":"ok"}'

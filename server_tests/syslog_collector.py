@@ -2,7 +2,7 @@ import os
 import socketserver
 
 
-LOG_FILE = os.environ.get("SYSLOG_COLLECTOR_LOG_FILE", "/logs/test_logs_sensitive_data.log")
+LOG_FILE = os.environ.get("SYSLOG_COLLECTOR_LOG_FILE", "/logs/test-logs-sensitive-data.log")
 PORT = int(os.environ.get("SYSLOG_COLLECTOR_PORT", "5514"))
 
 

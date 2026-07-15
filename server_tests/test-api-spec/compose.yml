@@ -1,0 +1,40 @@
+x-test-name: &test-name test-api-spec
+x-test-token: &test-token AIK_RUNTIME_1_test-api-spec
+x-app-service: &app-service app-test-api-spec
+x-database-name: &database-name test-api-spec
+
+services:
+  setup-test-api-spec:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: setup-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+
+  app-test-api-spec:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test-token
+      DATABASE_NAME: *database-name
+      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-api-spec${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+    depends_on:
+      setup-test-api-spec:
+        condition: service_completed_successfully
+
+  test-api-spec:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: test-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+      TEST_SERVER_HOST: *app-service
+      TEST_CONTROL_SERVER_HOST: *app-service
+    depends_on:
+      app-test-api-spec:
+        condition: service_started

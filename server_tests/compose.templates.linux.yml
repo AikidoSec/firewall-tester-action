@@ -1,5 +1,5 @@
 services:
-  setup_template:
+  setup-template:
     image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
@@ -23,7 +23,7 @@ services:
       - sh
       - /workspace/server_tests/setup.linux.sh
 
-  app_template:
+  app-template:
     image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     build:
       context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
@@ -39,7 +39,7 @@ services:
     restart: 'no'
 
   # IMDS responder for fixed metadata IPs used by SSRF tests.
-  imds_mock_template:
+  imds-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - type: bind
@@ -62,14 +62,14 @@ services:
       timeout: 5s
       retries: 60
     networks:
-      imds_aws:
+      imds-aws:
         ipv4_address: 169.254.169.254
-      imds_alibaba:
+      imds-alibaba:
         ipv4_address: 100.100.100.200
-      imds_aws_ipv6:
+      imds-aws-ipv6:
         ipv6_address: ${IMDS_AWS_IPV6_ADDRESS:?Set IMDS_AWS_IPV6_ADDRESS}
 
-  loopback_mock_template:
+  loopback-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - type: bind
@@ -89,7 +89,7 @@ services:
       retries: 60
     restart: 'no'
 
-  dns_mock_template:
+  dns-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - type: bind
@@ -108,7 +108,7 @@ services:
       retries: 30
     restart: 'no'
 
-  test_template:
+  test-template:
     image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
@@ -136,7 +136,7 @@ services:
         control_server_port="$$CONTROL_SERVER_PORT"
         if [ -z "$$control_server_port" ]; then
           case "$$TEST_NAME" in
-            control_test_*) control_server_port=8081 ;;
+            control-test-*) control_server_port=8081 ;;
           esac
         fi
 

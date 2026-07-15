@@ -2,11 +2,11 @@
 set -eu
 
 case "$TEST_NAME" in
-  *[!A-Za-z0-9_]*|""|test|control_test)
+  *[!A-Za-z0-9-]*|""|test|control-test)
     echo "Invalid TEST_NAME: $TEST_NAME" >&2
     exit 1
     ;;
-  test_*|control_test_*) ;;
+  test-*|control-test-*) ;;
   *)
     echo "Invalid TEST_NAME: $TEST_NAME" >&2
     exit 1

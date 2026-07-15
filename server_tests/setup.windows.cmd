@@ -9,8 +9,8 @@ if "%TEST_NAME%"=="" (
   exit /b 1
 )
 
-if /I "%TEST_NAME:~0,5%"=="test_" set "IS_VALID_TEST_NAME=1"
-if /I "%TEST_NAME:~0,13%"=="control_test_" set "IS_VALID_TEST_NAME=1"
+if /I "%TEST_NAME:~0,5%"=="test-" set "IS_VALID_TEST_NAME=1"
+if /I "%TEST_NAME:~0,13%"=="control-test-" set "IS_VALID_TEST_NAME=1"
 if not defined IS_VALID_TEST_NAME (
   echo Invalid TEST_NAME: %TEST_NAME%
   exit /b 1

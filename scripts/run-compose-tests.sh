@@ -86,7 +86,7 @@ compose=(docker compose --env-file "$compose_env_file" -f "$compose_file")
 
 cleanup_compose_project() {
   "${compose[@]}" down -v --remove-orphans || true
-  docker network rm "${COMPOSE_PROJECT_NAME}_default" >/dev/null 2>&1 || true
+  docker network rm "${COMPOSE_PROJECT_NAME}-default" >/dev/null 2>&1 || true
 }
 
 if [ "$command" = "cleanup" ]; then
@@ -111,11 +111,11 @@ cleanup_compose_project
 
 "${compose[@]}" --profile build build \
   "${build_arg_flags[@]}" \
-  demo_app_image
+  demo-app-image
 
 "${compose[@]}" --profile build build \
   core \
-  test_runner_image
+  test-runner-image
 
 "${compose[@]}" up --no-build -d --wait core postgres
 all_services="$("${compose[@]}" config --services)"
@@ -231,7 +231,7 @@ write_test_summary() {
 related_services() {
   local test_name="$1"
   printf '%s\n' "$all_services" | awk -v t="$test_name" '
-    $0 == t || $0 == "app_" t || $0 == "setup_" t || $0 ~ "_" t "$"
+    $0 == t || $0 == "app-" t || $0 == "setup-" t || $0 ~ "-" t "$"
   '
 }
 
@@ -374,9 +374,9 @@ elif [ -n "$RUN_TESTS" ]; then
 else
   while IFS= read -r test_name; do
     case "$TEST_TYPE:$test_name" in
-      server:test_runner_image)
+      server:test-runner-image)
         ;;
-      control:control_test_*|server:test_*)
+      control:control-test-*|server:test-*)
         add_test_if_selected "$test_name"
         ;;
     esac

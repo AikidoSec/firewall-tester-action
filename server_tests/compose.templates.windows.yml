@@ -1,5 +1,5 @@
 services:
-  setup_template:
+  setup-template:
     image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE}
     depends_on:
       postgres:
@@ -28,7 +28,7 @@ services:
     command:
       - C:\workspace\server_tests\setup.windows.cmd
 
-  app_template:
+  app-template:
     image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     isolation: process
     build:
@@ -58,7 +58,7 @@ services:
     restart: 'no'
 
   # IMDS responder for fixed IPv4 metadata IPs used by SSRF tests.
-  imds_mock_template:
+  imds-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     isolation: process
     volumes:
@@ -82,12 +82,12 @@ services:
       timeout: 5s
       retries: 60
     networks:
-      imds_aws:
+      imds-aws:
         ipv4_address: 169.254.169.254
-      imds_alibaba:
+      imds-alibaba:
         ipv4_address: 100.100.100.200
 
-  loopback_mock_template:
+  loopback-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     isolation: process
     volumes:
@@ -108,7 +108,7 @@ services:
       retries: 60
     restart: 'no'
 
-  dns_mock_template:
+  dns-mock-template:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     isolation: process
     volumes:
@@ -128,7 +128,7 @@ services:
       retries: 30
     restart: 'no'
 
-  test_template:
+  test-template:
     image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
     build:
       context: ..
@@ -158,7 +158,7 @@ services:
         $$ErrorActionPreference = 'Stop'
 
         $$controlServerPort = $$env:CONTROL_SERVER_PORT
-        if (-not $$controlServerPort -and $$env:TEST_NAME.StartsWith('control_test_')) {
+        if (-not $$controlServerPort -and $$env:TEST_NAME.StartsWith('control-test-')) {
           $$controlServerPort = '8081'
         }
 

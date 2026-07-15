@@ -14,9 +14,9 @@ directly with Docker Compose.
 - Each test directory has its own `compose.yml`; `TEST_NAME` and `TEST_TOKEN`
   are derived from Compose's project name.
 - Each test is runnable directly, naming only the test service:
-  - `DEMO_CONTEXT=../zen-demo-nodejs DEMO_IMAGE=firewall-tester-action-demo-nodejs APP_PORT=3000 docker compose --env-file compose.linux.env -f compose.yml up --build --exit-code-from test_sql_injection test_sql_injection`
+  - `DEMO_CONTEXT=../zen-demo-nodejs DEMO_IMAGE=firewall-tester-action-demo-nodejs APP_PORT=3000 docker compose --env-file compose.linux.env -f compose.yml up --build --exit-code-from test-sql-injection test-sql-injection`
 - Windows container mode selects the Windows env file:
-  - `DEMO_CONTEXT=../zen-demo-dotnet-framework DEMO_IMAGE=firewall-tester-action-demo-dotnet-framework APP_PORT=80 docker compose --env-file compose.windows.env -f compose.yml up --build --exit-code-from test_sql_injection test_sql_injection`
+  - `DEMO_CONTEXT=../zen-demo-dotnet-framework DEMO_IMAGE=firewall-tester-action-demo-dotnet-framework APP_PORT=80 docker compose --env-file compose.windows.env -f compose.yml up --build --exit-code-from test-sql-injection test-sql-injection`
 - Do not add `suite_all`, `suite_server`, or other suite aggregator services
   yet.
 - Do not add GitHub Actions matrix changes yet.
@@ -47,15 +47,15 @@ directly with Docker Compose.
   - Per-test setup applies `start_config.json` and `start_firewall.json` when
     present.
 - Special cases:
-  - `test_invalid_token` keeps its invalid `AIKIDO_TOKEN`.
-  - `test_no_token_set` receives no default `AIKIDO_TOKEN`.
-  - `test_internet_not_available` keeps intentionally unreachable core endpoint
+  - `test-invalid-token` keeps its invalid `AIKIDO_TOKEN`.
+  - `test-no-token-set` receives no default `AIKIDO_TOKEN`.
+  - `test-internet-not-available` keeps intentionally unreachable core endpoint
     envs.
   - Control tests pass `--control_server_port 8081` and use the app service as
     both server/control host as needed.
   - SSRF tests use Compose sidecars; stored SSRF uses DNS mocking instead of
     `/etc/hosts`.
-  - `test_logs_sensitive_data` reads app logs from a shared volume, not
+  - `test-logs-sensitive-data` reads app logs from a shared volume, not
     `docker logs`.
 
 ## Test Plan

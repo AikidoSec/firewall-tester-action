@@ -27,7 +27,7 @@ jobs:
           app_port: 3000
           build_args: |
             AGENT_VERSION=1.2.3
-          skip_tests: test_stored_ssrf
+          skip_tests: test-stored-ssrf
 ```
 
 Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
@@ -62,7 +62,7 @@ Run the same Compose path used by the action:
 .\scripts\run-compose-tests.ps1 `
   -DockerfilePath .\zen-demo\Dockerfile `
   -AppPort 3000 `
-  -TestName test_sql_injection
+  -TestName test-sql-injection
 ```
 
 The PowerShell wrapper calls Git Bash. You can also call the bash script
@@ -71,6 +71,6 @@ directly:
 ```sh
 DOCKERFILE_PATH=./zen-demo/Dockerfile \
 APP_PORT=3000 \
-TEST_NAME=test_sql_injection \
+TEST_NAME=test-sql-injection \
 bash ./scripts/run-compose-tests.sh
 ```

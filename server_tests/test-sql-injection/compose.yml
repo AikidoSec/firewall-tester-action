@@ -1,0 +1,40 @@
+x-test-name: &test-name test-sql-injection
+x-test-token: &test-token AIK_RUNTIME_1_test-sql-injection
+x-app-service: &app-service app-test-sql-injection
+x-database-name: &database-name test-sql-injection
+
+services:
+  setup-test-sql-injection:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: setup-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+
+  app-test-sql-injection:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: *test-token
+      DATABASE_NAME: *database-name
+      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-sql-injection${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+    depends_on:
+      setup-test-sql-injection:
+        condition: service_completed_successfully
+
+  test-sql-injection:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: test-template
+    environment:
+      TEST_NAME: *test-name
+      TEST_TOKEN: *test-token
+      TEST_SERVER_HOST: *app-service
+      TEST_CONTROL_SERVER_HOST: *app-service
+    depends_on:
+      app-test-sql-injection:
+        condition: service_started

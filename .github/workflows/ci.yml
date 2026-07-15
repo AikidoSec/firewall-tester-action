@@ -22,7 +22,7 @@ jobs:
         app:
           - name: nodejs
             repository: Aikido-demo-apps/zen-demo-nodejs
-            ref: dev-testing
+            ref: main
             app_port: 3000
             sleep_before_test: 10
             config_update_delay: 60
@@ -33,7 +33,7 @@ jobs:
             skip_tests: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
-            ref: gunicorn-threads-1w-4t
+            ref: main
             app_port: 8080
             sleep_before_test: 10
             config_update_delay: 60
@@ -66,7 +66,7 @@ jobs:
             skip_tests: ''
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
-            ref: dev-testing
+            ref: main
             app_port: 8080
             sleep_before_test: 10
             config_update_delay: 60

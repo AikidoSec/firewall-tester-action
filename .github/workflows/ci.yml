@@ -163,7 +163,6 @@ jobs:
           app_env_file: ./server_tests/empty.env
           app_env_file_2: ./server_tests/empty.env
           max_parallel_tests: 50
-          skip_tests: test-ssrf-diffrent-port
 
   control-tests-linux:
     name: php-control

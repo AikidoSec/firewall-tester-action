@@ -1,6 +1,7 @@
 @echo off
 setlocal EnableExtensions
 
+set "CURL_RETRY_OPTIONS=--retry 10 --retry-delay 2 --retry-max-time 60 --retry-all-errors"
 set "TEST_DIR=C:\workspace\server_tests\%TEST_NAME%"
 set "IS_VALID_TEST_NAME="
 
@@ -69,7 +70,7 @@ if errorlevel 1 exit /b 1
 
 echo Registering core app token
 > "%TEMP%\app.json" echo {"token":"%TEST_TOKEN%"}
-curl.exe -fsS -X POST "%CORE_URL%/api/runtime/apps" -H "Content-Type: application/json" --data-binary "@%TEMP%\app.json" >nul
+curl.exe -fsS %CURL_RETRY_OPTIONS% -X POST "%CORE_URL%/api/runtime/apps" -H "Content-Type: application/json" --data-binary "@%TEMP%\app.json" >nul
 if errorlevel 1 (
   echo Failed to create core app token
   exit /b 1
@@ -77,7 +78,7 @@ if errorlevel 1 (
 
 if exist "%TEST_DIR%\start_config.json" (
   echo Uploading runtime config
-  curl.exe -fsS -X POST "%CORE_URL%/api/runtime/config" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_config.json" >nul
+  curl.exe -fsS %CURL_RETRY_OPTIONS% -X POST "%CORE_URL%/api/runtime/config" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_config.json" >nul
   if errorlevel 1 (
     echo Failed to upload runtime config
     exit /b 1
@@ -86,7 +87,7 @@ if exist "%TEST_DIR%\start_config.json" (
 
 if exist "%TEST_DIR%\start_firewall.json" (
   echo Uploading firewall lists
-  curl.exe -fsS -X POST "%CORE_URL%/api/runtime/firewall/lists" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_firewall.json" >nul
+  curl.exe -fsS %CURL_RETRY_OPTIONS% -X POST "%CORE_URL%/api/runtime/firewall/lists" -H "Authorization: %TEST_TOKEN%" -H "Content-Type: application/json" --data-binary "@%TEST_DIR%\start_firewall.json" >nul
   if errorlevel 1 (
     echo Failed to upload firewall lists
     exit /b 1
@@ -94,7 +95,7 @@ if exist "%TEST_DIR%\start_firewall.json" (
 )
 
 echo Validating core app token
-curl.exe -fsS "%CORE_URL%/api/runtime/events" -H "Authorization: %TEST_TOKEN%" >nul
+curl.exe -fsS %CURL_RETRY_OPTIONS% "%CORE_URL%/api/runtime/events" -H "Authorization: %TEST_TOKEN%" >nul
 if errorlevel 1 (
   echo Core token validation failed
   exit /b 1

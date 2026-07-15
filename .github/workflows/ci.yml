@@ -77,7 +77,7 @@ jobs:
             skip_tests: ''
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
-            ref: dev-testing
+            ref: main
             app_port: 3000
             sleep_before_test: 10
             config_update_delay: 60

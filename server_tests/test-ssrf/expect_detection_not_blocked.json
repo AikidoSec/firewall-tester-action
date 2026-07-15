@@ -3,7 +3,7 @@
   "request": {
     "method": "POST",
     "route": "/api/request",
-    "url": "REGEX:^https?://app(?:_[a-z0-9_]+)?(?::\\d+)?/api/request$"
+    "url": "REGEX:^https?://app(?:-[a-z0-9-]+)?(?::\\d+)?/api/request$"
   },
   "attack": {
     "kind": "ssrf",

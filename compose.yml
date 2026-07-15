@@ -32,7 +32,7 @@ include:
   - ./server_tests/test-shell-injection/compose.yml
   - ./server_tests/test-sql-injection/compose.yml
   - ./server_tests/test-ssrf/compose.yml
-  - ./server_tests/test-ssrf-diffrent-port/compose.yml
+  - ./server_tests/test-ssrf-different-port/compose.yml
   - ./server_tests/test-stored-ssrf/compose.yml
   - ./server_tests/test-stored-ssrf-no-context/compose.yml
   - ./server_tests/test-user-ip-from-proxy/compose.yml

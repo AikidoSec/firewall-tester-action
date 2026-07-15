@@ -3,7 +3,7 @@
   "request": {
     "method": "POST",
     "route": "/api/execute",
-    "url": "REGEX:^https?://app(?:_[a-z0-9_]+)?(?::\\d+)?/api/execute$"
+    "url": "REGEX:^https?://app(?:-[a-z0-9-]+)?(?::\\d+)?/api/execute$"
   },
   "attack": {
     "kind": "shell_injection",

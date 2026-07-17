@@ -2,15 +2,9 @@ from testlib import *
 from core_api import CoreApi
 
 '''
-Validates IP list matching across formats (single IPv4, IPv4 CIDR member, IPv4-mapped IPv6,
-single IPv6, IPv6 CIDR member) in both blocking and monitoring mode, and that heartbeat stats
-(ipAddresses.breakdown) reflect the matches in each mode:
-
-1. With blockedIPAddresses populated (start_firewall.json): all 5 IP formats are blocked (403),
-   a non-member control IP is allowed (200), and the heartbeat reports 5 matches.
-2. After switching the same ranges to monitoredIPAddresses (change_config_monitor_mode.json):
-   the same 5 IP formats now pass through (200) since monitoring never blocks, the control IP
-   still passes, and the next heartbeat again reports 5 matches (this time from the monitored list).
+Tests IP list matching across formats (single IPv4, IPv4 CIDR member, IPv4-mapped IPv6,
+single IPv6, IPv6 CIDR member) in both blocking and monitoring mode, and checks that
+heartbeat stats (ipAddresses.breakdown) reflect the matches in each mode.
 '''
 
 MATCHING_IPS = [
@@ -28,7 +22,6 @@ def run_test(s: TestServer, c: CoreApi):
 
     start_heartbeat_events = c.get_events("heartbeat")
 
-    # 1. Blocking mode: all formats blocked, control IP allowed
     for entry in MATCHING_IPS:
         response = s.get("/api/pets/", headers={"X-Forwarded-For": entry["ip"]})
         collector.soft_assert_response_code_is(
@@ -40,7 +33,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should not be blocked: {response.text}")
 
-    # Wait for the first heartbeat (sent ~30s after agent start) and inspect stats
+    # First heartbeat lands ~30-60s after agent start
     c.wait_for_new_events(
         70, old_events_length=len(start_heartbeat_events), filter_type="heartbeat"
     )
@@ -60,7 +53,6 @@ def run_test(s: TestServer, c: CoreApi):
         f"Expected {len(MATCHING_IPS)} matches while blocking, got "
         f"{blocked_breakdown.get('geoip/Belgium;BE')} (breakdown: {blocked_breakdown})")
 
-    # 2. Switch the same ranges to monitoring mode
     heartbeat_baseline_after_block_phase = len(all_heartbeat_events)
     c.update_runtime_firewall_file("change_config_monitor_mode.json")
 
@@ -76,7 +68,6 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should still not be blocked: {response.text}")
 
-    # Wait for the next heartbeat and inspect monitoring stats
     c.wait_for_new_events(
         150, old_events_length=heartbeat_baseline_after_block_phase, filter_type="heartbeat"
     )

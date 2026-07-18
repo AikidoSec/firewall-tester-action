@@ -1,6 +1,8 @@
-.git
-node_modules
-dist
-coverage
-badges
-*.log
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.base.json
+!requirements.txt
+!src
+!src/**

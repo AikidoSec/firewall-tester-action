@@ -10,6 +10,7 @@ import inspect
 import os
 import http.client
 import re
+from urllib.parse import quote
 
 _sessions = {}
 _raw_connections = {}
@@ -32,6 +33,10 @@ def get_raw_connection(port, host=TEST_SERVER_HOST, timeout=100):
     return _raw_connections[key]
 
 
+def percent_encode_non_ascii(route):
+    return "".join(char if char.isascii() else quote(char) for char in route)
+
+
 def wrap_raw_response(raw_response, port, route, host=TEST_SERVER_HOST):
     response = requests.Response()
     response.status_code = raw_response.status
@@ -51,7 +56,7 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
         try:
             if raw:
                 conn = get_raw_connection(port, host, timeout)
-                conn.request(method, route, headers=headers)
+                conn.request(method, percent_encode_non_ascii(route), headers=headers)
                 raw_response = conn.getresponse()
                 r = wrap_raw_response(raw_response, port, route, host)
             else:

@@ -36,21 +36,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
             skip_tests: |-
-              test-allowed-ip-for-routes,
-              test-allowed-ip-most-restrictive,
-              test-block-traffic-by-countries,
-              test-bypassed-ip,
-              test-bypassed-ip-for-geo-blocking,
-              test-bypassed-ip-for-rate-limiting,
-              test-demo-apps-generic-tests,
-              test-excluded-user-from-rate-limiting,
-              test-outbound-domain-blocking,
-              test-path-traversal,
-              test-rate-limiting-retry-after,
-              test-stored-ssrf,
-              test-stored-ssrf-no-context,
-              test-user-rate-limiting-1-minute-enable-disable,
-              test-wave-attack
+              test-allowed-ip-for-routes,test-allowed-ip-most-restrictive,test-block-traffic-by-countries,test-bypassed-ip,test-bypassed-ip-for-geo-blocking,test-bypassed-ip-for-rate-limiting,test-demo-apps-generic-tests,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-path-traversal,test-rate-limiting-retry-after,test-stored-ssrf,test-stored-ssrf-no-context,test-user-rate-limiting-1-minute-enable-disable,test-wave-attack
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
@@ -60,15 +46,7 @@ jobs:
             app_env_file_2: ./server_tests/app_env/php.env
             build_args: PHP_FIREWALL_VERSION=1.0.126
             skip_tests: |-
-              test-allow-traffic-by-countries,
-              test-excluded-user-from-rate-limiting,
-              test-outbound-domain-blocking,
-              test-rate-limiting-retry-after,
-              test-ssrf,
-              test-stored-ssrf,
-              test-stored-ssrf-no-context,
-              test-user-ip-from-proxy,
-              test-wave-attack
+              test-allow-traffic-by-countries,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-rate-limiting-retry-after,test-ssrf,test-stored-ssrf,test-stored-ssrf-no-context,test-user-ip-from-proxy,test-wave-attack
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
@@ -85,15 +63,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
             skip_tests: |-
-              test-api-spec,
-              test-bypassed-ip,
-              test-demo-apps-generic-tests,
-              test-outbound-domain-blocking,
-              test-rate-limiting-retry-after,
-              test-ssrf,
-              test-stored-ssrf,
-              test-user-ip-from-proxy,
-              test-wave-attack
+              test-api-spec,test-bypassed-ip,test-demo-apps-generic-tests,test-outbound-domain-blocking,test-rate-limiting-retry-after,test-ssrf,test-stored-ssrf,test-user-ip-from-proxy,test-wave-attack
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: main
@@ -102,10 +72,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
             skip_tests: |-
-              test-outbound-domain-blocking,
-              test-rate-limiting-group-id-1-minute,
-              test-rate-limiting-retry-after,
-              test-user-ip-from-proxy
+              test-outbound-domain-blocking,test-rate-limiting-group-id-1-minute,test-rate-limiting-retry-after,test-user-ip-from-proxy
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
@@ -114,8 +81,7 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
             skip_tests: |-
-              test-outbound-domain-blocking,
-              test-rate-limiting-retry-after
+              test-outbound-domain-blocking,test-rate-limiting-retry-after
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -203,5 +169,4 @@ jobs:
           app_env_file_2: ./server_tests/app_env/php.env
           test_type: control
           skip_tests: |-
-            control-test-graceful-stop,
-            control-test-install-aikido
+            control-test-graceful-stop,control-test-install-aikido

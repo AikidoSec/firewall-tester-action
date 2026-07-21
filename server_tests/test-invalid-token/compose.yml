@@ -1,17 +1,4 @@
-x-test-name: &test-name test-invalid-token
-x-test-token: &test-token AIK_RUNTIME_1_test-invalid-token
-x-app-service: &app-service app-test-invalid-token
-x-database-name: &database-name test-invalid-token
-
 services:
-  setup-test-invalid-token:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-invalid-token:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -20,21 +7,8 @@ services:
       - ./test.env
     environment:
       AIKIDO_TOKEN: AIK_RUNTIME_1_1_INVALID
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-invalid-token${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
-    depends_on:
-      setup-test-invalid-token:
-        condition: service_completed_successfully
-
-  test-invalid-token:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-test-invalid-token:
-        condition: service_started
+      DATABASE_NAME: test-invalid-token
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-invalid-token${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

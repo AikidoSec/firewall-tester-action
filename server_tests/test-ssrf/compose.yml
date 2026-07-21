@@ -1,30 +1,20 @@
-x-test-name: &test-name test-ssrf
-x-test-token: &test-token AIK_RUNTIME_1_test-ssrf
-x-app-service: &app-service app-test-ssrf
-x-database-name: &database-name test-ssrf
-
 services:
-  setup-test-ssrf:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-ssrf:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
     env_file:
       - ./test.env
-    environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-ssrf${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
     depends_on:
-      setup-test-ssrf:
-        condition: service_completed_successfully
+      imds-mock:
+        condition: service_healthy
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-ssrf
+      DATABASE_NAME: test-ssrf
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-ssrf${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
     networks:
       default: null
       imds-aws:
@@ -32,23 +22,6 @@ services:
       imds-alibaba:
         ipv4_address: 100.100.100.100
       imds-aws-ipv6: null
-
-  test-ssrf:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-test-ssrf:
-        condition: service_started
-      ssrf-mock-4000-test-ssrf:
-        condition: service_healthy
-      imds-mock:
-        condition: service_healthy
 
   # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf-mock-4000-test-ssrf:

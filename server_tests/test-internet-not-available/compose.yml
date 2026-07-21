@@ -1,17 +1,4 @@
-x-test-name: &test-name test-internet-not-available
-x-test-token: &test-token AIK_RUNTIME_1_test-internet-not-available
-x-app-service: &app-service app-test-internet-not-available
-x-database-name: &database-name test-internet-not-available
-
 services:
-  setup-test-internet-not-available:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-internet-not-available:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -19,22 +6,9 @@ services:
     env_file:
       - ./test.env
     environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-internet-not-available${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
-    depends_on:
-      setup-test-internet-not-available:
-        condition: service_completed_successfully
-
-  test-internet-not-available:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-test-internet-not-available:
-        condition: service_started
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-internet-not-available
+      DATABASE_NAME: test-internet-not-available
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-internet-not-available${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

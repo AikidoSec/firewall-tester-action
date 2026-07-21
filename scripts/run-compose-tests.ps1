@@ -1,14 +1,13 @@
 param(
     [string] $DockerfilePath = $env:DOCKERFILE_PATH,
     [string] $BuildArgs = $env:BUILD_ARGS,
+    [string] $ConfigUpdateDelay = $env:CONFIG_UPDATE_DELAY,
     [string] $AppPort = $env:APP_PORT,
     [string] $AppEnvFile = $env:APP_ENV_FILE,
     [string] $AppEnvFile2 = $env:APP_ENV_FILE_2,
-    [string] $ConfigUpdateDelay = $env:CONFIG_UPDATE_DELAY,
     [string] $MaxParallelTests = $env:MAX_PARALLEL_TESTS,
     [string] $RunTests = $env:RUN_TESTS,
     [string] $SkipTests = $env:SKIP_TESTS,
-    [string] $SleepBeforeTest = $env:SLEEP_BEFORE_TEST,
     [string] $TestName = $env:TEST_NAME,
     [string] $TestType = $env:TEST_TYPE,
     [string] $Command = 'run'
@@ -44,18 +43,17 @@ function Convert-ToBashPath {
     return $resolved.ProviderPath.Replace('\', '/')
 }
 
-if ($DockerfilePath) { $env:DOCKERFILE_PATH = Convert-ToBashPath $DockerfilePath }
-if ($BuildArgs) { $env:BUILD_ARGS = $BuildArgs }
-if ($AppPort) { $env:APP_PORT = $AppPort }
-if ($AppEnvFile) { $env:APP_ENV_FILE = Convert-ToBashPath $AppEnvFile }
-if ($AppEnvFile2) { $env:APP_ENV_FILE_2 = Convert-ToBashPath $AppEnvFile2 }
-if ($ConfigUpdateDelay) { $env:CONFIG_UPDATE_DELAY = $ConfigUpdateDelay }
-if ($MaxParallelTests) { $env:MAX_PARALLEL_TESTS = $MaxParallelTests }
-if ($RunTests) { $env:RUN_TESTS = $RunTests }
-if ($SkipTests) { $env:SKIP_TESTS = $SkipTests }
-if ($SleepBeforeTest) { $env:SLEEP_BEFORE_TEST = $SleepBeforeTest }
-if ($TestName) { $env:TEST_NAME = $TestName }
-if ($TestType) { $env:TEST_TYPE = $TestType }
+$env:DOCKERFILE_PATH = Convert-ToBashPath $DockerfilePath
+$env:BUILD_ARGS = $BuildArgs
+$env:CONFIG_UPDATE_DELAY = $ConfigUpdateDelay
+$env:APP_PORT = $AppPort
+$env:APP_ENV_FILE = Convert-ToBashPath $AppEnvFile
+$env:APP_ENV_FILE_2 = Convert-ToBashPath $AppEnvFile2
+$env:MAX_PARALLEL_TESTS = $MaxParallelTests
+$env:RUN_TESTS = $RunTests
+$env:SKIP_TESTS = $SkipTests
+$env:TEST_NAME = $TestName
+$env:TEST_TYPE = $TestType
 
 $script = Join-Path $PSScriptRoot 'run-compose-tests.sh'
 & $bash $script $Command

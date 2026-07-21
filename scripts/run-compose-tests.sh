@@ -24,11 +24,11 @@ APP_ENV_FILE_2="${APP_ENV_FILE_2:-}"
 APP_PORT="${APP_PORT:-8080}"
 BUILD_ARGS="${BUILD_ARGS:-}"
 CONFIG_UPDATE_DELAY="${CONFIG_UPDATE_DELAY:-60}"
-MAX_PARALLEL_TESTS="${MAX_PARALLEL_TESTS:-${COMPOSE_TEST_PARALLELISM:-50}}"
+MAX_PARALLEL_TESTS="${MAX_PARALLEL_TESTS:-20}"
 RUN_TESTS="${RUN_TESTS:-}"
 RUNNER_TEMP="${RUNNER_TEMP:-$action_path/.tmp}"
-SLEEP_BEFORE_TEST="${SLEEP_BEFORE_TEST:-1}"
 SKIP_TESTS="${SKIP_TESTS:-}"
+STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-600}"
 TEST_NAME="${TEST_NAME:-}"
 TEST_TYPE="${TEST_TYPE:-server}"
 
@@ -65,13 +65,18 @@ trim() {
   printf '%s\n' "$value"
 }
 
+join_by_comma() {
+  local IFS=,
+  printf '%s' "$*"
+}
+
 demo_context="$(dirname "$dockerfile_path")"
 demo_context_absolute="$(cd "$demo_context" && pwd)"
 export DEMO_CONTEXT="$(compose_path "$demo_context_absolute")"
 export DEMO_DOCKERFILE="$(basename "$dockerfile_path")"
 export APP_ENV_FILE="$(normalize_env_file "$APP_ENV_FILE")"
 export APP_ENV_FILE_2="$(normalize_env_file "$APP_ENV_FILE_2")"
-export APP_PORT CONFIG_UPDATE_DELAY SLEEP_BEFORE_TEST
+export APP_PORT CONFIG_UPDATE_DELAY STARTUP_TIMEOUT
 
 if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
   if [ -n "$TEST_NAME" ]; then
@@ -82,11 +87,15 @@ if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
 fi
 export DEMO_IMAGE="${DEMO_IMAGE:-firewall-tester-action-demo-$COMPOSE_PROJECT_NAME}"
 
+mkdir -p "$RUNNER_TEMP"
+runner_temp_absolute="$(cd "$RUNNER_TEMP" && pwd)"
+results_dir="$runner_temp_absolute/compose-suite-results"
+export RUNNER_TEMP_COMPOSE="$(compose_path "$results_dir")"
+
 compose=(docker compose --env-file "$compose_env_file" -f "$compose_file")
 
 cleanup_compose_project() {
-  "${compose[@]}" down -v --remove-orphans || true
-  docker network rm "${COMPOSE_PROJECT_NAME}-default" >/dev/null 2>&1 || true
+  "${compose[@]}" down --timeout 0 -v --remove-orphans || true
 }
 
 if [ "$command" = "cleanup" ]; then
@@ -94,9 +103,14 @@ if [ "$command" = "cleanup" ]; then
   exit 0
 fi
 
-mkdir -p "$RUNNER_TEMP/compose-test-logs"
-: > "$RUNNER_TEMP/compose-test-failures"
+if [ "$TEST_TYPE" != "server" ] && [ "$TEST_TYPE" != "control" ]; then
+  echo "TEST_TYPE must be either server or control" >&2
+  exit 2
+fi
 
+rm -rf "$results_dir"
+mkdir -p "$results_dir"
+: > "$RUNNER_TEMP/compose-test-failures"
 trap cleanup_compose_project EXIT
 
 build_arg_flags=()
@@ -113,318 +127,146 @@ cleanup_compose_project
   "${build_arg_flags[@]}" \
   demo-app-image
 
-"${compose[@]}" --profile build build \
-  core \
-  test-runner-image
+"${compose[@]}" build core suite-runner
 
-"${compose[@]}" up --no-build -d --wait core postgres
 all_services="$("${compose[@]}" config --services)"
 
-summary_order=()
-declare -A test_started_at=()
-declare -A summary_status=()
-declare -A summary_duration=()
-declare -A summary_error=()
-
-record_selected_test() {
-  local test_name="$1"
-  summary_order+=("$test_name")
-}
-
-duration_for_test() {
-  local test_name="$1"
-  local started_at="${test_started_at[$test_name]:-}"
-  if [ -z "$started_at" ]; then
-    printf 'N/A\n'
-    return
-  fi
-
-  printf '%ss\n' "$(($(date +%s) - started_at))"
-}
-
-record_test_result() {
-  local test_name="$1"
-  local status="$2"
-  local duration="$3"
-  local error_message="${4:-}"
-
-  summary_status["$test_name"]="$status"
-  summary_duration["$test_name"]="$duration"
-  summary_error["$test_name"]="$error_message"
-}
-
-markdown_escape() {
-  local value="$1"
-  value="${value//$'\r'/}"
-  value="${value//$'\n'/<br>}"
-  value="${value//|/\\|}"
-  printf '%s\n' "$value"
-}
-
-write_test_summary() {
-  local total=0
-  local passed=0
-  local failed=0
-  local skipped=0
-  local test_name
-  local status
-  local duration
-  local error_message
-
-  for test_name in "${summary_order[@]}"; do
-    total=$((total + 1))
-    status="${summary_status[$test_name]:-UNKNOWN}"
-    case "$status" in
-      PASS) passed=$((passed + 1)) ;;
-      FAIL) failed=$((failed + 1)) ;;
-      SKIP) skipped=$((skipped + 1)) ;;
-    esac
-  done
-
-  echo
-  echo "Test Results Summary"
-  echo "===================="
-  echo "Total Tests: $total"
-  echo "Passed: $passed"
-  echo "Skipped: $skipped"
-  echo "Failed: $failed"
-  echo
-  echo "Detailed Results:"
-  printf '%-45s %-8s %-10s %s\n' "Test" "Status" "Duration" "Error"
-  for test_name in "${summary_order[@]}"; do
-    status="${summary_status[$test_name]:-UNKNOWN}"
-    duration="${summary_duration[$test_name]:-N/A}"
-    error_message="${summary_error[$test_name]:-}"
-    printf '%-45s %-8s %-10s %s\n' "$test_name" "$status" "$duration" "$error_message"
-  done
-
-  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-    {
-      echo "## Test Results Summary"
-      echo
-      echo "### Overview"
-      echo
-      echo "- **Total Tests:** $total"
-      echo "- **Passed:** $passed"
-      echo "- **Skipped:** $skipped"
-      echo "- **Failed:** $failed"
-      echo
-      echo "### Detailed Results"
-      echo
-      echo "| Test | Status | Duration | Error Message |"
-      echo "|------|--------|----------|---------------|"
-      for test_name in "${summary_order[@]}"; do
-        status="${summary_status[$test_name]:-UNKNOWN}"
-        duration="${summary_duration[$test_name]:-N/A}"
-        error_message="${summary_error[$test_name]:-}"
-        printf '| %s | %s | %s | %s |\n' \
-          "$(markdown_escape "$test_name")" \
-          "$(markdown_escape "$status")" \
-          "$(markdown_escape "$duration")" \
-          "$(markdown_escape "$error_message")"
-      done
-      echo
-    } >> "$GITHUB_STEP_SUMMARY"
-  fi
-}
-
-related_services() {
-  local test_name="$1"
-  printf '%s\n' "$all_services" | awk -v t="$test_name" '
-    $0 == t || $0 == "app-" t || $0 == "setup-" t || $0 ~ "-" t "$"
-  '
-}
-
-cleanup_tests() {
-  local services=()
-  local service
-  local test_name
-  for test_name in "$@"; do
-    while IFS= read -r service; do
-      if [ -n "$service" ]; then
-        services+=("$service")
-      fi
-    done < <(related_services "$test_name")
-  done
-
-  if [ "${#services[@]}" -gt 0 ]; then
-    "${compose[@]}" kill "${services[@]}" >/dev/null 2>&1 || true
-    "${compose[@]}" rm -f -v "${services[@]}" >/dev/null 2>&1 || true
-  fi
-}
-
-test_container_id() {
-  local test_name="$1"
-  "${compose[@]}" ps -a -q "$test_name" 2>/dev/null | tail -n 1
-}
-
-start_test() {
-  local test_name="$1"
-  local start_log="$RUNNER_TEMP/compose-test-logs/${test_name}.start.log"
-  local services=()
-  local service
-
-  echo "START ${test_name}"
-  test_started_at["$test_name"]="$(date +%s)"
-  if "${compose[@]}" up --no-build -d "$test_name" > "$start_log" 2>&1; then
-    running_tests+=("$test_name")
-    return
-  fi
-
-  echo "FAIL ${test_name}"
-  record_test_result "$test_name" "FAIL" "$(duration_for_test "$test_name")" "Startup failed"
-  printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-  echo "::group::${test_name} startup log"
-  cat "$start_log"
-  while IFS= read -r service; do
-    if [ -n "$service" ]; then
-      services+=("$service")
-    fi
-  done < <(related_services "$test_name")
-  if [ "${#services[@]}" -gt 0 ]; then
-    "${compose[@]}" logs --no-color "${services[@]}" || true
-  fi
-  echo "::endgroup::"
-  cleanup_tests "$test_name"
-}
-
-test_finished() {
-  local test_name="$1"
-  local container_id
-  local state
-  container_id="$(test_container_id "$test_name")"
-  if [ -z "$container_id" ]; then
-    return 1
-  fi
-
-  state="$(docker inspect -f '{{.State.Status}}' "$container_id" 2>/dev/null || echo missing)"
-  [ "$state" = "exited" ] || [ "$state" = "dead" ]
-}
-
-collect_test() {
-  local test_name="$1"
-  local container_id
-  local status=1
-  local services=()
-  local service
-  container_id="$(test_container_id "$test_name")"
-  if [ -n "$container_id" ]; then
-    status="$(docker inspect -f '{{.State.ExitCode}}' "$container_id" 2>/dev/null || echo 1)"
-  fi
-
-  if [ "$status" = "0" ]; then
-    echo "PASS ${test_name}"
-    record_test_result "$test_name" "PASS" "$(duration_for_test "$test_name")"
-  else
-    echo "FAIL ${test_name}"
-    record_test_result "$test_name" "FAIL" "$(duration_for_test "$test_name")" "Exit code $status"
-    printf '%s\n' "$test_name" >> "$RUNNER_TEMP/compose-test-failures"
-    while IFS= read -r service; do
-      if [ -n "$service" ]; then
-        services+=("$service")
-      fi
-    done < <(related_services "$test_name")
-    echo "::group::${test_name} log"
-    if [ "${#services[@]}" -gt 0 ]; then
-      "${compose[@]}" logs --no-color "${services[@]}" || true
-    fi
-    echo "::endgroup::"
-  fi
-
-  cleanup_tests "$test_name"
+service_exists() {
+  local expected="$1"
+  grep -Fxq "$expected" <<< "$all_services"
 }
 
 is_skipped_test() {
-  local test_name="$1"
-  local skipped_test
-  local skipped=()
-  IFS=',' read -ra skipped <<< "$SKIP_TESTS"
-  for skipped_test in "${skipped[@]}"; do
-    skipped_test="$(trim "$skipped_test")"
-    if [ "$skipped_test" = "$test_name" ]; then
+  local expected="$1"
+  local candidate
+  local values=()
+  IFS=',' read -ra values <<< "$SKIP_TESTS"
+  for candidate in "${values[@]}"; do
+    candidate="$(trim "$candidate")"
+    if [ "$candidate" = "$expected" ]; then
       return 0
     fi
   done
   return 1
 }
 
-add_test_if_selected() {
+selected_tests=()
+add_selected_test() {
   local test_name="$1"
-  record_selected_test "$test_name"
-  if is_skipped_test "$test_name"; then
-    echo "SKIP ${test_name}"
-    record_test_result "$test_name" "SKIP" "N/A" "Skipped"
-    return
+  if ! service_exists "app-$test_name"; then
+    echo "Unknown test: $test_name" >&2
+    exit 2
   fi
-  tests+=("$test_name")
+  selected_tests+=("$test_name")
 }
 
-tests=()
 if [ -n "$TEST_NAME" ]; then
-  add_test_if_selected "$TEST_NAME"
+  add_selected_test "$TEST_NAME"
 elif [ -n "$RUN_TESTS" ]; then
   requested_tests=()
   IFS=',' read -ra requested_tests <<< "$RUN_TESTS"
   for requested_test in "${requested_tests[@]}"; do
     requested_test="$(trim "$requested_test")"
     if [ -n "$requested_test" ]; then
-      add_test_if_selected "$requested_test"
+      add_selected_test "$requested_test"
     fi
   done
 else
-  while IFS= read -r test_name; do
-    case "$TEST_TYPE:$test_name" in
-      server:test-runner-image)
-        ;;
-      control:control-test-*|server:test-*)
-        add_test_if_selected "$test_name"
+  while IFS= read -r service; do
+    case "$TEST_TYPE:$service" in
+      server:app-test-*|control:app-control-test-*)
+        selected_tests+=("${service#app-}")
         ;;
     esac
   done < <(printf '%s\n' "$all_services" | sort)
 fi
 
-if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "max_parallel_tests must be a positive integer" >&2
-  exit 1
-fi
-
-next_test_index=0
-running_tests=()
-
-while [ "$next_test_index" -lt "${#tests[@]}" ] || [ "${#running_tests[@]}" -gt 0 ]; do
-  while [ "${#running_tests[@]}" -lt "$MAX_PARALLEL_TESTS" ] && [ "$next_test_index" -lt "${#tests[@]}" ]; do
-    start_test "${tests[$next_test_index]}"
-    next_test_index=$((next_test_index + 1))
-  done
-
-  if [ "${#running_tests[@]}" -eq 0 ]; then
-    continue
-  fi
-
-  next_running_tests=()
-  completed_any=0
-  for test_name in "${running_tests[@]}"; do
-    if test_finished "$test_name"; then
-      collect_test "$test_name"
-      completed_any=1
-    else
-      next_running_tests+=("$test_name")
-    fi
-  done
-  running_tests=()
-  if [ "${#next_running_tests[@]}" -gt 0 ]; then
-    running_tests=("${next_running_tests[@]}")
-  fi
-
-  if [ "$completed_any" -eq 0 ]; then
-    sleep 2
+tests_to_run=()
+skipped_tests=()
+for test_name in "${selected_tests[@]}"; do
+  if is_skipped_test "$test_name"; then
+    echo "SKIP $test_name"
+    skipped_tests+=("$test_name")
+  else
+    tests_to_run+=("$test_name")
   fi
 done
 
-write_test_summary
+export SUITE_TESTS="$(join_by_comma "${tests_to_run[@]}")"
+export SUITE_SKIPPED_TESTS="$(join_by_comma "${skipped_tests[@]}")"
+export SUITE_MAX_WORKERS="$MAX_PARALLEL_TESTS"
 
-if [ -s "$RUNNER_TEMP/compose-test-failures" ]; then
-  echo "Failed tests:"
-  sort -u "$RUNNER_TEMP/compose-test-failures"
+if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "MAX_PARALLEL_TESTS must be a positive integer" >&2
+  exit 2
+fi
+
+if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
+  echo "CONFIG_UPDATE_DELAY must be a non-negative integer" >&2
+  exit 2
+fi
+
+runtime_services=()
+for test_name in "${tests_to_run[@]}"; do
+  while IFS= read -r service; do
+    if [ "$service" = "app-$test_name" ] || [[ "$service" == *-"$test_name" ]]; then
+      runtime_services+=("$service")
+    fi
+  done <<< "$all_services"
+done
+
+echo "Selected tests: ${#selected_tests[@]}"
+echo "Tests to run: ${#tests_to_run[@]}"
+echo "Compose services to start: ${#runtime_services[@]}"
+
+set +e
+"${compose[@]}" up \
+  --no-build \
+  -d \
+  --wait \
+  --wait-timeout "$STARTUP_TIMEOUT" \
+  suite-runner \
+  "${runtime_services[@]}"
+startup_status=$?
+set -e
+
+suite_container_id="$("${compose[@]}" ps -a -q suite-runner | tail -n 1)"
+if [ -z "$suite_container_id" ]; then
+  echo "Suite runner container disappeared before its logs were collected" >&2
   exit 1
 fi
+docker logs --follow "$suite_container_id" &
+runner_logs_pid=$!
+
+if [ "$startup_status" -eq 0 ]; then
+  : > "$results_dir/runtime-ready"
+else
+  echo "Failed to start the suite runner or one or more runtime services" >&2
+  docker stop -t 0 "$suite_container_id" >/dev/null 2>&1 || true
+fi
+
+set +e
+docker wait "$suite_container_id" >/dev/null
+wait "$runner_logs_pid"
+set -e
+
+suite_status="$(docker inspect -f '{{.State.ExitCode}}' "$suite_container_id")"
+if [ -f "$results_dir/summary.md" ]; then
+  cat "$results_dir/summary.md"
+  cp "$results_dir/summary.md" "$RUNNER_TEMP/compose-suite-summary.md"
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+    cat "$results_dir/summary.md" >> "$GITHUB_STEP_SUMMARY"
+  fi
+fi
+if [ -f "$results_dir/summary.json" ]; then
+  cp "$results_dir/summary.json" "$RUNNER_TEMP/compose-suite-summary.json"
+fi
+if [ -f "$results_dir/failures.txt" ]; then
+  cp "$results_dir/failures.txt" "$RUNNER_TEMP/compose-test-failures"
+fi
+
+if [ "$startup_status" -ne 0 ]; then
+  exit "$startup_status"
+fi
+
+exit "$suite_status"

@@ -24,78 +24,58 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-nodejs
             ref: main
             app_port: 3000
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: main
             app_port: 8080
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
             app_port: 8080
-            sleep_before_test: 10
             config_update_delay: 120
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
             build_args: PHP_FIREWALL_VERSION=1.0.126
-            parallelism: 50
             skip_tests: test-stored-ssrf,test-stored-ssrf-no-context
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: main
             app_port: 8080
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: main
             app_port: 3000
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
             app_port: 3000
-            sleep_before_test: 10
-            config_update_delay: 60
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            parallelism: 50
             skip_tests: ''
     steps:
       - name: Checkout action
@@ -115,11 +95,9 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           build_args: ${{ matrix.app.build_args }}
           app_port: ${{ matrix.app.app_port }}
-          config_update_delay: ${{ matrix.app.config_update_delay }}
-          sleep_before_test: ${{ matrix.app.sleep_before_test }}
+          config_update_delay: ${{ matrix.app.config_update_delay || 60 }}
           app_env_file: ${{ matrix.app.app_env_file }}
           app_env_file_2: ${{ matrix.app.app_env_file_2 }}
-          max_parallel_tests: ${{ matrix.app.parallelism }}
           skip_tests: ${{ matrix.app.skip_tests }}
 
   server-tests-windows:
@@ -158,11 +136,8 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 80
-          config_update_delay: 60
-          sleep_before_test: 10
           app_env_file: ./server_tests/empty.env
           app_env_file_2: ./server_tests/empty.env
-          max_parallel_tests: 50
 
   control-tests-linux:
     name: php-control
@@ -185,9 +160,6 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 8080
-          config_update_delay: 60
-          sleep_before_test: 10
           app_env_file: ./zen-demo/.env.example
           app_env_file_2: ./server_tests/app_env/php.env
-          max_parallel_tests: 50
           test_type: control

@@ -1,17 +1,4 @@
-x-test-name: &test-name test-ssrf-different-port
-x-test-token: &test-token AIK_RUNTIME_1_test-ssrf-different-port
-x-app-service: &app-service app-test-ssrf-different-port
-x-database-name: &database-name test-ssrf-different-port
-
 services:
-  setup-test-ssrf-different-port:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-ssrf-different-port:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -19,27 +6,12 @@ services:
     env_file:
       - ./test.env
     environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-ssrf-different-port${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
-    depends_on:
-      setup-test-ssrf-different-port:
-        condition: service_completed_successfully
-
-  test-ssrf-different-port:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-test-ssrf-different-port:
-        condition: service_started
-      ssrf-mock-4000-test-ssrf-different-port:
-        condition: service_healthy
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-ssrf-different-port
+      DATABASE_NAME: test-ssrf-different-port
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-ssrf-different-port${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
 
   # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf-mock-4000-test-ssrf-different-port:

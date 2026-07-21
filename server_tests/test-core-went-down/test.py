@@ -21,13 +21,14 @@ def check_attacks_blocked(collector, s, response_code):
         response, response_code, "path traversal")
 
 
-def check_event_is_submitted_shell_injection(collector, s, c, response_code, expected_json):
+def check_event_is_submitted_shell_injection(
+        collector, s, c, response_code, expected_json, max_wait_time=5):
     start_events = c.get_events("detected_attack")
     request_started_at_ms = int(time.time() * 1000) - 1000
     response = s.post("/api/execute", {"userCommand": "whoami"})
     collector.soft_assert_response_code_is(response, response_code)
 
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + max_wait_time
     new_events = []
     candidate_events = []
     last_error = None
@@ -93,10 +94,9 @@ def run_test(s: TestServer, c: CoreApi):
     check_attacks_blocked(collector, s, 500)
 
     c.set_mock_server_up()
-    time.sleep(30)
 
     check_event_is_submitted_shell_injection(
-        collector, s, c, 500, "expect_detection_blocked.json")
+        collector, s, c, 500, "expect_detection_blocked.json", max_wait_time=70)
 
     collector.raise_if_failures()
 

@@ -1,17 +1,4 @@
-x-test-name: &test-name control-test-graceful-restart
-x-test-token: &test-token AIK_RUNTIME_1_control-test-graceful-restart
-x-app-service: &app-service app-control-test-graceful-restart
-x-database-name: &database-name control-test-graceful-restart
-
 services:
-  setup-control-test-graceful-restart:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-control-test-graceful-restart:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -19,22 +6,9 @@ services:
     env_file:
       - ./test.env
     environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}control-test-graceful-restart${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
-    depends_on:
-      setup-control-test-graceful-restart:
-        condition: service_completed_successfully
-
-  control-test-graceful-restart:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-control-test-graceful-restart:
-        condition: service_started
+      AIKIDO_TOKEN: AIK_RUNTIME_1_control-test-graceful-restart
+      DATABASE_NAME: control-test-graceful-restart
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}control-test-graceful-restart${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

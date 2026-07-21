@@ -1,30 +1,20 @@
-x-test-name: &test-name test-stored-ssrf-no-context
-x-test-token: &test-token AIK_RUNTIME_1_test-stored-ssrf-no-context
-x-app-service: &app-service app-test-stored-ssrf-no-context
-x-database-name: &database-name test-stored-ssrf-no-context
-
 services:
-  setup-test-stored-ssrf-no-context:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-stored-ssrf-no-context:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
     env_file:
       - ./test.env
-    environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-stored-ssrf-no-context${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
     depends_on:
-      setup-test-stored-ssrf-no-context:
-        condition: service_completed_successfully
+      imds-mock:
+        condition: service_healthy
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-stored-ssrf-no-context
+      DATABASE_NAME: test-stored-ssrf-no-context
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-stored-ssrf-no-context${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
     dns:
       - 127.0.0.1
     networks:
@@ -34,24 +24,6 @@ services:
       imds-alibaba:
         ipv4_address: 100.100.100.102
       imds-aws-ipv6: null
-
-  test-stored-ssrf-no-context:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-      TEST_DNS_MOCK_URL: http://app-test-stored-ssrf-no-context:8053
-    depends_on:
-      app-test-stored-ssrf-no-context:
-        condition: service_started
-      dns-mock-test-stored-ssrf-no-context:
-        condition: service_healthy
-      imds-mock:
-        condition: service_healthy
 
   # DNS responder with mutable per-test records for stored SSRF hostnames.
   dns-mock-test-stored-ssrf-no-context:

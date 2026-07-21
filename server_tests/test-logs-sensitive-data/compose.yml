@@ -1,17 +1,4 @@
-x-test-name: &test-name test-logs-sensitive-data
-x-test-token: &test-token AIK_RUNTIME_1_test-logs-sensitive-data
-x-app-service: &app-service app-test-logs-sensitive-data
-x-database-name: &database-name test-logs-sensitive-data
-
 services:
-  setup-test-logs-sensitive-data:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-logs-sensitive-data:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -19,12 +6,13 @@ services:
     env_file:
       - ./test.env
     environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-logs-sensitive-data${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-logs-sensitive-data
+      DATABASE_NAME: test-logs-sensitive-data
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-logs-sensitive-data${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
     depends_on:
-      setup-test-logs-sensitive-data:
-        condition: service_completed_successfully
       log-collector-test-logs-sensitive-data:
         condition: service_started
     logging:
@@ -33,29 +21,11 @@ services:
         syslog-address: tcp://${SYSLOG_COLLECTOR_HOST:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}
         tag: '{{.Name}}'
 
-  test-logs-sensitive-data:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-      TEST_APP_LOG_FILE: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test-logs-sensitive-data.log
-    depends_on:
-      app-test-logs-sensitive-data:
-        condition: service_started
-    volumes:
-      - type: volume
-        source: test-logs-sensitive-data-logs
-        target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
-        read_only: true
-
   log-collector-test-logs-sensitive-data:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     environment:
-      SYSLOG_COLLECTOR_LOG_FILE: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test-logs-sensitive-data.log
+      SYSLOG_COLLECTOR_LOG_FILE:
+        ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test-logs-sensitive-data.log
     volumes:
       - type: bind
         source: ..
@@ -66,13 +36,15 @@ services:
         target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
     ports:
       - '${SYSLOG_COLLECTOR_PORT:-5514}:5514'
-    command: python ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
+    command:
+      python ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
     healthcheck:
       test:
         - CMD
         - python
         - -c
-        - import socket; socket.create_connection(('127.0.0.1', 5514), 1).close()
+        - import socket; socket.create_connection(('127.0.0.1', 5514),
+          1).close()
       interval: 1s
       timeout: 5s
       retries: 30

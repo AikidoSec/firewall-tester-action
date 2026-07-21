@@ -12,13 +12,14 @@ inputs:
     required: true
   test_name:
     description:
-      Optional single server_tests directory to run, for example test-sql-injection
+      Optional single server_tests directory to run, for example
+      test-sql-injection
     required: false
     default: ''
   run_tests:
     description:
-      Optional comma-separated list of tests to run. If omitted, all tests
-      for the selected test type are run.
+      Optional comma-separated list of tests to run. If omitted, all tests for
+      the selected test type are run.
     required: false
     default: ''
   skip_tests:
@@ -36,20 +37,13 @@ inputs:
     required: false
     default: '8080'
   max_parallel_tests:
-    description: Maximum number of Compose tests to run in parallel.
+    description: Maximum number of tests run concurrently by the shared runner
     required: false
-    default: '50'
+    default: '20'
   config_update_delay:
-    description: Delay in seconds after runtime config updates
+    description: Delay in seconds after runtime configuration updates
     required: false
     default: '60'
-  sleep_before_test:
-    description:
-      Delay in seconds before starting the test after the app starts or becomes
-      reachable. This preserves the old runner behavior while the agent fetches
-      startup config.
-    required: false
-    default: '1'
   app_env_file:
     description: Optional env file passed to the application service
     required: false
@@ -77,7 +71,6 @@ runs:
         DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
         MAX_PARALLEL_TESTS: ${{ inputs.max_parallel_tests }}
         RUN_TESTS: ${{ inputs.run_tests }}
-        SLEEP_BEFORE_TEST: ${{ inputs.sleep_before_test }}
         SKIP_TESTS: ${{ inputs.skip_tests }}
         TEST_NAME: ${{ inputs.test_name }}
         TEST_TYPE: ${{ inputs.test_type }}

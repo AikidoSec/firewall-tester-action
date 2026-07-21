@@ -97,17 +97,16 @@ def test_no_heartbeat_or_start_events(collector, s, c: CoreApi, initial_heartbea
             if "stats" in event:
                 stats = event["stats"]
                 if "requests" in stats:
-                    # All request stats should be zero or minimal
+                    # Disabled agents must not collect request statistics.
                     collector.soft_assert(
-                        stats["requests"].get(
-                            "total", 0) == 0 or stats["requests"].get("total", 0) == 1,
+                        stats["requests"].get("total", 0) == 0,
                         f"When AIKIDO_DISABLE=true, heartbeat should not contain request statistics: {stats}"
                     )
 
-            # Routes should be empty or minimal
+            # Routes should be empty.
             if "routes" in event:
                 collector.soft_assert(
-                    len(event.get("routes", [])) <= 1,
+                    len(event.get("routes", [])) == 0,
                     f"When AIKIDO_DISABLE=true, no API routes should be tracked: {event['routes']}"
                 )
 

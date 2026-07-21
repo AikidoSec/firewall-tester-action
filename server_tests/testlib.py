@@ -117,12 +117,11 @@ def init_server_and_core():
     parser.add_argument("--control_server_port", type=int, required=False)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
-    parser.add_argument("--config_update_delay", type=int, default=60)
     args = parser.parse_args()
 
     server = TestServer(port=args.server_port, token=args.token)
-    core = CoreApi(token=args.token, core_url=f"http://{TEST_CORE_HOST}:{args.core_port}", test_name=args.test_name,
-                   config_update_delay=args.config_update_delay)
+    core = CoreApi(token=args.token, core_url=f"http://{TEST_CORE_HOST}:{args.core_port}",
+                   test_name=args.test_name)
     if args.control_server_port:
         control_server = TestControlServer(port=args.control_server_port)
         return args, server, core, control_server

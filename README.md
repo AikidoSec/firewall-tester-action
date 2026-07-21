@@ -1,8 +1,8 @@
 # Firewall Tester Action
 
 Internal validation framework for Aikido firewall agents. Tests are orchestrated
-with Docker Compose: each test directory has a `compose.yml` that starts the
-mock core, Postgres, the demo app, and the Python test runner for that test.
+with Docker Compose: a shared mock core, PostgreSQL database, and suite runner
+coordinate an isolated demo-app service for every selected test.
 
 ## Usage
 
@@ -19,7 +19,7 @@ jobs:
         with:
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
-          ref: dev-testing
+          ref: main
 
       - uses: AikidoSec/firewall-tester-action@v1
         with:
@@ -35,18 +35,18 @@ repository runs all Linux demo apps through a GitHub matrix.
 
 ## Inputs
 
-| Name                   | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `dockerfile_path`      | Path to the Dockerfile with the Aikido agent installed            |
-| `test_name`            | Optional single test directory under `server_tests`               |
-| `run_tests`            | Optional comma-separated list of tests to run                     |
-| `skip_tests`           | Optional comma-separated list of tests to skip                    |
-| `build_args`           | Optional newline-separated Docker build args for the demo image   |
-| `app_port`             | Port exposed by the application during Docker runtime             |
-| `config_update_delay`  | Delay in seconds after runtime config updates                     |
-| `app_env_file`         | Optional env file passed to the application service               |
-| `app_env_file_2`       | Optional second env file passed to the application service        |
-| `max_parallel_tests`   | Maximum number of Compose tests to run in parallel                |
+| Name                  | Description                                                     |
+| --------------------- | --------------------------------------------------------------- |
+| `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed          |
+| `test_name`           | Optional single test directory under `server_tests`             |
+| `run_tests`           | Optional comma-separated list of tests to run                   |
+| `skip_tests`          | Optional comma-separated list of tests to skip                  |
+| `build_args`          | Optional newline-separated Docker build args for the demo image |
+| `app_port`            | Port exposed by the application during Docker runtime           |
+| `max_parallel_tests`  | Maximum number of tests run concurrently (default: 20)          |
+| `config_update_delay` | Delay after runtime configuration updates (default: 60 seconds) |
+| `app_env_file`        | Optional env file passed to the application service             |
+| `app_env_file_2`      | Optional second env file passed to the application service      |
 
 ## Running Locally
 

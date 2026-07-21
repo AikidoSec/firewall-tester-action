@@ -53,7 +53,8 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - pg_isready -U ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER} -h 127.0.0.1 -p 5432
+        - pg_isready -U ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER} -h
+          127.0.0.1 -p 5432
       interval: 1s
       timeout: 5s
       retries: 180
@@ -70,7 +71,8 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - node -e "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - node -e
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 1s
       timeout: 5s
       retries: 60
@@ -86,13 +88,16 @@ services:
     profiles:
       - build
 
-  # Python test runner image build target used by setup and test services.
-  test-runner-image:
+  # One Compose-managed runner performs all setup, waits for apps, and runs tests.
+  suite-runner:
     extends:
       file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    profiles:
-      - build
+      service: suite-runner-template
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_healthy
 
   imds-mock:
     extends:

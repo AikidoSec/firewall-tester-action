@@ -105,31 +105,33 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs: {response.text}")
 
-    # Wait a bit to give the agent time to potentially send heartbeat / stats
-    c.wait_for_new_events(
-        70, old_events_length=len(start_heartbeat_events), filter_type="heartbeat"
+    traffic_finished_at = int(time.time() * 1000)
+    heartbeat, candidates = c.wait_for_heartbeat_after(
+        160, len(start_heartbeat_events), traffic_finished_at
     )
 
     all_heartbeat_events = c.get_events("heartbeat")
-    new_heartbeat_events = all_heartbeat_events[len(start_heartbeat_events):]
-
-    # Prerequisite: need exactly 1 heartbeat event to inspect its contents
     if not collector.soft_assert(
-            len(new_heartbeat_events) == 1,
-            f"Expected 1 heartbeat event, got {len(new_heartbeat_events)}"):
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
         collector.raise_if_failures()
         return
 
-    heartbeat = new_heartbeat_events[0]
     # routes should not contain  "method": "POST", "path": "/api/create",
     for route in heartbeat["routes"]:
         collector.soft_assert(
             not ("POST" in route["method"] and "/api/create" in route["path"]),
             f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data")
 
+    # The initial request can be emitted just before or just after this test
+    # takes its heartbeat baseline, so inspect the token's full event stream.
+    requests_total = sum(
+        event.get("stats", {}).get("requests", {}).get("total", 0)
+        for event in all_heartbeat_events
+    )
     collector.soft_assert(
-        heartbeat["stats"]["requests"]["total"] == 1,
-        f"Requests total should be 1, found {heartbeat['stats']['requests']['total']}")
+        requests_total == 1,
+        f"Only the initial request should be counted, found {requests_total}")
     # attacksDetected
     collector.soft_assert(
         heartbeat["stats"]["requests"]["attacksDetected"]["total"] == 0,

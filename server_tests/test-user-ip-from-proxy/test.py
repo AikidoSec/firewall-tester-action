@@ -29,17 +29,17 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(response, 200)
         time.sleep(0.5)
 
-    c.wait_for_new_events(70, old_events_length=len(
-        start_events), filter_type="heartbeat")
+    traffic_finished_at = int(time.time() * 1000)
+    heartbeat, candidates = c.wait_for_heartbeat_after(
+        160, len(start_events), traffic_finished_at
+    )
 
-    all_events = c.get_events("heartbeat")
-    new_events = all_events[len(start_events):]
-
-    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 heartbeat event, got {len(new_events)}"):
+    if not collector.soft_assert(
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
         collector.raise_if_failures()
         return
 
-    heartbeat = new_events[0]
     users = heartbeat.get("users", [])
 
     if not collector.soft_assert(len(users) >= 1, f"Expected at least 1 user in heartbeat, got {len(users)}"):

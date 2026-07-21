@@ -129,18 +129,16 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
         collector.soft_assert_response_body_contains(
             response, "blocked an outbound connection", f"{response.text} - percent-encoded hostname b%C3%B6se.example.com should not be allowed")
 
-    c.wait_for_new_events(120, old_events_length=len(
-        start_events), filter_type="heartbeat")
+    traffic_finished_at = int(time.time() * 1000)
+    heartbeat, candidates = c.wait_for_heartbeat_after(
+        160, len(start_events), traffic_finished_at
+    )
 
-    # test heartbeat event ()
-    all_events = c.get_events("heartbeat")
-    new_events = all_events[len(start_events):]
-
-    # # Prerequisite: need exactly 1 heartbeat event to check contents
-    if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new heartbeat event, got {len(new_events)}"):
+    if not collector.soft_assert(
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
         return
 
-    heartbeat = new_events[0]
     # assrt hostname in heartbeat
     collector.soft_assert("hostnames" in heartbeat,
                           "hostnames should be in heartbeat")

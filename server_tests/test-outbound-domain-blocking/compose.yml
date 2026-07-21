@@ -1,17 +1,4 @@
-x-test-name: &test-name test-outbound-domain-blocking
-x-test-token: &test-token AIK_RUNTIME_1_test-outbound-domain-blocking
-x-app-service: &app-service app-test-outbound-domain-blocking
-x-database-name: &database-name test-outbound-domain-blocking
-
 services:
-  setup-test-outbound-domain-blocking:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: setup-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-
   app-test-outbound-domain-blocking:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
@@ -19,32 +6,21 @@ services:
     env_file:
       - ./test.env
     environment:
-      AIKIDO_TOKEN: *test-token
-      DATABASE_NAME: *database-name
-      DATABASE_URL: '${DATABASE_URL_PREFIX:?Set DATABASE_URL_PREFIX}test-outbound-domain-blocking${DATABASE_URL_SUFFIX:?Set DATABASE_URL_SUFFIX}'
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-outbound-domain-blocking
+      DATABASE_NAME: test-outbound-domain-blocking
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-outbound-domain-blocking${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
       APP_HOSTS_ENTRIES: >-
-        11.22.33.44 böse.example.com|11.22.33.44 münchen.example.com|11.22.33.44 münchen-allowed.example.com
+        11.22.33.44 böse.example.com|11.22.33.44 münchen.example.com|11.22.33.44
+        münchen-allowed.example.com
     depends_on:
-      setup-test-outbound-domain-blocking:
-        condition: service_completed_successfully
       mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
         condition: service_started
     networks:
       - default
       - outbound-domain-blocking-test-outbound-domain-blocking
-
-  test-outbound-domain-blocking:
-    extends:
-      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: test-template
-    environment:
-      TEST_NAME: *test-name
-      TEST_TOKEN: *test-token
-      TEST_SERVER_HOST: *app-service
-      TEST_CONTROL_SERVER_HOST: *app-service
-    depends_on:
-      app-test-outbound-domain-blocking:
-        condition: service_started
 
   mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
@@ -53,7 +29,8 @@ services:
         source: ..
         target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
         read_only: true
-    command: python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    command:
+      python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:
       RESPONSE_BODY: '{"status":"ok"}'
     networks:

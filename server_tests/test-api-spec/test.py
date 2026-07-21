@@ -78,17 +78,17 @@ def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi)
         response = s.post(*fn())
         collector.soft_assert_response_code_is(response, 200)
 
-    c.wait_for_new_events(70, old_events_length=len(
-        start_events), filter_type="heartbeat")
+    traffic_finished_at = int(time.time() * 1000)
+    heartbeat, candidates = c.wait_for_heartbeat_after(
+        160, len(start_events), traffic_finished_at
+    )
 
-    all_events = c.get_events("heartbeat")
-    new_events = all_events[len(start_events):]
-
-    # Prerequisite: need exactly 1 event to check its contents
-    if not collector.soft_assert(len(new_events) == 1, f"Expected 1 new heartbeat event, got {len(new_events)}"):
+    if not collector.soft_assert(
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
         return
     try:
-        assert_event_contains_subset_file(new_events[0], expected_json)
+        assert_event_contains_subset_file(heartbeat, expected_json)
     except AssertionError as e:
         collector.add_failure(str(e))
 

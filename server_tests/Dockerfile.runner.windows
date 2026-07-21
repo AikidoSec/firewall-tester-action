@@ -1,7 +1,13 @@
 # escape=`
+FROM sokigo/postgresql-windows:15.15-2022 AS postgres-client
+
 FROM python:3.13-windowsservercore-ltsc2022
 
 WORKDIR C:\workspace
+
+COPY --from=postgres-client C:\pgsql\bin C:\pgsql\bin
+
+ENV PATH="C:\pgsql\bin;C:\Python\Scripts;C:\Python;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH"
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

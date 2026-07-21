@@ -5,6 +5,7 @@ import createApp from './src/handlers/createApp.js'
 import { checkToken } from './src/middleware/checkToken.js'
 import { getConfigHandler } from './src/handlers/getConfig.js'
 import { updateConfigHandler } from './src/handlers/updateConfig.js'
+import { getConfigDeliveryHandler } from './src/handlers/getConfigDelivery.js'
 import { realtimeConfigHandler } from './src/handlers/realtimeConfig.js'
 import { listEventsHandler } from './src/handlers/listEvents.js'
 import { captureEventHandler } from './src/handlers/captureEvent.js'
@@ -31,6 +32,7 @@ app.get('/health', (_req, res) => {
 
 app.get('/api/runtime/config', checkToken, getConfigHandler)
 app.post('/api/runtime/config', checkToken, updateConfigHandler)
+app.get('/api/runtime/config/delivery', checkToken, getConfigDeliveryHandler)
 
 app.get('/config', checkToken, realtimeConfigHandler)
 

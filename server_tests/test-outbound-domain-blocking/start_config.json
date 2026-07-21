@@ -1,5 +1,5 @@
 {
-  "heartbeatIntervalInMS": 600000,
+  "heartbeatIntervalInMS": 60000,
   "endpoints": [
     {
       "method": "POST",

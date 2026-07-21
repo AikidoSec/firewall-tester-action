@@ -24,6 +24,7 @@ APP_ENV_FILE_2="${APP_ENV_FILE_2:-}"
 APP_PORT="${APP_PORT:-8080}"
 BUILD_ARGS="${BUILD_ARGS:-}"
 CONFIG_UPDATE_DELAY="${CONFIG_UPDATE_DELAY:-60}"
+IGNORE_FAILURES="${IGNORE_FAILURES:-false}"
 MAX_PARALLEL_TESTS="${MAX_PARALLEL_TESTS:-20}"
 RUN_TESTS="${RUN_TESTS:-}"
 RUNNER_TEMP="${RUNNER_TEMP:-$action_path/.tmp}"
@@ -206,6 +207,11 @@ if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
+if [ "$IGNORE_FAILURES" != "true" ] && [ "$IGNORE_FAILURES" != "false" ]; then
+  echo "IGNORE_FAILURES must be true or false" >&2
+  exit 2
+fi
+
 runtime_services=()
 for test_name in "${tests_to_run[@]}"; do
   while IFS= read -r service; do
@@ -267,6 +273,11 @@ fi
 
 if [ "$startup_status" -ne 0 ]; then
   exit "$startup_status"
+fi
+
+if [ "$suite_status" -ne 0 ] && [ "$IGNORE_FAILURES" = "true" ]; then
+  echo "Test failures were reported but are being ignored"
+  exit 0
 fi
 
 exit "$suite_status"

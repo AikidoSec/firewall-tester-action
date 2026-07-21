@@ -26,6 +26,10 @@ inputs:
     description: Optional comma-separated list of test names to skip.
     required: false
     default: ''
+  ignore_failures:
+    description: Exit successfully after reporting test failures.
+    required: false
+    default: 'false'
   build_args:
     description:
       Optional newline-separated Docker build args for the demo image, in
@@ -69,6 +73,7 @@ runs:
         BUILD_ARGS: ${{ inputs.build_args }}
         CONFIG_UPDATE_DELAY: ${{ inputs.config_update_delay }}
         DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+        IGNORE_FAILURES: ${{ inputs.ignore_failures }}
         MAX_PARALLEL_TESTS: ${{ inputs.max_parallel_tests }}
         RUN_TESTS: ${{ inputs.run_tests }}
         SKIP_TESTS: ${{ inputs.skip_tests }}

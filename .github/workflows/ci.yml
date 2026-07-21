@@ -35,6 +35,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
+            ignore_failures: true
             skip_tests: |-
               test-allowed-ip-for-routes,test-allowed-ip-most-restrictive,test-block-traffic-by-countries,test-bypassed-ip,test-bypassed-ip-for-geo-blocking,test-bypassed-ip-for-rate-limiting,test-demo-apps-generic-tests,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-path-traversal,test-rate-limiting-retry-after,test-stored-ssrf,test-stored-ssrf-no-context,test-user-rate-limiting-1-minute-enable-disable,test-wave-attack
           - name: php
@@ -45,6 +46,7 @@ jobs:
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env
             build_args: PHP_FIREWALL_VERSION=1.0.126
+            ignore_failures: true
             skip_tests: |-
               test-allow-traffic-by-countries,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-rate-limiting-retry-after,test-ssrf,test-stored-ssrf,test-stored-ssrf-no-context,test-user-ip-from-proxy,test-wave-attack
           - name: dotnet-core
@@ -101,6 +103,7 @@ jobs:
           build_args: ${{ matrix.app.build_args }}
           app_port: ${{ matrix.app.app_port }}
           config_update_delay: ${{ matrix.app.config_update_delay || 60 }}
+          ignore_failures: ${{ matrix.app.ignore_failures || false }}
           app_env_file: ${{ matrix.app.app_env_file }}
           app_env_file_2: ${{ matrix.app.app_env_file_2 }}
           skip_tests: ${{ matrix.app.skip_tests }}

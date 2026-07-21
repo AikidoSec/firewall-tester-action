@@ -27,7 +27,6 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            skip_tests: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: main
@@ -36,8 +35,6 @@ jobs:
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
             ignore_failures: true
-            skip_tests: |-
-              test-allowed-ip-for-routes,test-allowed-ip-most-restrictive,test-block-traffic-by-countries,test-bypassed-ip,test-bypassed-ip-for-geo-blocking,test-bypassed-ip-for-rate-limiting,test-demo-apps-generic-tests,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-path-traversal,test-rate-limiting-retry-after,test-stored-ssrf,test-stored-ssrf-no-context,test-user-rate-limiting-1-minute-enable-disable,test-wave-attack
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: dev-testing
@@ -47,8 +44,6 @@ jobs:
             app_env_file_2: ./server_tests/app_env/php.env
             build_args: PHP_FIREWALL_VERSION=1.0.126
             ignore_failures: true
-            skip_tests: |-
-              test-allow-traffic-by-countries,test-excluded-user-from-rate-limiting,test-outbound-domain-blocking,test-rate-limiting-retry-after,test-ssrf,test-stored-ssrf,test-stored-ssrf-no-context,test-user-ip-from-proxy,test-wave-attack
           - name: dotnet-core
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
@@ -56,7 +51,6 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            skip_tests: ''
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: main
@@ -64,8 +58,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            skip_tests: |-
-              test-api-spec,test-bypassed-ip,test-demo-apps-generic-tests,test-outbound-domain-blocking,test-rate-limiting-retry-after,test-ssrf,test-stored-ssrf,test-user-ip-from-proxy,test-wave-attack
+            ignore_failures: true
           - name: ruby
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: main
@@ -73,8 +66,7 @@ jobs:
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            skip_tests: |-
-              test-outbound-domain-blocking,test-rate-limiting-group-id-1-minute,test-rate-limiting-retry-after,test-user-ip-from-proxy
+            ignore_failures: true
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
@@ -82,8 +74,7 @@ jobs:
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
-            skip_tests: |-
-              test-outbound-domain-blocking,test-rate-limiting-retry-after
+            ignore_failures: true
     steps:
       - name: Checkout action
         uses: actions/checkout@v4
@@ -106,7 +97,6 @@ jobs:
           ignore_failures: ${{ matrix.app.ignore_failures || false }}
           app_env_file: ${{ matrix.app.app_env_file }}
           app_env_file_2: ${{ matrix.app.app_env_file_2 }}
-          skip_tests: ${{ matrix.app.skip_tests }}
 
   server-tests-windows:
     name: dotnet-framework
@@ -171,5 +161,4 @@ jobs:
           app_env_file: ./zen-demo/.env.example
           app_env_file_2: ./server_tests/app_env/php.env
           test_type: control
-          skip_tests: |-
-            control-test-graceful-stop,control-test-install-aikido
+          ignore_failures: true

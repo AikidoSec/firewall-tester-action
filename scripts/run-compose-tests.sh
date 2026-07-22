@@ -228,35 +228,12 @@ echo "Compose services to start: ${#runtime_services[@]}"
 set +e
 "${compose[@]}" up \
   --no-build \
-  -d \
-  --wait \
-  --wait-timeout "$STARTUP_TIMEOUT" \
+  --timeout 0 \
+  --exit-code-from suite-runner \
   suite-runner \
   "${runtime_services[@]}"
-startup_status=$?
+suite_status=$?
 set -e
-
-suite_container_id="$("${compose[@]}" ps -a -q suite-runner | tail -n 1)"
-if [ -z "$suite_container_id" ]; then
-  echo "Suite runner container disappeared before its logs were collected" >&2
-  exit 1
-fi
-docker logs --follow "$suite_container_id" &
-runner_logs_pid=$!
-
-if [ "$startup_status" -eq 0 ]; then
-  : > "$results_dir/runtime-ready"
-else
-  echo "Failed to start the suite runner or one or more runtime services" >&2
-  docker stop -t 0 "$suite_container_id" >/dev/null 2>&1 || true
-fi
-
-set +e
-docker wait "$suite_container_id" >/dev/null
-wait "$runner_logs_pid"
-set -e
-
-suite_status="$(docker inspect -f '{{.State.ExitCode}}' "$suite_container_id")"
 if [ -f "$results_dir/summary.md" ]; then
   cat "$results_dir/summary.md"
   cp "$results_dir/summary.md" "$RUNNER_TEMP/compose-suite-summary.md"
@@ -271,11 +248,7 @@ if [ -f "$results_dir/failures.txt" ]; then
   cp "$results_dir/failures.txt" "$RUNNER_TEMP/compose-test-failures"
 fi
 
-if [ "$startup_status" -ne 0 ]; then
-  exit "$startup_status"
-fi
-
-if [ "$suite_status" -ne 0 ] && [ "$IGNORE_FAILURES" = "true" ]; then
+if [ "$suite_status" -ne 0 ] && [ "$IGNORE_FAILURES" = "true" ] && [ -f "$results_dir/suite-complete" ]; then
   echo "Test failures were reported but are being ignored"
   exit 0
 fi

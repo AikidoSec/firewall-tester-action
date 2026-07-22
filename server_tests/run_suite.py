@@ -17,7 +17,7 @@ WORKSPACE = Path(os.environ.get("WORKSPACE_ROOT", r"C:\workspace" if IS_WINDOWS 
 SERVER_TESTS = WORKSPACE / "server_tests"
 RESULTS = Path(os.environ.get("SUITE_RESULTS_DIR", r"C:\results" if IS_WINDOWS else "/results"))
 SETUP_COMPLETE = RESULTS / "setup-complete"
-RUNTIME_READY = RESULTS / "runtime-ready"
+SUITE_COMPLETE = RESULTS / "suite-complete"
 TESTS_WITHOUT_STARTUP_CONFIG = {
     "test-aikido-disable",
     "test-internet-not-available",
@@ -40,15 +40,6 @@ def app_host_for(test_name: str) -> str:
 
 def control_server_port() -> str:
     return os.environ.get("CONTROL_SERVER_PORT") or "8081"
-
-
-def wait_for_runtime_ready(timeout_seconds: int) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        if RUNTIME_READY.exists():
-            return
-        time.sleep(0.2)
-    raise RuntimeError(f"Runtime services did not start within {timeout_seconds}s")
 
 
 def run_setup(test_name: str) -> None:
@@ -300,7 +291,7 @@ def main() -> int:
 
     RESULTS.mkdir(parents=True, exist_ok=True)
     SETUP_COMPLETE.unlink(missing_ok=True)
-    RUNTIME_READY.unlink(missing_ok=True)
+    SUITE_COMPLETE.unlink(missing_ok=True)
 
     setup_started = time.monotonic()
     try:
@@ -324,7 +315,6 @@ def main() -> int:
     SETUP_COMPLETE.touch()
 
     results = []
-    wait_for_runtime_ready(int(os.environ.get("STARTUP_TIMEOUT", "600")))
     if tests:
         print(f"RUNTIME SERVICES READY ({len(tests)} tests)", flush=True)
 
@@ -351,6 +341,7 @@ def main() -> int:
                     print(f"--- end {result['test']} log ---", flush=True)
 
     write_summary(results, skipped, setup_seconds)
+    SUITE_COMPLETE.touch()
     return 1 if any(result["status"] == "FAIL" for result in results) else 0
 
 

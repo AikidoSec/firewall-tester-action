@@ -20,6 +20,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "bundle:core": "esbuild src/coremock/main.ts --bundle --platform=node --target=node20 --format=cjs --outfile=dist/coremock.cjs",
     "ci-test": "NODE_OPTIONS=--experimental-vm-modules NODE_NO_WARNINGS=1 npx jest",
     "coverage": "npx make-coverage-badge --output-path ./badges/coverage.svg",
     "format:write": "npx prettier --write .",
@@ -43,6 +44,7 @@
     "@types/node": "^20.17.48",
     "@typescript-eslint/eslint-plugin": "^8.32.1",
     "@typescript-eslint/parser": "^8.32.1",
+    "esbuild": "^0.28.1",
     "eslint": "^9.27.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-import-resolver-typescript": "^4.3.5",

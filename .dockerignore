@@ -4,5 +4,7 @@
 !tsconfig.json
 !tsconfig.base.json
 !requirements.txt
+!dist
+!dist/coremock.cjs
 !src
 !src/**

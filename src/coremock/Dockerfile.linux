@@ -2,10 +2,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.json tsconfig.base.json ./
-RUN npm ci
-COPY src ./src
+COPY dist/coremock.cjs ./
 
 EXPOSE 3000
 
-ENTRYPOINT npm run start-core
+ENTRYPOINT ["node", "coremock.cjs"]

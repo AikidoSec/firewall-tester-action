@@ -2,11 +2,14 @@ import concurrent.futures
 import json
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
 import time
 
+import psycopg
+from psycopg import sql
 import requests
 
 from core_api import CoreApi
@@ -24,6 +27,7 @@ TESTS_WITHOUT_STARTUP_CONFIG = {
     "test-invalid-token",
     "test-no-token-set",
 }
+TEST_NAME_PATTERN = re.compile(r"^(?:test|control-test)-[a-z0-9][a-z0-9-]*$")
 
 
 def csv_values(name: str) -> list[str]:
@@ -42,19 +46,110 @@ def control_server_port() -> str:
     return os.environ.get("CONTROL_SERVER_PORT") or "8081"
 
 
-def run_setup(test_name: str) -> None:
-    environment = os.environ.copy()
-    environment["TEST_NAME"] = test_name
-    environment["TEST_TOKEN"] = token_for(test_name)
-    command = (
-        ["cmd", "/D", "/S", "/C", str(SERVER_TESTS / "setup.windows.cmd")]
-        if IS_WINDOWS
-        else ["sh", str(SERVER_TESTS / "setup.linux.sh")]
+def connect_to_database() -> psycopg.Connection:
+    return psycopg.connect(
+        host=os.environ["POSTGRES_HOST"],
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        user=os.environ["POSTGRES_ADMIN_USER"],
+        password=os.environ["POSTGRES_ADMIN_PASSWORD"],
+        dbname="postgres",
+        autocommit=True,
     )
+
+
+def prepare_database_role(connection: psycopg.Connection) -> None:
+    database_user = os.environ["POSTGRES_USER"]
+    database_password = os.environ["POSTGRES_PASSWORD"]
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (database_user,))
+        role_exists = cursor.fetchone() is not None
+        role_statement = sql.SQL(
+            "ALTER ROLE {} WITH LOGIN PASSWORD {}"
+            if role_exists
+            else "CREATE ROLE {} WITH LOGIN PASSWORD {}"
+        ).format(sql.Identifier(database_user), sql.Literal(database_password))
+        cursor.execute(role_statement)
+
+
+def prepare_database(connection: psycopg.Connection, test_name: str) -> None:
+    database_user = os.environ["POSTGRES_USER"]
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (test_name,))
+        if cursor.fetchone() is None:
+            cursor.execute(
+                sql.SQL("CREATE DATABASE {} OWNER {}").format(
+                    sql.Identifier(test_name), sql.Identifier(database_user)
+                )
+            )
+
+
+def request_core(method: str, path: str, **kwargs) -> requests.Response:
+    deadline = time.monotonic() + 60
+    last_error = None
+
+    with requests.Session() as session:
+        session.trust_env = False
+        for attempt in range(10):
+            try:
+                remaining_seconds = deadline - time.monotonic()
+                if remaining_seconds <= 0:
+                    break
+                response = session.request(
+                    method,
+                    f"{os.environ['CORE_URL']}{path}",
+                    timeout=min(10, remaining_seconds),
+                    **kwargs,
+                )
+                response.raise_for_status()
+                return response
+            except requests.RequestException as error:
+                last_error = error
+                if attempt < 9:
+                    time.sleep(min(2, max(0, deadline - time.monotonic())))
+
+    raise RuntimeError(f"Core setup request failed: {last_error}")
+
+
+def run_setup(test_name: str, database: psycopg.Connection) -> None:
+    if not TEST_NAME_PATTERN.fullmatch(test_name):
+        raise RuntimeError(f"Invalid test name: {test_name}")
+    test_dir = SERVER_TESTS / test_name
+    if not (test_dir / "test.py").is_file():
+        raise RuntimeError(f"Unknown test: {test_name}")
+
     print(f"SETUP {test_name}", flush=True)
-    result = subprocess.run(command, env=environment, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(f"Setup failed for {test_name} with exit code {result.returncode}")
+    print(f"Preparing database for {test_name}", flush=True)
+    prepare_database(database, test_name)
+
+    token = token_for(test_name)
+    headers = {"Authorization": token}
+    print("Registering core app token", flush=True)
+    request_core("POST", "/api/runtime/apps", json={"token": token})
+
+    config_path = test_dir / "start_config.json"
+    if config_path.is_file():
+        print("Uploading runtime config", flush=True)
+        request_core(
+            "POST",
+            "/api/runtime/config",
+            headers=headers,
+            json=json.loads(config_path.read_text(encoding="utf-8")),
+        )
+
+    firewall_path = test_dir / "start_firewall.json"
+    if firewall_path.is_file():
+        print("Uploading firewall lists", flush=True)
+        request_core(
+            "POST",
+            "/api/runtime/firewall/lists",
+            headers=headers,
+            json=json.loads(firewall_path.read_text(encoding="utf-8")),
+        )
+
+    print("Validating core app token", flush=True)
+    request_core("GET", "/api/runtime/events", headers=headers)
+    print(f"Setup completed for {test_name}", flush=True)
 
 
 def wait_for_app(test_name: str, app_host: str, output, deadline: float) -> None:
@@ -92,15 +187,14 @@ def wait_for_app(test_name: str, app_host: str, output, deadline: float) -> None
     # Give every agent the same one-request baseline and start agents whose
     # application initializes only while handling its first request.
     initial_url = f"http://{app_host}:{port}/"
-    session = requests.Session()
-    session.trust_env = False
-    try:
+    with requests.Session() as session:
+        session.trust_env = False
         remaining_seconds = deadline - time.monotonic()
         if remaining_seconds <= 0:
             raise RuntimeError("Startup deadline expired before the initial request")
         response = session.get(
             initial_url,
-            timeout=min(60, remaining_seconds),
+            timeout=remaining_seconds,
             allow_redirects=False,
         )
         print(
@@ -108,10 +202,6 @@ def wait_for_app(test_name: str, app_host: str, output, deadline: float) -> None
             file=output,
             flush=True,
         )
-    except requests.RequestException as error:
-        # The request may still have reached a slow-starting application.
-        # Config delivery below is the authoritative startup check.
-        print(f"Initial request did not complete: {error}", file=output, flush=True)
 
 
 def wait_for_startup_config(test_name: str, output, deadline: float) -> None:
@@ -294,9 +384,13 @@ def main() -> int:
     SUITE_COMPLETE.unlink(missing_ok=True)
 
     setup_started = time.monotonic()
+    test_name = tests[0] if tests else "suite-setup"
     try:
-        for test_name in tests:
-            run_setup(test_name)
+        if tests:
+            with connect_to_database() as database:
+                prepare_database_role(database)
+                for test_name in tests:
+                    run_setup(test_name, database)
     except Exception as exception:
         setup_seconds = round(time.monotonic() - setup_started, 2)
         result = {

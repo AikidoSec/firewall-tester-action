@@ -43,7 +43,7 @@ repository runs all Linux demo apps through a GitHub matrix.
 | `skip_tests`          | Optional comma-separated list of tests to skip                  |
 | `build_args`          | Optional newline-separated Docker build args for the demo image |
 | `app_port`            | Port exposed by the application during Docker runtime           |
-| `max_parallel_tests`  | Maximum number of tests run concurrently (default: 20)          |
+| `max_parallel_tests`  | Maximum concurrent Compose operations and tests (default: 20)   |
 | `config_update_delay` | Delay after runtime configuration updates (default: 60 seconds) |
 | `app_env_file`        | Optional env file passed to the application service             |
 | `app_env_file_2`      | Optional second env file passed to the application service      |

@@ -33,6 +33,11 @@ STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-600}"
 TEST_NAME="${TEST_NAME:-}"
 TEST_TYPE="${TEST_TYPE:-server}"
 
+if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "MAX_PARALLEL_TESTS must be a positive integer" >&2
+  exit 2
+fi
+
 container_os="$(docker info --format '{{.OSType}}')"
 if [ "$container_os" = "windows" ]; then
   compose_env_file="${COMPOSE_ENV_FILE:-$action_path/compose.windows.env}"
@@ -93,10 +98,42 @@ runner_temp_absolute="$(cd "$RUNNER_TEMP" && pwd)"
 results_dir="$runner_temp_absolute/compose-suite-results"
 export RUNNER_TEMP_COMPOSE="$(compose_path "$results_dir")"
 
-compose=(docker compose --env-file "$compose_env_file" -f "$compose_file")
+compose=(
+  docker compose
+  --parallel "$MAX_PARALLEL_TESTS"
+  --env-file "$compose_env_file"
+  -f "$compose_file"
+)
 
 cleanup_compose_project() {
   "${compose[@]}" down --timeout 0 -v --remove-orphans || true
+}
+
+print_compose_diagnostics() {
+  local container_ids=()
+  local network_ids=()
+
+  echo "Compose suite did not complete; collecting container diagnostics" >&2
+  "${compose[@]}" ps -a || true
+  docker ps -a --no-trunc \
+    --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" || true
+
+  mapfile -t container_ids < <("${compose[@]}" ps -a -q 2>/dev/null || true)
+  if [ "${#container_ids[@]}" -gt 0 ]; then
+    docker inspect \
+      --format 'ID={{.Id}} Name={{.Name}} Status={{.State.Status}} ExitCode={{.State.ExitCode}} Error={{json .State.Error}}' \
+      "${container_ids[@]}" || true
+  fi
+
+  mapfile -t network_ids < <(
+    docker network ls -q \
+      --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME"
+  )
+  if [ "${#network_ids[@]}" -gt 0 ]; then
+    docker network inspect \
+      --format 'ID={{.Id}} Name={{.Name}} Containers={{json .Containers}}' \
+      "${network_ids[@]}" || true
+  fi
 }
 
 if [ "$command" = "cleanup" ]; then
@@ -197,11 +234,6 @@ export SUITE_TESTS="$(join_by_comma "${tests_to_run[@]}")"
 export SUITE_SKIPPED_TESTS="$(join_by_comma "${skipped_tests[@]}")"
 export SUITE_MAX_WORKERS="$MAX_PARALLEL_TESTS"
 
-if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "MAX_PARALLEL_TESTS must be a positive integer" >&2
-  exit 2
-fi
-
 if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
   echo "CONFIG_UPDATE_DELAY must be a non-negative integer" >&2
   exit 2
@@ -234,6 +266,11 @@ set +e
   "${runtime_services[@]}"
 suite_status=$?
 set -e
+
+if [ "$suite_status" -ne 0 ] && [ ! -f "$results_dir/suite-complete" ]; then
+  print_compose_diagnostics
+fi
+
 if [ -f "$results_dir/summary.md" ]; then
   cat "$results_dir/summary.md"
   cp "$results_dir/summary.md" "$RUNNER_TEMP/compose-suite-summary.md"

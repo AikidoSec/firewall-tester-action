@@ -41,7 +41,8 @@ inputs:
     required: false
     default: '8080'
   max_parallel_tests:
-    description: Maximum number of tests run concurrently by the shared runner
+    description:
+      Maximum number of concurrent Compose operations and test workers
     required: false
     default: '20'
   config_update_delay:

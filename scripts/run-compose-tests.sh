@@ -106,7 +106,7 @@ compose=(
 )
 
 cleanup_compose_project() {
-  "${compose[@]}" down --timeout 0 -v --remove-orphans || true
+  "${compose[@]}" down --timeout 10 -v --remove-orphans || true
 }
 
 print_compose_diagnostics() {
@@ -260,7 +260,7 @@ echo "Compose services to start: ${#runtime_services[@]}"
 set +e
 "${compose[@]}" up \
   --no-build \
-  --timeout 0 \
+  --timeout 10 \
   --exit-code-from suite-runner \
   suite-runner \
   "${runtime_services[@]}"

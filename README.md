@@ -50,6 +50,10 @@ repository runs all Linux demo apps through a GitHub matrix.
 
 ## Running Locally
 
+Turn off ProtonVPN before running the suite. It is known to interfere with
+Docker networking and container DNS resolution, especially for Windows
+containers.
+
 Clone a demo app into `./zen-demo`:
 
 ```sh

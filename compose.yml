@@ -82,9 +82,10 @@ services:
 
   # Demo app image build target; tests run per-test app services from this image.
   demo-app-image:
-    extends:
-      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: app-template
+    image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
     profiles:
       - build
 

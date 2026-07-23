@@ -8,6 +8,9 @@ services:
       service: app-template
     env_file:
       - ./test.env
+    depends_on:
+      ssrf-mock-4000-test-ssrf-different-port:
+        condition: service_healthy
     environment:
       AIKIDO_TOKEN: AIK_RUNTIME_1_test-ssrf-different-port
       DATABASE_NAME: test-ssrf-different-port
@@ -15,6 +18,7 @@ services:
         '${DATABASE_URL_PREFIX:?Set
         DATABASE_URL_PREFIX}test-ssrf-different-port${DATABASE_URL_SUFFIX:?Set
         DATABASE_URL_SUFFIX}'
+    network_mode: service:ssrf-mock-4000-test-ssrf-different-port
 
   # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf-mock-4000-test-ssrf-different-port:
@@ -25,12 +29,12 @@ services:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: loopback-mock-template
-    depends_on:
-      test-ssrf-different-port:
-        condition: service_started
-    network_mode: service:test-ssrf-different-port
     environment:
       HOST: 127.0.0.1
       PORT: 4000
       READY_FILE: /tmp/ssrf-mock-ready
       RESPONSE_BODY: '{"status":"ok"}'
+    networks:
+      default:
+        aliases:
+          - test-ssrf-different-port

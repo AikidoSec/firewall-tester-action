@@ -258,19 +258,8 @@ up_args=(
 )
 
 if [ -n "$TEST_NAME" ] || [ -n "$RUN_TESTS" ] || [ -n "$SKIP_TESTS" ]; then
-  runtime_services=()
-  for test_name in "${tests_to_run[@]}"; do
-    runtime_services+=("$test_name")
-    # Include test-specific sidecars; reverse dependencies are not started with
-    # the test service automatically.
-    while IFS= read -r service; do
-      if [[ "$service" == *-"$test_name" ]]; then
-        runtime_services+=("$service")
-      fi
-    done <<< "$all_services"
-  done
-  echo "Compose services to start: ${#runtime_services[@]}"
-  up_args+=(suite-runner "${runtime_services[@]}")
+  echo "Compose services to start: ${#tests_to_run[@]}"
+  up_args+=(suite-runner "${tests_to_run[@]}")
 else
   echo "Compose profile: $active_test_profile"
 fi

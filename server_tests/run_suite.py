@@ -237,7 +237,7 @@ def test_environment(test_name: str) -> dict[str, str]:
         }
     )
     if test_name in {"test-stored-ssrf", "test-stored-ssrf-no-context"}:
-        environment["TEST_DNS_MOCK_URL"] = f"http://{app_host}:8053"
+        environment["TEST_DNS_MOCK_URL"] = f"http://dns-mock-{test_name}:8053"
     if test_name == "test-logs-sensitive-data":
         environment["TEST_APP_LOG_FILE"] = str(
             Path(os.environ["TEST_LOG_DIR"]) / "test-logs-sensitive-data.log"

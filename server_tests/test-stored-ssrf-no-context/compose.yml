@@ -11,6 +11,8 @@ services:
     depends_on:
       imds-mock:
         condition: service_healthy
+      dns-mock-test-stored-ssrf-no-context:
+        condition: service_healthy
     environment:
       AIKIDO_TOKEN: AIK_RUNTIME_1_test-stored-ssrf-no-context
       DATABASE_NAME: test-stored-ssrf-no-context
@@ -19,7 +21,8 @@ services:
         DATABASE_URL_PREFIX}test-stored-ssrf-no-context${DATABASE_URL_SUFFIX:?Set
         DATABASE_URL_SUFFIX}'
     dns:
-      - 127.0.0.1
+      - ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
+        STORED_SSRF_NO_CONTEXT_DNS_IPV4}
     networks:
       default: null
       imds-aws:
@@ -37,7 +40,7 @@ services:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: dns-mock-template
-    depends_on:
-      test-stored-ssrf-no-context:
-        condition: service_started
-    network_mode: service:test-stored-ssrf-no-context
+    networks:
+      default:
+        ipv4_address: ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
+          STORED_SSRF_NO_CONTEXT_DNS_IPV4}

@@ -4,16 +4,20 @@ import requests
 import argparse
 from core_api import CoreApi
 import json
-import subprocess
 import random
 import string
 import inspect
 import os
 import http.client
 import re
+from urllib.parse import quote
 
 _sessions = {}
 _raw_connections = {}
+TEST_SERVER_HOST = os.environ.get("TEST_SERVER_HOST", "localhost")
+TEST_CORE_HOST = os.environ.get("TEST_CORE_HOST", "localhost")
+TEST_CONTROL_SERVER_HOST = os.environ.get("TEST_CONTROL_SERVER_HOST", TEST_SERVER_HOST)
+TEST_APP_LOG_FILE = os.environ.get("TEST_APP_LOG_FILE")
 
 
 def get_session(port):
@@ -22,23 +26,28 @@ def get_session(port):
     return _sessions[port]
 
 
-def get_raw_connection(port):
-    if port not in _raw_connections:
-        _raw_connections[port] = http.client.HTTPConnection("localhost", port)
-    return _raw_connections[port]
+def get_raw_connection(port, host=TEST_SERVER_HOST, timeout=100):
+    key = (host, port)
+    if key not in _raw_connections:
+        _raw_connections[key] = http.client.HTTPConnection(host, port, timeout=timeout)
+    return _raw_connections[key]
 
 
-def wrap_raw_response(raw_response, port, route):
+def percent_encode_non_ascii(route):
+    return "".join(char if char.isascii() else quote(char) for char in route)
+
+
+def wrap_raw_response(raw_response, port, route, host=TEST_SERVER_HOST):
     response = requests.Response()
     response.status_code = raw_response.status
     response.headers = requests.structures.CaseInsensitiveDict(raw_response.getheaders())
     response._content = raw_response.read()
-    response.url = f"http://localhost:{port}{route}"
+    response.url = f"http://{host}:{port}{route}"
     response.read = lambda: response.content
     return response
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET"):
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET", host=TEST_SERVER_HOST, timeout=100):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
@@ -46,17 +55,17 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     for attempt in range(3):
         try:
             if raw:
-                conn = get_raw_connection(port)
-                conn.request(method, route, headers=headers)
+                conn = get_raw_connection(port, host, timeout)
+                conn.request(method, percent_encode_non_ascii(route), headers=headers)
                 raw_response = conn.getresponse()
-                r = wrap_raw_response(raw_response, port, route)
+                r = wrap_raw_response(raw_response, port, route, host)
             else:
-                r = get_session(port).get(f"http://localhost:{port}{route}", headers=headers)
+                r = get_session(port).get(f"http://{host}:{port}{route}", headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
             if raw:
-                conn = _raw_connections.pop(port, None)
+                conn = _raw_connections.pop((host, port), None)
                 if conn is not None:
                     conn.close()
             if attempt == 2:  # Last attempt
@@ -74,14 +83,14 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     return r
 
 
-def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100):
+def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100, host=TEST_SERVER_HOST):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
 
     for attempt in range(3):
         try:
-            r = requests.post(f"http://localhost:{port}{route}",
+            r = requests.post(f"http://{host}:{port}{route}",
                               json=data, headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
@@ -97,8 +106,8 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
     return r
 
 
-def localhost_request_request(port, method, route, data, headers, benchmark, timeout):
-    return requests.request(method, f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
+def localhost_request_request(port, method, route, data, headers, benchmark, timeout, host=TEST_SERVER_HOST):
+    return requests.request(method, f"http://{host}:{port}{route}", json=data, headers=headers, timeout=timeout)
 
 
 def init_server_and_core():
@@ -108,12 +117,11 @@ def init_server_and_core():
     parser.add_argument("--control_server_port", type=int, required=False)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
-    parser.add_argument("--config_update_delay", type=int, default=60)
     args = parser.parse_args()
 
     server = TestServer(port=args.server_port, token=args.token)
-    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
-                   config_update_delay=args.config_update_delay)
+    core = CoreApi(token=args.token, core_url=f"http://{TEST_CORE_HOST}:{args.core_port}",
+                   test_name=args.test_name)
     if args.control_server_port:
         control_server = TestControlServer(port=args.control_server_port)
         return args, server, core, control_server
@@ -140,7 +148,7 @@ class TestControlServer:
 
     def check_health(self):
         for i in range(5):
-            r = localhost_get_request(self.port, "/health")
+            r = localhost_get_request(self.port, "/health", host=TEST_CONTROL_SERVER_HOST)
             if r and r.status_code == 200:
                 break
             time.sleep((i + 1) * 3)
@@ -150,7 +158,7 @@ class TestControlServer:
             r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
 
     def status_is_running(self, running: bool):
-        r = localhost_get_request(self.port, "/status")
+        r = localhost_get_request(self.port, "/status", host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Status check failed: {r.text}")
         if running:
             assert_response_body_contains(
@@ -160,67 +168,67 @@ class TestControlServer:
                 r, "stopped", f"Server is not stopped {r.text}")
 
     def start_server(self):
-        r = localhost_post_request(self.port, "/start_server", {})
+        r = localhost_post_request(self.port, "/start_server", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Start server failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
         time.sleep(3)
 
     def stop_server(self):
-        r = localhost_post_request(self.port, "/stop_server", {})
+        r = localhost_post_request(self.port, "/stop_server", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(
             r, 200, f"Stop server failed: {r.text} {self.get_server_logs()}")
         assert_response_body_contains(
             r, "\"is_running\":false", message=f"Server is not stopped {self.get_server_logs()}")
 
     def restart(self):
-        r = localhost_post_request(self.port, "/restart", {})
+        r = localhost_post_request(self.port, "/restart", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Restart failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
 
     def graceful_restart(self):
-        r = localhost_post_request(self.port, "/graceful-restart", {})
+        r = localhost_post_request(self.port, "/graceful-restart", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Graceful restart failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
         time.sleep(3)
 
     def graceful_stop_server(self):
-        r = localhost_post_request(self.port, "/graceful-stop", {})
+        r = localhost_post_request(self.port, "/graceful-stop", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
         time.sleep(3)
 
     def get_server_logs(self, type="error", lines=1000):
         response = localhost_get_request(
-            self.port, f"/get-server-logs?type={type}&lines={lines}")
+            self.port, f"/get-server-logs?type={type}&lines={lines}", host=TEST_CONTROL_SERVER_HOST)
         return response.text if response else None
 
     def uninstall_aikido(self):
-        r = localhost_post_request(self.port, "/uninstall-aikido", {})
+        r = localhost_post_request(self.port, "/uninstall-aikido", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Uninstall aikido failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Uninstall aikido failed: {r.text}")
 
     def install_aikido(self):
-        r = localhost_post_request(self.port, "/install-aikido", {})
+        r = localhost_post_request(self.port, "/install-aikido", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Install aikido failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Install aikido failed: {r.text}")
 
     def install_aikido_version(self, version: str):
         r = localhost_post_request(
-            self.port, "/install-aikido-version", {"version": version})
+            self.port, "/install-aikido-version", {"version": version}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(
             r, 200, f"Install aikido version failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Install aikido version failed: {r.text}")
 
     def config_test(self):
-        return localhost_get_request(self.port, "/config-test")
+        return localhost_get_request(self.port, "/config-test", host=TEST_CONTROL_SERVER_HOST)
 
     def kill_agent(self):
-        r = localhost_post_request(self.port, "/kill-aikido-agent", {})
+        r = localhost_post_request(self.port, "/kill-aikido-agent", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Kill aikido agent failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Kill aikido agent failed: {r.text}")
@@ -231,11 +239,11 @@ class TestServer:
         self.port = port
         self.token = token
 
-    def get(self, route="", headers={}, benchmark=False):
-        return localhost_get_request(self.port, route, headers, benchmark)
+    def get(self, route="", headers={}, benchmark=False, timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, timeout=timeout)
 
-    def get_raw(self, route="", headers={}, benchmark=False, method="GET"):
-        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method)
+    def get_raw(self, route="", headers={}, benchmark=False, method="GET", timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method, timeout=timeout)
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
@@ -244,10 +252,17 @@ class TestServer:
         return localhost_request_request(self.port, method, route, data, headers, benchmark, timeout)
 
     def get_logs(self, container_name: str):
-        # this gets the logs from the server (docker logs <container_name>)
-        logs = subprocess.check_output(
-            ["docker", "logs", container_name], stderr=subprocess.STDOUT)
-        return logs.decode("utf-8")
+        if not TEST_APP_LOG_FILE:
+            raise RuntimeError("TEST_APP_LOG_FILE is required to read app logs")
+
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if os.path.exists(TEST_APP_LOG_FILE):
+                with open(TEST_APP_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                    return f.read()
+            time.sleep(0.5)
+
+        raise RuntimeError(f"App log file does not exist: {TEST_APP_LOG_FILE}")
 
 
 def assert_event_contains_subset(event, event_subset, dry_mode=False, _path=""):

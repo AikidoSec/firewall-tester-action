@@ -1,0 +1,6 @@
+{
+  "block": true,
+  "heartbeatIntervalInMS": 60000,
+  "receivedAnyStats": false,
+  "allowedIPAddresses": ["2.16.53.10"]
+}

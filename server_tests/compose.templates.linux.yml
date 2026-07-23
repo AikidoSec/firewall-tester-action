@@ -1,0 +1,151 @@
+services:
+  suite-runner-template:
+    image: ${TEST_RUNNER_IMAGE:?Set TEST_RUNNER_IMAGE}
+    build:
+      context: ..
+      dockerfile: server_tests/Dockerfile.runner
+    volumes:
+      - ..:/workspace:ro
+      - type: bind
+        source: ${RUNNER_TEMP_COMPOSE:?Set RUNNER_TEMP_COMPOSE}
+        target: /results
+      - type: volume
+        source: test-logs-sensitive-data-logs
+        target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
+        read_only: true
+    working_dir: /workspace/server_tests
+    environment:
+      WORKSPACE_ROOT: /workspace
+      SUITE_RESULTS_DIR: /results
+      SUITE_TESTS: ${SUITE_TESTS:-}
+      SUITE_SKIPPED_TESTS: ${SUITE_SKIPPED_TESTS:-}
+      SUITE_MAX_WORKERS: ${SUITE_MAX_WORKERS:-}
+      CORE_URL: ${CORE_URL:?Set CORE_URL}
+      CORE_HOST: ${CORE_HOST:?Set CORE_HOST}
+      POSTGRES_HOST: ${POSTGRES_HOST_IPV4:?Set POSTGRES_HOST_IPV4}
+      POSTGRES_PORT: 5432
+      POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_ADMIN_PASSWORD:
+        ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
+      TEST_LOG_DIR: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
+      APP_PORT: ${APP_PORT:-8080}
+      STARTUP_TIMEOUT: ${STARTUP_TIMEOUT:-600}
+      CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
+      CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
+      SKIP_IPV6_SSRF: ${SKIP_IPV6_SSRF:-0}
+    command:
+      - python
+      - /workspace/server_tests/run_suite.py
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if
+          os.path.exists('/results/setup-complete') else 1)
+      interval: 1s
+      timeout: 5s
+      retries: ${STARTUP_TIMEOUT:-600}
+    restart: 'no'
+
+  app-template: &app-template
+    profiles:
+      - all
+    image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
+    depends_on:
+      suite-runner:
+        condition: service_healthy
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
+    env_file:
+      - ${APP_ENV_FILE:-./empty.env}
+      - ${APP_ENV_FILE_2:-./empty.env}
+      - ./test.default.env
+    environment:
+      POSTGRES_USER: ${TEST_DB_USER:?Set TEST_DB_USER}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
+      PORT: ${APP_PORT:-8080}
+    restart: 'no'
+
+  control-app-template:
+    <<: *app-template
+    profiles:
+      - php-control
+
+  # IMDS responder for fixed metadata IPs used by SSRF tests.
+  imds-mock-template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command:
+      python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    environment:
+      PORT: 80
+      READY_FILE: /tmp/ssrf-imds-ready
+      RESPONSE_BODY: '{"Code": "Success"}'
+      ENABLE_IPV6: 1
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE'])
+          else 1)
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    networks:
+      imds-aws:
+        ipv4_address: 169.254.169.254
+      imds-alibaba:
+        ipv4_address: 100.100.100.200
+      imds-aws-ipv6:
+        ipv6_address: ${IMDS_AWS_IPV6_ADDRESS:?Set IMDS_AWS_IPV6_ADDRESS}
+
+  loopback-mock-template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command:
+      python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import os, sys; sys.exit(0 if os.path.exists(os.environ['READY_FILE'])
+          else 1)
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    restart: 'no'
+
+  dns-mock-template:
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    volumes:
+      - type: bind
+        source: .
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command: python ${PYTHON_DNS_MOCK_PATH:?Set PYTHON_DNS_MOCK_PATH}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8053/health',
+          timeout=1).read()
+      interval: 1s
+      timeout: 5s
+      retries: 30
+    restart: 'no'

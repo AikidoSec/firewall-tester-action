@@ -1,0 +1,56 @@
+services:
+  test-logs-sensitive-data:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-logs-sensitive-data
+      DATABASE_NAME: test-logs-sensitive-data
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-logs-sensitive-data${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
+    depends_on:
+      log-collector-test-logs-sensitive-data:
+        condition: service_started
+    logging:
+      driver: syslog
+      options:
+        syslog-address: tcp://${SYSLOG_COLLECTOR_HOST:-127.0.0.1}:${SYSLOG_COLLECTOR_PORT:-5514}
+        tag: '{{.Name}}'
+
+  log-collector-test-logs-sensitive-data:
+    profiles:
+      - all
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    environment:
+      SYSLOG_COLLECTOR_LOG_FILE:
+        ${TEST_LOG_DIR:?Set TEST_LOG_DIR}/test-logs-sensitive-data.log
+    volumes:
+      - type: bind
+        source: ..
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+      - type: volume
+        source: test-logs-sensitive-data-logs
+        target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
+    ports:
+      - '${SYSLOG_COLLECTOR_PORT:-5514}:5514'
+    command:
+      python ${PYTHON_SYSLOG_COLLECTOR_PATH:?Set PYTHON_SYSLOG_COLLECTOR_PATH}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import socket; socket.create_connection(('127.0.0.1', 5514),
+          1).close()
+      interval: 1s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  test-logs-sensitive-data-logs:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-test-logs-sensitive-data-logs

@@ -1,79 +1,107 @@
 # Firewall Tester Action
 
-This is an **internal validation framework** used to validate that firewall
-agents work correctly.  
-It runs QA tests against firewall agents in a Dockerized environment and checks
-expected behaviors like startup events, heartbeats, runtime protection.
+Internal validation framework for Aikido firewall agents. Tests are orchestrated
+with Docker Compose: a shared mock core, PostgreSQL database, and suite runner
+coordinate an isolated demo-app service for every selected test.
 
-## 🚀 Usage
+## Usage
+
+Run the full server test suite with the composite action:
 
 ```yaml
 jobs:
-  run-firewall-tests:
+  run-firewall-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Run Firewall QA Tests
-        uses: AikidoSec/firewall-tester-action@v1
+      - uses: actions/checkout@v4
         with:
-          dockerfile_path: ./test-app-dockerfiles/Dockerfile.hono
+          repository: Aikido-demo-apps/zen-demo-nodejs
+          path: ./zen-demo
+          ref: main
+
+      - uses: AikidoSec/firewall-tester-action@v1
+        with:
+          dockerfile_path: ./zen-demo/Dockerfile
+          app_port: 3000
+          build_args: |
+            AGENT_VERSION=1.2.3
+          skip_tests: test-stored-ssrf
 ```
 
-## 🧩 Inputs
+Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
+repository runs all Linux demo apps through a GitHub matrix.
 
-| Name                  | Description                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed (required)                                      |
-| `extra_args`          | Extra arguments to pass to the `docker run` command (`--env`, `-e`, and `--env-file` only are allowed) |
-| `extra_build_args`    | Extra arguments to pass to the `docker build` command (e.g. `--build-arg APP_VERSION=2.0.1`)           |
-| `app_port`            | The port exposed by the application during Docker runtime                                              |
-| `max_parallel_tests`  | Maximum number of tests to run in parallel (default: `5`)                                              |
-| `config_update_delay` | Delay (in seconds) after updating the config to ensure it's applied (default: `60`)                    |
-| `skip_tests`          | Comma-separated list of tests to skip (e.g. `test_allowed_ip,test_sql_injection`)                      |
-| `test_timeout`        | Timeout (in seconds) for each test (default: `60`)                                                     |
-| `sleep_before_test`   | Number of seconds to wait before starting the test (default: `1`)                                      |
+## Inputs
 
-## Running locally
+| Name                  | Description                                                     |
+| --------------------- | --------------------------------------------------------------- |
+| `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed          |
+| `test_name`           | Optional single test directory under `server_tests`             |
+| `run_tests`           | Optional comma-separated list of tests to run                   |
+| `test_suite`          | Compose profile selecting a suite (default: `all`)              |
+| `skip_tests`          | Optional comma-separated list of tests to skip                  |
+| `build_args`          | Optional newline-separated Docker build args for the demo image |
+| `app_port`            | Port exposed by the application during Docker runtime           |
+| `max_parallel_tests`  | Maximum concurrent Compose operations and tests (default: 20)   |
+| `config_update_delay` | Delay after runtime configuration updates (default: 60 seconds) |
+| `app_env_file`        | Optional env file passed to the application service             |
+| `app_env_file_2`      | Optional second env file passed to the application service      |
 
-You'll need Docker, Node.js >= 20, and Python 3.
+## Running Locally
 
-Clone the demo app you want to test into `./zen-demo/`:
+Clone a demo app into `./zen-demo`:
 
 ```sh
-git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo/zen-demo-nodejs
-# or whichever language you're working on
+git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 ```
 
-Then install dependencies:
+### macOS and Linux
+
+Run the full test suite using the same Compose path as the action:
 
 ```sh
-npm install
-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+DOCKERFILE_PATH=./zen-demo/Dockerfile \
+APP_PORT=3000 \
+bash ./scripts/run-compose-tests.sh
 ```
 
-Run tests for a language:
+Set `TEST_NAME=test-sql-injection` to run one test, or `TEST_SUITE=ssrf` to run
+a focused suite.
 
-```sh
-npm run local-action-nodejs
-npm run local-action-php
-npm run local-action-java
-npm run local-action-python
-npm run local-action-ruby
-npm run local-action-go
-npm run local-action-dotnet
+Turn off ProtonVPN before running the suite. It is known to interfere with
+Docker networking and container DNS resolution.
+
+### Windows
+
+On Windows, use the PowerShell wrapper:
+
+```powershell
+.\scripts\run-compose-tests.ps1 `
+  -DockerfilePath .\zen-demo\Dockerfile `
+  -AppPort 3000
 ```
 
-To run a single test, pass the name after `--`:
+Add `-TestName test-sql-injection` to run one test, or `-TestSuite ssrf` to run
+a focused suite.
 
-```sh
-npm run local-action-nodejs -- test_sql_injection
-npm run local-action-php -- test_shell_injection,test_path_traversal
-```
+The PowerShell wrapper calls Git Bash, which must be installed and available.
+ProtonVPN is especially likely to interfere with Windows container networking,
+so turn it off before running the suite.
 
-Each language has a corresponding `.env.example.<lang>` file where you can
-adjust the Dockerfile path, parallelism, timeouts, etc.
+## Test Suites
+
+Suites are Docker Compose profiles. Tests can belong to more than one suite.
+
+| Suite              | Tests                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| `all`              | All tests supported by the standard demo-app contract      |
+| `attacks`          | Injection, traversal, wave attack, outbound and SSRF tests |
+| `ssrf`             | Direct and stored SSRF tests                               |
+| `policies`         | Rate limiting, IP, country, bypass and protection policies |
+| `core-integration` | Core connectivity, authentication and telemetry            |
+| `php-control`      | PHP/Apache installation and process lifecycle tests        |
+
+The `php-control` suite requires the specialized controllable PHP/Apache demo
+app and is not included in `all`.

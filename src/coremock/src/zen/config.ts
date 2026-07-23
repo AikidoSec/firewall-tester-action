@@ -10,6 +10,8 @@ const configs: {
   allowedIPAddresses: string[]
   receivedAnyStats: boolean
 }[] = []
+const sentConfigVersions = new Map<number, number>()
+const deliveredConfigVersions = new Map<number, number>()
 
 function generateConfig(app: AppData) {
   return {
@@ -32,6 +34,31 @@ export function getAppConfig(app: AppData) {
   const newConf = generateConfig(app)
   configs.push(newConf)
   return newConf
+}
+
+export function markAppConfigSent(app: AppData, configUpdatedAt: number) {
+  const previousVersion = sentConfigVersions.get(app.id) ?? 0
+  sentConfigVersions.set(app.id, Math.max(previousVersion, configUpdatedAt))
+}
+
+export function markAppConfigDelivered(app: AppData) {
+  const configUpdatedAt = sentConfigVersions.get(app.id)
+  if (configUpdatedAt === undefined) {
+    return
+  }
+
+  const previousVersion = deliveredConfigVersions.get(app.id) ?? 0
+  deliveredConfigVersions.set(
+    app.id,
+    Math.max(previousVersion, configUpdatedAt)
+  )
+}
+
+export function getAppConfigDelivery(app: AppData) {
+  return {
+    configUpdatedAt: getAppConfig(app).configUpdatedAt,
+    deliveredConfigUpdatedAt: deliveredConfigVersions.get(app.id) ?? 0
+  }
 }
 
 export function updateAppConfig(

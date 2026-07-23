@@ -1,5 +1,8 @@
 services:
-  app-test-ssrf:
+  test-ssrf:
+    profiles:
+      - attacks
+      - ssrf
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
@@ -25,13 +28,17 @@ services:
 
   # Loopback responder for payloads targeting this app container's 127.0.0.1:4000.
   ssrf-mock-4000-test-ssrf:
+    profiles:
+      - all
+      - attacks
+      - ssrf
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: loopback-mock-template
     depends_on:
-      app-test-ssrf:
+      test-ssrf:
         condition: service_started
-    network_mode: service:app-test-ssrf
+    network_mode: service:test-ssrf
     environment:
       HOST: 127.0.0.1
       PORT: 4000

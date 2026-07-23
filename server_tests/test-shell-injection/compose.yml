@@ -1,5 +1,7 @@
 services:
-  app-test-shell-injection:
+  test-shell-injection:
+    profiles:
+      - attacks
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

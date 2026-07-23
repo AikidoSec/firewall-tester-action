@@ -1,8 +1,8 @@
 services:
-  app-control-test-graceful-stop:
+  control-test-graceful-stop:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: app-template
+      service: control-app-template
     env_file:
       - ./test.env
     environment:

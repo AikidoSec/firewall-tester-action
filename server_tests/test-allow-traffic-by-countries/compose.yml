@@ -1,5 +1,7 @@
 services:
-  app-test-allow-traffic-by-countries:
+  test-allow-traffic-by-countries:
+    profiles:
+      - policies
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

@@ -9,7 +9,7 @@ param(
     [string] $RunTests = $env:RUN_TESTS,
     [string] $SkipTests = $env:SKIP_TESTS,
     [string] $TestName = $env:TEST_NAME,
-    [string] $TestType = $env:TEST_TYPE,
+    [string] $TestSuite = $env:TEST_SUITE,
     [string] $Command = 'run'
 )
 
@@ -53,7 +53,7 @@ $env:MAX_PARALLEL_TESTS = $MaxParallelTests
 $env:RUN_TESTS = $RunTests
 $env:SKIP_TESTS = $SkipTests
 $env:TEST_NAME = $TestName
-$env:TEST_TYPE = $TestType
+$env:TEST_SUITE = $TestSuite
 
 $script = Join-Path $PSScriptRoot 'run-compose-tests.sh'
 & $bash $script $Command

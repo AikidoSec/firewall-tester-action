@@ -31,7 +31,7 @@ RUNNER_TEMP="${RUNNER_TEMP:-$action_path/.tmp}"
 SKIP_TESTS="${SKIP_TESTS:-}"
 STARTUP_TIMEOUT="${STARTUP_TIMEOUT:-600}"
 TEST_NAME="${TEST_NAME:-}"
-TEST_TYPE="${TEST_TYPE:-server}"
+TEST_SUITE="${TEST_SUITE:-all}"
 
 if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
   echo "MAX_PARALLEL_TESTS must be a positive integer" >&2
@@ -98,12 +98,32 @@ runner_temp_absolute="$(cd "$RUNNER_TEMP" && pwd)"
 results_dir="$runner_temp_absolute/compose-suite-results"
 export RUNNER_TEMP_COMPOSE="$(compose_path "$results_dir")"
 
+active_test_profile="$TEST_SUITE"
+if [ -n "$TEST_NAME" ] || [ -n "$RUN_TESTS" ]; then
+  active_test_profile="*"
+fi
+
 compose=(
   docker compose
   --parallel "$MAX_PARALLEL_TESTS"
+  --profile "$active_test_profile"
   --env-file "$compose_env_file"
   -f "$compose_file"
 )
+
+all_services="$("${compose[@]}" config --services)"
+available_tests=()
+while IFS= read -r service; do
+  if [ -f "$action_path/server_tests/$service/test.py" ]; then
+    available_tests+=("$service")
+  fi
+done < <(sort <<< "$all_services")
+if [ "$active_test_profile" != "*" ] && [ "${#available_tests[@]}" -eq 0 ]; then
+  echo "Unknown test suite: $TEST_SUITE" >&2
+  echo "Available suites:" >&2
+  "${compose[@]}" config --profiles | grep -Fvx build >&2
+  exit 2
+fi
 
 cleanup_compose_project() {
   "${compose[@]}" down --timeout 10 -v --remove-orphans || true
@@ -141,11 +161,6 @@ if [ "$command" = "cleanup" ]; then
   exit 0
 fi
 
-if [ "$TEST_TYPE" != "server" ] && [ "$TEST_TYPE" != "control" ]; then
-  echo "TEST_TYPE must be either server or control" >&2
-  exit 2
-fi
-
 rm -rf "$results_dir"
 mkdir -p "$results_dir"
 : > "$RUNNER_TEMP/compose-test-failures"
@@ -167,19 +182,10 @@ cleanup_compose_project
 
 "${compose[@]}" build core suite-runner
 
-all_services="$("${compose[@]}" config --services)"
-
-service_exists() {
-  local expected="$1"
-  grep -Fxq "$expected" <<< "$all_services"
-}
-
 is_skipped_test() {
   local expected="$1"
   local candidate
-  local values=()
-  IFS=',' read -ra values <<< "$SKIP_TESTS"
-  for candidate in "${values[@]}"; do
+  for candidate in "${skip_test_names[@]}"; do
     candidate="$(trim "$candidate")"
     if [ "$candidate" = "$expected" ]; then
       return 0
@@ -189,9 +195,12 @@ is_skipped_test() {
 }
 
 selected_tests=()
+skip_test_names=()
+IFS=',' read -ra skip_test_names <<< "$SKIP_TESTS"
+
 add_selected_test() {
   local test_name="$1"
-  if ! service_exists "app-$test_name"; then
+  if ! printf '%s\n' "${available_tests[@]}" | grep -Fxq "$test_name"; then
     echo "Unknown test: $test_name" >&2
     exit 2
   fi
@@ -210,13 +219,7 @@ elif [ -n "$RUN_TESTS" ]; then
     fi
   done
 else
-  while IFS= read -r service; do
-    case "$TEST_TYPE:$service" in
-      server:app-test-*|control:app-control-test-*)
-        selected_tests+=("${service#app-}")
-        ;;
-    esac
-  done < <(printf '%s\n' "$all_services" | sort)
+  selected_tests=("${available_tests[@]}")
 fi
 
 tests_to_run=()
@@ -244,26 +247,36 @@ if [ "$IGNORE_FAILURES" != "true" ] && [ "$IGNORE_FAILURES" != "false" ]; then
   exit 2
 fi
 
-runtime_services=()
-for test_name in "${tests_to_run[@]}"; do
-  while IFS= read -r service; do
-    if [ "$service" = "app-$test_name" ] || [[ "$service" == *-"$test_name" ]]; then
-      runtime_services+=("$service")
-    fi
-  done <<< "$all_services"
-done
-
 echo "Selected tests: ${#selected_tests[@]}"
 echo "Tests to run: ${#tests_to_run[@]}"
-echo "Compose services to start: ${#runtime_services[@]}"
+
+up_args=(
+  up
+  --no-build
+  --timeout 10
+  --exit-code-from suite-runner
+)
+
+if [ -n "$TEST_NAME" ] || [ -n "$RUN_TESTS" ] || [ -n "$SKIP_TESTS" ]; then
+  runtime_services=()
+  for test_name in "${tests_to_run[@]}"; do
+    runtime_services+=("$test_name")
+    # Include test-specific sidecars; reverse dependencies are not started with
+    # the test service automatically.
+    while IFS= read -r service; do
+      if [[ "$service" == *-"$test_name" ]]; then
+        runtime_services+=("$service")
+      fi
+    done <<< "$all_services"
+  done
+  echo "Compose services to start: ${#runtime_services[@]}"
+  up_args+=(suite-runner "${runtime_services[@]}")
+else
+  echo "Compose profile: $active_test_profile"
+fi
 
 set +e
-"${compose[@]}" up \
-  --no-build \
-  --timeout 10 \
-  --exit-code-from suite-runner \
-  suite-runner \
-  "${runtime_services[@]}"
+"${compose[@]}" "${up_args[@]}"
 suite_status=$?
 set -e
 

@@ -1,5 +1,7 @@
 services:
-  app-test-wave-attack:
+  test-wave-attack:
+    profiles:
+      - attacks
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

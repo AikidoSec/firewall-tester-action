@@ -1,5 +1,8 @@
 services:
-  app-test-aikido-disable:
+  test-aikido-disable:
+    profiles:
+      - policies
+      - core-integration
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

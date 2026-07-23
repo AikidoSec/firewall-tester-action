@@ -1,8 +1,8 @@
 services:
-  app-control-test-restart:
+  control-test-restart:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
-      service: app-template
+      service: control-app-template
     env_file:
       - ./test.env
     environment:

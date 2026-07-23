@@ -1,5 +1,7 @@
 services:
-  app-test-bypassed-ip-for-rate-limiting:
+  test-bypassed-ip-for-rate-limiting:
+    profiles:
+      - policies
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

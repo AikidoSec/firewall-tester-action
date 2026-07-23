@@ -40,6 +40,7 @@ repository runs all Linux demo apps through a GitHub matrix.
 | `dockerfile_path`     | Path to the Dockerfile with the Aikido agent installed          |
 | `test_name`           | Optional single test directory under `server_tests`             |
 | `run_tests`           | Optional comma-separated list of tests to run                   |
+| `test_suite`          | Compose profile selecting a suite (default: `all`)              |
 | `skip_tests`          | Optional comma-separated list of tests to skip                  |
 | `build_args`          | Optional newline-separated Docker build args for the demo image |
 | `app_port`            | Port exposed by the application during Docker runtime           |
@@ -50,31 +51,57 @@ repository runs all Linux demo apps through a GitHub matrix.
 
 ## Running Locally
 
-Turn off ProtonVPN before running the suite. It is known to interfere with
-Docker networking and container DNS resolution, especially for Windows
-containers.
-
 Clone a demo app into `./zen-demo`:
 
 ```sh
 git clone git@github.com:Aikido-demo-apps/zen-demo-nodejs.git zen-demo
 ```
 
-Run the same Compose path used by the action:
+### macOS and Linux
 
-```powershell
-.\scripts\run-compose-tests.ps1 `
-  -DockerfilePath .\zen-demo\Dockerfile `
-  -AppPort 3000 `
-  -TestName test-sql-injection
-```
-
-The PowerShell wrapper calls Git Bash. You can also call the bash script
-directly:
+Run the full test suite using the same Compose path as the action:
 
 ```sh
 DOCKERFILE_PATH=./zen-demo/Dockerfile \
 APP_PORT=3000 \
-TEST_NAME=test-sql-injection \
 bash ./scripts/run-compose-tests.sh
 ```
+
+Set `TEST_NAME=test-sql-injection` to run one test, or `TEST_SUITE=ssrf` to run
+a focused suite.
+
+Turn off ProtonVPN before running the suite. It is known to interfere with
+Docker networking and container DNS resolution.
+
+### Windows
+
+On Windows, use the PowerShell wrapper:
+
+```powershell
+.\scripts\run-compose-tests.ps1 `
+  -DockerfilePath .\zen-demo\Dockerfile `
+  -AppPort 3000
+```
+
+Add `-TestName test-sql-injection` to run one test, or `-TestSuite ssrf` to run
+a focused suite.
+
+The PowerShell wrapper calls Git Bash, which must be installed and available.
+ProtonVPN is especially likely to interfere with Windows container networking,
+so turn it off before running the suite.
+
+## Test Suites
+
+Suites are Docker Compose profiles. Tests can belong to more than one suite.
+
+| Suite              | Tests                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| `all`              | All tests supported by the standard demo-app contract      |
+| `attacks`          | Injection, traversal, wave attack, outbound and SSRF tests |
+| `ssrf`             | Direct and stored SSRF tests                               |
+| `policies`         | Rate limiting, IP, country, bypass and protection policies |
+| `core-integration` | Core connectivity, authentication and telemetry            |
+| `php-control`      | PHP/Apache installation and process lifecycle tests        |
+
+The `php-control` suite requires the specialized controllable PHP/Apache demo
+app and is not included in `all`.

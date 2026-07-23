@@ -38,10 +38,6 @@ def token_for(test_name: str) -> str:
     return f"AIK_RUNTIME_1_{test_name}"
 
 
-def app_host_for(test_name: str) -> str:
-    return f"app-{test_name}"
-
-
 def control_server_port() -> str:
     return os.environ.get("CONTROL_SERVER_PORT") or "8081"
 
@@ -228,7 +224,7 @@ def wait_for_startup_config(test_name: str, output, deadline: float) -> None:
 
 def test_environment(test_name: str) -> dict[str, str]:
     environment = os.environ.copy()
-    app_host = app_host_for(test_name)
+    app_host = test_name
     environment.update(
         {
             "PYTHONPATH": str(SERVER_TESTS),
@@ -252,7 +248,7 @@ def test_environment(test_name: str) -> dict[str, str]:
 def run_test(test_name: str) -> dict:
     started = time.monotonic()
     log_path = RESULTS / f"{test_name}.log"
-    app_host = app_host_for(test_name)
+    app_host = test_name
     app_port = os.environ.get("APP_PORT", "8080")
     startup_timeout = int(os.environ.get("STARTUP_TIMEOUT", "600"))
     startup_deadline = time.monotonic() + startup_timeout

@@ -1,5 +1,7 @@
 services:
-  app-test-rate-limiting-group-id-1-minute:
+  test-rate-limiting-group-id-1-minute:
+    profiles:
+      - policies
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

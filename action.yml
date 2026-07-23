@@ -18,10 +18,16 @@ inputs:
     default: ''
   run_tests:
     description:
-      Optional comma-separated list of tests to run. If omitted, all tests for
-      the selected test type are run.
+      Optional comma-separated list of tests to run. If omitted, the selected
+      test suite is run.
     required: false
     default: ''
+  test_suite:
+    description:
+      Compose profile selecting the test suite when test_name/run_tests are not
+      set.
+    required: false
+    default: 'all'
   skip_tests:
     description: Optional comma-separated list of test names to skip.
     required: false
@@ -57,11 +63,6 @@ inputs:
     description: Optional second env file passed to the application service
     required: false
     default: ''
-  test_type:
-    description: Test suite to run when test_name/run_tests are not set.
-    required: false
-    default: 'server'
-
 runs:
   using: composite
   steps:
@@ -79,7 +80,7 @@ runs:
         RUN_TESTS: ${{ inputs.run_tests }}
         SKIP_TESTS: ${{ inputs.skip_tests }}
         TEST_NAME: ${{ inputs.test_name }}
-        TEST_TYPE: ${{ inputs.test_type }}
+        TEST_SUITE: ${{ inputs.test_suite }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-compose-tests.sh"
 
     - name: Clean up Compose tests
@@ -90,5 +91,7 @@ runs:
         APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
         APP_PORT: ${{ inputs.app_port }}
         DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+        RUN_TESTS: ${{ inputs.run_tests }}
         TEST_NAME: ${{ inputs.test_name }}
+        TEST_SUITE: ${{ inputs.test_suite }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-compose-tests.sh" cleanup

@@ -1,5 +1,7 @@
 services:
-  app-test-invalid-token:
+  test-invalid-token:
+    profiles:
+      - core-integration
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

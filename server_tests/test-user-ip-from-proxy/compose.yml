@@ -1,5 +1,7 @@
 services:
-  app-test-user-ip-from-proxy:
+  test-user-ip-from-proxy:
+    profiles:
+      - core-integration
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

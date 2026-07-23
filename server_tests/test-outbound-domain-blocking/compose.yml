@@ -1,5 +1,8 @@
 services:
-  app-test-outbound-domain-blocking:
+  test-outbound-domain-blocking:
+    profiles:
+      - attacks
+      - policies
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
@@ -23,6 +26,10 @@ services:
       - outbound-domain-blocking-test-outbound-domain-blocking
 
   mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
+    profiles:
+      - all
+      - attacks
+      - policies
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     volumes:
       - type: bind

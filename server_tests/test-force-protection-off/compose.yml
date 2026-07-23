@@ -1,5 +1,7 @@
 services:
-  app-test-force-protection-off:
+  test-force-protection-off:
+    profiles:
+      - policies
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

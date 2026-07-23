@@ -54,7 +54,9 @@ services:
       retries: ${STARTUP_TIMEOUT:-600}
     restart: 'no'
 
-  app-template:
+  app-template: &app-template
+    profiles:
+      - all
     image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     isolation: process
     depends_on:
@@ -85,6 +87,11 @@ services:
         & C:\ServiceMonitor.exe w3svc
         exit $$LASTEXITCODE
     restart: 'no'
+
+  control-app-template:
+    <<: *app-template
+    profiles:
+      - php-control
 
   # IMDS responder for fixed IPv4 metadata IPs used by SSRF tests.
   imds-mock-template:

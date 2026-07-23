@@ -1,5 +1,5 @@
 services:
-  app-test-demo-apps-generic-tests:
+  test-demo-apps-generic-tests:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

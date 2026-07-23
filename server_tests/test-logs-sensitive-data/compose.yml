@@ -1,5 +1,5 @@
 services:
-  app-test-logs-sensitive-data:
+  test-logs-sensitive-data:
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
@@ -22,6 +22,8 @@ services:
         tag: '{{.Name}}'
 
   log-collector-test-logs-sensitive-data:
+    profiles:
+      - all
     image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
     environment:
       SYSLOG_COLLECTOR_LOG_FILE:

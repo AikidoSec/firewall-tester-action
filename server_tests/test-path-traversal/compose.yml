@@ -1,5 +1,7 @@
 services:
-  app-test-path-traversal:
+  test-path-traversal:
+    profiles:
+      - attacks
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

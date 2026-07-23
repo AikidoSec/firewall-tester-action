@@ -50,7 +50,9 @@ services:
       retries: ${STARTUP_TIMEOUT:-600}
     restart: 'no'
 
-  app-template:
+  app-template: &app-template
+    profiles:
+      - all
     image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
     depends_on:
       suite-runner:
@@ -67,6 +69,11 @@ services:
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Set TEST_DB_PASSWORD}
       PORT: ${APP_PORT:-8080}
     restart: 'no'
+
+  control-app-template:
+    <<: *app-template
+    profiles:
+      - php-control
 
   # IMDS responder for fixed metadata IPs used by SSRF tests.
   imds-mock-template:

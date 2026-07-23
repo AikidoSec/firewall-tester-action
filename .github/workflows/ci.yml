@@ -160,5 +160,5 @@ jobs:
           app_port: 8080
           app_env_file: ./zen-demo/.env.example
           app_env_file_2: ./server_tests/app_env/php.env
-          test_type: control
+          test_suite: php-control
           ignore_failures: true

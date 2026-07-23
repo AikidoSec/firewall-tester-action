@@ -1,5 +1,8 @@
 services:
-  app-test-stored-ssrf:
+  test-stored-ssrf:
+    profiles:
+      - attacks
+      - ssrf
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template
@@ -27,10 +30,14 @@ services:
 
   # DNS responder with mutable per-test records for stored SSRF hostnames.
   dns-mock-test-stored-ssrf:
+    profiles:
+      - all
+      - attacks
+      - ssrf
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: dns-mock-template
     depends_on:
-      app-test-stored-ssrf:
+      test-stored-ssrf:
         condition: service_started
-    network_mode: service:app-test-stored-ssrf
+    network_mode: service:test-stored-ssrf

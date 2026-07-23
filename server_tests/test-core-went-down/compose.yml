@@ -1,5 +1,7 @@
 services:
-  app-test-core-went-down:
+  test-core-went-down:
+    profiles:
+      - core-integration
     extends:
       file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
       service: app-template

@@ -308,7 +308,7 @@ def tail(path: Path, line_count: int = 200) -> str:
         return f"Could not read {path}: {error}\n"
 
 
-def write_summary(results: list[dict], skipped: list[str], setup_seconds: float) -> None:
+def write_summary(results: list[dict], skipped: list[str]) -> None:
     ordered = sorted(results, key=lambda result: result["test"])
     passed = sum(result["status"] == "PASS" for result in ordered)
     failed = sum(result["status"] == "FAIL" for result in ordered)
@@ -316,7 +316,6 @@ def write_summary(results: list[dict], skipped: list[str], setup_seconds: float)
 
     print("\nTest Results Summary", flush=True)
     print("====================", flush=True)
-    print(f"Setup: {setup_seconds:.2f}s", flush=True)
     print(f"Total Tests: {total}", flush=True)
     print(f"Passed: {passed}", flush=True)
     print(f"Skipped: {len(skipped)}", flush=True)
@@ -332,7 +331,6 @@ def write_summary(results: list[dict], skipped: list[str], setup_seconds: float)
         print(f"{test_name:<55} SKIP       N/A Skipped", flush=True)
 
     summary = {
-        "setup_seconds": setup_seconds,
         "total": total,
         "passed": passed,
         "skipped": len(skipped),
@@ -345,7 +343,6 @@ def write_summary(results: list[dict], skipped: list[str], setup_seconds: float)
     markdown = [
         "## Test Results Summary",
         "",
-        f"- **Setup:** {setup_seconds:.2f}s",
         f"- **Total Tests:** {total}",
         f"- **Passed:** {passed}",
         f"- **Skipped:** {len(skipped)}",
@@ -396,7 +393,7 @@ def main() -> int:
             "error": str(exception),
             "log": "",
         }
-        write_summary([result], skipped, setup_seconds)
+        write_summary([result], skipped)
         print(f"SETUP FAILED: {exception}", flush=True)
         return 1
 
@@ -430,7 +427,7 @@ def main() -> int:
                     print(tail(Path(result["log"])), end="", flush=True)
                     print(f"--- end {result['test']} log ---", flush=True)
 
-    write_summary(results, skipped, setup_seconds)
+    write_summary(results, skipped)
     SUITE_COMPLETE.touch()
     return 1 if any(result["status"] == "FAIL" for result in results) else 0
 

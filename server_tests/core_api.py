@@ -94,8 +94,9 @@ class CoreApi:
         return False
 
     def wait_for_heartbeat_after(self, max_wait_time: int, old_events_length: int,
-                                 not_before_ms: int, max_heartbeats: int = 2):
-        """Prefer a post-traffic heartbeat, falling back to content validation."""
+                                 not_before_ms: int, max_heartbeats: int = 2,
+                                 predicate=None):
+        """Wait for a post-traffic heartbeat, optionally matching its content."""
         deadline = time.monotonic() + max_wait_time
         checked = 0
         candidates = []
@@ -109,7 +110,8 @@ class CoreApi:
                 heartbeat = candidates[checked]
                 checked += 1
                 ended_at = heartbeat.get("stats", {}).get("endedAt", 0)
-                if ended_at >= not_before_ms:
+                if ended_at >= not_before_ms and (
+                        predicate is None or predicate(heartbeat)):
                     return heartbeat, candidates
 
             if checked >= max_heartbeats:

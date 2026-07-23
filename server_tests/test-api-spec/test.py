@@ -79,8 +79,17 @@ def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi)
         collector.soft_assert_response_code_is(response, 200)
 
     traffic_finished_at = int(time.time() * 1000)
+
+    def contains_api_spec(heartbeat):
+        try:
+            assert_event_contains_subset_file(heartbeat, expected_json)
+            return True
+        except AssertionError:
+            return False
+
     heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at
+        160, len(start_events), traffic_finished_at,
+        predicate=contains_api_spec
     )
 
     if not collector.soft_assert(

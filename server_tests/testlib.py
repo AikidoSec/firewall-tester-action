@@ -97,6 +97,20 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
     return r
 
 
+def localhost_post_raw(port, route, body, headers={}, timeout=100):
+    """Send a POST with a raw body (bytes or string) and explicit headers."""
+    for attempt in range(3):
+        try:
+            r = requests.post(f"http://localhost:{port}{route}",
+                              data=body, headers=headers, timeout=timeout)
+            return r
+        except Exception as e:
+            print(f"Error (attempt {attempt + 1}/3): {e}")
+            if attempt == 2:
+                return requests.Response()
+            time.sleep(0.1)
+
+
 def localhost_request_request(port, method, route, data, headers, benchmark, timeout):
     return requests.request(method, f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
 
@@ -239,6 +253,9 @@ class TestServer:
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
+
+    def post_raw(self, route="", body=b"", headers={}, timeout=100):
+        return localhost_post_raw(self.port, route, body, headers, timeout)
 
     def request(self, method, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_request_request(self.port, method, route, data, headers, benchmark, timeout)

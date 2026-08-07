@@ -51,8 +51,7 @@ export function listsHandler(req: RequestWithAppData, res: Response) {
         : [],
     monitoredIPAddresses:
       monitoredIps.length > 0
-        ? monitoredIps
-        : [
+        ? [
             {
               key: 'geoip/Belgium;BE',
               source: 'geoip',
@@ -60,5 +59,6 @@ export function listsHandler(req: RequestWithAppData, res: Response) {
               ips: monitoredIps
             }
           ]
+        : []
   })
 }

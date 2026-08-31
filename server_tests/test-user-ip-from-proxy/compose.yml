@@ -8,6 +8,7 @@ services:
     env_file:
       - ./test.env
     environment:
+      AIKIDO_CLIENT_IP_HEADER: ${AIKIDO_CLIENT_IP_HEADER:-X-Real-IP}
       AIKIDO_TOKEN: AIK_RUNTIME_1_test-user-ip-from-proxy
       DATABASE_NAME: test-user-ip-from-proxy
       DATABASE_URL:

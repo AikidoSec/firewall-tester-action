@@ -63,6 +63,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-ruby
             ref: main
             app_port: 3000
+            aikido_client_ip_header: HTTP_X_REAL_IP
             app_env_file: ./server_tests/app_env/ruby.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
@@ -89,6 +90,8 @@ jobs:
 
       - name: Run Compose tests
         uses: ./
+        env:
+          AIKIDO_CLIENT_IP_HEADER: ${{ matrix.app.aikido_client_ip_header || 'X-Real-IP' }}
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           build_args: ${{ matrix.app.build_args }}

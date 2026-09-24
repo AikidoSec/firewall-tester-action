@@ -38,6 +38,16 @@ if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
+if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
+  echo "CONFIG_UPDATE_DELAY must be a non-negative integer" >&2
+  exit 2
+fi
+
+if [ "$IGNORE_FAILURES" != "true" ] && [ "$IGNORE_FAILURES" != "false" ]; then
+  echo "IGNORE_FAILURES must be true or false" >&2
+  exit 2
+fi
+
 container_os="$(docker info --format '{{.OSType}}')"
 if [ "$container_os" = "windows" ]; then
   compose_env_file="${COMPOSE_ENV_FILE:-$action_path/compose.windows.env}"
@@ -156,32 +166,6 @@ print_compose_diagnostics() {
   fi
 }
 
-if [ "$command" = "cleanup" ]; then
-  cleanup_compose_project
-  exit 0
-fi
-
-rm -rf "$results_dir"
-mkdir -p "$results_dir"
-: > "$RUNNER_TEMP/compose-test-failures"
-trap cleanup_compose_project EXIT
-
-build_arg_flags=()
-while IFS= read -r build_arg; do
-  build_arg="$(trim "$build_arg")"
-  if [ -n "$build_arg" ]; then
-    build_arg_flags+=(--build-arg "$build_arg")
-  fi
-done <<< "$BUILD_ARGS"
-
-cleanup_compose_project
-
-"${compose[@]}" --profile build build \
-  "${build_arg_flags[@]}" \
-  demo-app-image
-
-"${compose[@]}" build core suite-runner
-
 is_skipped_test() {
   local expected="$1"
   local candidate
@@ -237,15 +221,31 @@ export SUITE_TESTS="$(join_by_comma "${tests_to_run[@]}")"
 export SUITE_SKIPPED_TESTS="$(join_by_comma "${skipped_tests[@]}")"
 export SUITE_MAX_WORKERS="$MAX_PARALLEL_TESTS"
 
-if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
-  echo "CONFIG_UPDATE_DELAY must be a non-negative integer" >&2
-  exit 2
+if [ "$command" = "cleanup" ]; then
+  cleanup_compose_project
+  exit 0
 fi
 
-if [ "$IGNORE_FAILURES" != "true" ] && [ "$IGNORE_FAILURES" != "false" ]; then
-  echo "IGNORE_FAILURES must be true or false" >&2
-  exit 2
-fi
+rm -rf "$results_dir"
+mkdir -p "$results_dir"
+: > "$RUNNER_TEMP/compose-test-failures"
+trap cleanup_compose_project EXIT
+
+build_arg_flags=()
+while IFS= read -r build_arg; do
+  build_arg="$(trim "$build_arg")"
+  if [ -n "$build_arg" ]; then
+    build_arg_flags+=(--build-arg "$build_arg")
+  fi
+done <<< "$BUILD_ARGS"
+
+cleanup_compose_project
+
+"${compose[@]}" --profile build build \
+  "${build_arg_flags[@]}" \
+  demo-app-image
+
+"${compose[@]}" build core suite-runner
 
 echo "Selected tests: ${#selected_tests[@]}"
 echo "Tests to run: ${#tests_to_run[@]}"

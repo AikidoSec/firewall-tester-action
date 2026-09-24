@@ -83,15 +83,16 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     return r
 
 
-def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100, host=TEST_SERVER_HOST):
+def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100, host=TEST_SERVER_HOST, raw=False):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
+    payload = {"data": data} if raw else {"json": data}
 
     for attempt in range(3):
         try:
             r = requests.post(f"http://{host}:{port}{route}",
-                              json=data, headers=headers, timeout=timeout)
+                              **payload, headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
@@ -247,6 +248,9 @@ class TestServer:
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
+
+    def post_raw(self, route="", data="", headers={}, benchmark=False, timeout=100):
+        return localhost_post_request(self.port, route, data, headers, benchmark, timeout, raw=True)
 
     def request(self, method, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_request_request(self.port, method, route, data, headers, benchmark, timeout)

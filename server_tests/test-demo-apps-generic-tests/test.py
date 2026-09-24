@@ -4,8 +4,6 @@ from testlib import *
 from core_api import CoreApi
 import os
 import base64
-import sys
-sys.setrecursionlimit(40001)
 
 '''
 1. Check for user blocking.
@@ -13,13 +11,6 @@ sys.setrecursionlimit(40001)
 3. Send a very big request to the server.
 4. Send an sql injection payload to see if the server it's still working.
 '''
-
-
-def build_nested_dict(depth: int):
-    result = {"a": "b"}
-    for level in range(1, depth + 1):
-        result = {f"key{level}": result}
-    return result
 
 
 def build_nested_json_text(depth: int):
@@ -35,6 +26,15 @@ def create_token(json_data):
     else:
         payload = json.dumps(json_data)
     return f"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.{base64.b64encode(payload.encode()).decode()}.1234567890"
+
+
+def check_pets_after_attack(collector, s, response, description):
+    if not collector.soft_assert(get_response_status_code(response) is not None,
+                                 f"No HTTP response for {description}"):
+        return
+    pets = s.get("/api/pets/")
+    if collector.soft_assert_response_code_is(pets, 200, f"Reading pets after {description}"):
+        collector.soft_assert('Gru' not in pets.text, f"Bypass for {description}, pets: {pets.text}")
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -72,14 +72,10 @@ def run_test(s: TestServer, c: CoreApi):
         response, 500, f"Expected 500 for /api/create {response.text}")
 
     # ------ Big Nested JSON ------
-    json_data = build_nested_dict(8000)
-    body = {
-        "a": json_data,
-        "name": "Malicious Pet', 'Gru from the Minions') --"
-    }
-    response = s.post("/api/create", data=body)
-    pets = s.get("/api/pets/")
-    collector.soft_assert('Gru' not in pets.text, f"Bypass for big nested json, pets: {pets.text}")
+    body = '{"a":' + build_nested_json_text(8000) + ',"name":' + json.dumps(
+        "Malicious Pet', 'Gru from the Minions') --") + '}'
+    response = s.post_raw("/api/create", data=body, headers={"Content-Type": "application/json"})
+    check_pets_after_attack(collector, s, response, "big nested json")
 
     # ------ Big Nested JSON in token ------
     token = create_token(build_nested_json_text(8000))
@@ -88,8 +84,7 @@ def run_test(s: TestServer, c: CoreApi):
         "name": "Malicious Pet', 'Gru from the Minions') --"
     }
     response = s.post("/api/create", data=body)
-    pets = s.get("/api/pets/")
-    collector.soft_assert('Gru' not in pets.text, f"Bypass for big nested json in token, pets: {pets.text}")
+    check_pets_after_attack(collector, s, response, "big nested json in token")
 
     # ------ Token in token ------
     token = create_token({"a": "b"})
@@ -100,8 +95,7 @@ def run_test(s: TestServer, c: CoreApi):
         "name": "Malicious Pet', 'Gru from the Minions') --"
     }
     response = s.post("/api/create", data=body)
-    pets = s.get("/api/pets/")
-    collector.soft_assert('Gru' not in pets.text, f"Bypass for token in token, pets: {pets.text}")
+    check_pets_after_attack(collector, s, response, "token in token")
 
     collector.raise_if_failures()
 

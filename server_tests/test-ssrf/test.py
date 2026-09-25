@@ -82,9 +82,6 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json):
 
 def check_ssrf(collector, s, route, ip):
     response = s.post(route, {"url": ip}, timeout=10)
-    if not collector.soft_assert(get_response_status_code(response) is not None,
-                                 f"[{route}] No HTTP response for SSRF check: {ip!r}"):
-        return
     collector.soft_assert_response_code_is_not(
         response, 200, f"[{route}] SSRF check failed for {ip} {response.text}")
 

@@ -14,6 +14,11 @@ services:
         target: ${TEST_LOG_DIR:?Set TEST_LOG_DIR}
         read_only: true
     working_dir: /workspace/server_tests
+    extra_hosts:
+      core: ${CORE_HOST_IPV4}
+      postgres: ${POSTGRES_HOST_IPV4}
+      dns-mock-test-stored-ssrf: ${STORED_SSRF_DNS_IPV4}
+      dns-mock-test-stored-ssrf-no-context: ${STORED_SSRF_NO_CONTEXT_DNS_IPV4}
     environment:
       WORKSPACE_ROOT: /workspace
       SUITE_RESULTS_DIR: /results
@@ -22,7 +27,7 @@ services:
       SUITE_MAX_WORKERS: ${SUITE_MAX_WORKERS:-}
       CORE_URL: ${CORE_URL:?Set CORE_URL}
       CORE_HOST: ${CORE_HOST:?Set CORE_HOST}
-      POSTGRES_HOST: ${POSTGRES_HOST_IPV4:?Set POSTGRES_HOST_IPV4}
+      POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
       POSTGRES_ADMIN_PASSWORD:

@@ -26,7 +26,7 @@ services:
       SUITE_MAX_WORKERS: ${SUITE_MAX_WORKERS:-}
       CORE_URL: ${CORE_URL:?Set CORE_URL}
       CORE_HOST: ${CORE_HOST:?Set CORE_HOST}
-      POSTGRES_HOST: ${POSTGRES_HOST_IPV4:?Set POSTGRES_HOST_IPV4}
+      POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_ADMIN_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
       POSTGRES_ADMIN_PASSWORD:
@@ -39,9 +39,20 @@ services:
       CONFIG_UPDATE_DELAY: ${CONFIG_UPDATE_DELAY:-60}
       CONTROL_SERVER_PORT: ${CONTROL_SERVER_PORT:-}
       SKIP_IPV6_SSRF: ${SKIP_IPV6_SSRF:-0}
+    # Windows containers ignore extra_hosts, so write the mappings at startup.
     command:
-      - python
-      - C:\workspace\server_tests\run_suite.py
+      - powershell
+      - -NoProfile
+      - -Command
+      - |
+        Add-Content -Path "$$env:SystemRoot\System32\drivers\etc\hosts" -Value @(
+          "${CORE_HOST_IPV4} core",
+          "${POSTGRES_HOST_IPV4} postgres",
+          "${STORED_SSRF_DNS_IPV4} dns-mock-test-stored-ssrf",
+          "${STORED_SSRF_NO_CONTEXT_DNS_IPV4} dns-mock-test-stored-ssrf-no-context"
+        ) -ErrorAction Stop
+        python C:\workspace\server_tests\run_suite.py
+        exit $$LASTEXITCODE
     healthcheck:
       test:
         - CMD

@@ -77,6 +77,9 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     send_attacks(collector, 200, "")
 
     cs.graceful_restart()
+    # A pre-install keep-alive connection can still use an old Apache worker
+    # after a graceful restart.
+    get_session(s.port).close()
     send_attacks(collector, 500, "firewall has blocked")
 
     collector.raise_if_failures()

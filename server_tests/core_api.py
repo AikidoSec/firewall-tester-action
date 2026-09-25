@@ -119,7 +119,7 @@ class CoreApi:
 
             time.sleep(1)
 
-        return (candidates[-1] if candidates else None), candidates
+        return None, candidates
 
     def set_mock_server_down(self):
         response = requests.post(

@@ -185,19 +185,23 @@ def wait_for_app(test_name: str, app_host: str, output, deadline: float) -> None
     initial_url = f"http://{app_host}:{port}/"
     with requests.Session() as session:
         session.trust_env = False
-        remaining_seconds = deadline - time.monotonic()
-        if remaining_seconds <= 0:
-            raise RuntimeError("Startup deadline expired before the initial request")
-        response = session.get(
-            initial_url,
-            timeout=remaining_seconds,
-            allow_redirects=False,
-        )
-        print(
-            f"Initial request completed with HTTP {response.status_code}",
-            file=output,
-            flush=True,
-        )
+        while True:
+            remaining_seconds = deadline - time.monotonic()
+            if remaining_seconds <= 0:
+                raise RuntimeError(f"Startup deadline expired waiting for {initial_url}")
+            response = session.get(
+                initial_url,
+                timeout=remaining_seconds,
+                allow_redirects=False,
+            )
+            print(
+                f"Initial request completed with HTTP {response.status_code}",
+                file=output,
+                flush=True,
+            )
+            if response.status_code not in (502, 503, 504):
+                return
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
 
 
 def wait_for_startup_config(test_name: str, output, deadline: float) -> None:

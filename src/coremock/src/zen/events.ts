@@ -39,6 +39,7 @@ export function captureEvent(event: any, app: AppData) {
   }
 
   if (event.type === 'heartbeat') {
+    event.routes ??= []
     event.routes.forEach((route: any) => {
       route.apispec = normalizeTypesInApiSpec(route.apispec)
     })

@@ -43607,6 +43607,7 @@ function captureEvent(event, app2) {
     events.set(app2.id, []);
   }
   if (event.type === "heartbeat") {
+    event.routes ??= [];
     event.routes.forEach((route) => {
       route.apispec = normalizeTypesInApiSpec(route.apispec);
     });

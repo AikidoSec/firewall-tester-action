@@ -24,8 +24,6 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-nodejs
             ref: main
             app_port: 3000
-            app_env_file: ./server_tests/empty.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
@@ -33,8 +31,6 @@ jobs:
             app_port: 8080
             # 60s config poll + 15s worker cache refresh
             config_update_delay: 75
-            app_env_file: ./server_tests/empty.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
             ignore_failures: true
           - name: php
@@ -51,15 +47,11 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-dotnet-core
             ref: main
             app_port: 8080
-            app_env_file: ./server_tests/empty.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: main
             app_port: 8080
-            app_env_file: ./server_tests/empty.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
             ignore_failures: true
           - name: ruby
@@ -68,15 +60,12 @@ jobs:
             app_port: 3000
             aikido_client_ip_header: HTTP_X_REAL_IP
             app_env_file: ./server_tests/app_env/ruby.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
             ignore_failures: true
           - name: go
             repository: Aikido-demo-apps/zen-demo-go
             ref: main
             app_port: 3000
-            app_env_file: ./server_tests/empty.env
-            app_env_file_2: ./server_tests/empty.env
             build_args: ''
             ignore_failures: true
     steps:
@@ -141,8 +130,6 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 80
-          app_env_file: ./server_tests/empty.env
-          app_env_file_2: ./server_tests/empty.env
 
   control-tests-linux:
     name: php-control

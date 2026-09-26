@@ -31,6 +31,8 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-python
             ref: main
             app_port: 8080
+            # 60s config poll + 15s worker cache refresh
+            config_update_delay: 75
             app_env_file: ./server_tests/empty.env
             app_env_file_2: ./server_tests/empty.env
             build_args: ''
@@ -39,6 +41,7 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-php
             ref: main
             app_port: 8080
+            # 60s config poll + 60s request-processor refresh
             config_update_delay: 120
             app_env_file: ./zen-demo/.env.example
             app_env_file_2: ./server_tests/app_env/php.env

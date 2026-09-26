@@ -33,7 +33,7 @@ def check_event_is_submitted_shell_injection(
     candidate_events = []
     last_error = None
 
-    while time.monotonic() < deadline:
+    while True:
         all_events = c.get_events("detected_attack")
         new_events = all_events[len(start_events):]
         candidate_events = [
@@ -48,7 +48,10 @@ def check_event_is_submitted_shell_injection(
             except AssertionError as e:
                 last_error = e
 
-        time.sleep(1)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        time.sleep(min(1, remaining))
 
     collector.add_failure(
         f"Expected at least one new event matching '{expected_json}', "

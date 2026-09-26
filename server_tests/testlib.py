@@ -467,26 +467,26 @@ class AssertionCollector:
         actual = get_response_status_code(response)
         msg = f"Expected status {status_code}, got {actual}"
         if message:
-            msg += f" ({message})"
+            msg += f"; {message}"
         return self.soft_assert(actual == status_code, msg)
 
     def soft_assert_response_code_is_not(self, response, status_code, message=None):
         actual = get_response_status_code(response)
         msg = f"Status code should not be {status_code}, got {actual}"
         if message:
-            msg += f" ({message})"
+            msg += f"; {message}"
         return self.soft_assert(actual != status_code, msg)
 
     def soft_assert_response_body_contains(self, response, text, message=None):
         msg = f"Text '{text}' is not part of response body"
         if message:
-            msg += f" ({message})"
+            msg += f"; {message}"
         return self.soft_assert(text in response.text, msg)
 
     def soft_assert_response_body_does_not_contain(self, response, text, message=None):
         msg = f"Text '{text}' is part of response body"
         if message:
-            msg += f" ({message})"
+            msg += f"; {message}"
         return self.soft_assert(text not in response.text, msg)
 
     @property

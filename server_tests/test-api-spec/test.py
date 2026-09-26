@@ -74,17 +74,27 @@ def get_api_spec_simple():
 
 def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi):
     start_events = c.get_events("heartbeat")
+    # Keep both requests in the same heartbeat so their schemas can be merged.
+    if not collector.soft_assert(
+            c.wait_for_new_events(160, len(start_events), "heartbeat"),
+            "Expected a fresh heartbeat before sending API-schema test requests"):
+        return
+    start_events = c.get_events("heartbeat")
+
     for fn in fns:
         response = s.post(*fn())
         collector.soft_assert_response_code_is(response, 200)
 
     traffic_finished_at = int(time.time() * 1000)
+    last_error = None
 
     def contains_api_spec(heartbeat):
+        nonlocal last_error
         try:
             assert_event_contains_subset_file(heartbeat, expected_json)
             return True
-        except AssertionError:
+        except AssertionError as e:
+            last_error = e
             return False
 
     heartbeat, candidates = c.wait_for_heartbeat_after(
@@ -94,6 +104,7 @@ def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi)
 
     if not collector.soft_assert(
             heartbeat is not None,
+            str(last_error) if last_error is not None else
             f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
         return
     try:

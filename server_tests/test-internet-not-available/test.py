@@ -24,7 +24,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response,
         500,
-        f"Agent did not start blocking before timeout. Last response: {response.text if response else 'no response'}",
+        "Agent did not start blocking before timeout",
     )
     collector.raise_if_failures()
 

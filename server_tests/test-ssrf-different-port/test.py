@@ -16,7 +16,7 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.post("/api/request_different_port",
                       {"url": "http://127.0.0.1:4001", "port": "4000"})
     collector.soft_assert_response_code_is(
-        response, 200, f"Aikido Zen should not block the request {response.text}")
+        response, 200, "Aikido Zen should not block the request")
     collector.raise_if_failures()
 
 

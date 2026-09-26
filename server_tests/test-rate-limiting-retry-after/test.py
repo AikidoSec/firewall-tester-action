@@ -42,7 +42,7 @@ def run_test(s: TestServer, c: CoreApi):
         has_header = collector.soft_assert(
             response is not None and "Retry-After" in response.headers,
             f"Rate-limited response {i+1}/5 missing Retry-After header "
-            f"(headers: {dict(response.headers) if response else 'None'})")
+            f"(headers: {dict(response.headers)})")
 
         if has_header:
             retry_after = response.headers["Retry-After"]

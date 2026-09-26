@@ -22,6 +22,7 @@ services:
     environment:
       WORKSPACE_ROOT: /workspace
       SUITE_RESULTS_DIR: /results
+      TEST_SOURCE_URL: ${TEST_SOURCE_URL:-}
       SUITE_TESTS: ${SUITE_TESTS:-}
       SUITE_SKIPPED_TESTS: ${SUITE_SKIPPED_TESTS:-}
       SUITE_MAX_WORKERS: ${SUITE_MAX_WORKERS:-}

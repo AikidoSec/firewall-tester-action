@@ -305,13 +305,30 @@ def run_test(test_name: str) -> dict:
     return result
 
 
-def tail(path: Path, line_count: int = 200) -> str:
+def read_log(path: Path) -> str:
     try:
-        return "".join(
-            path.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)[-line_count:]
-        )
+        return path.read_text(encoding="utf-8", errors="replace")
     except OSError as error:
         return f"Could not read {path}: {error}\n"
+
+
+def tail(path: Path, line_count: int = 200) -> str:
+    return "".join(read_log(path).splitlines(keepends=True)[-line_count:])
+
+
+def format_assertion(assertion: str, test_name: str) -> str:
+    text = escape(assertion[:1000] + ("... (truncated)" if len(assertion) > 1000 else ""))
+    source_url = os.environ.get("TEST_SOURCE_URL", "")
+    prefix = re.match(r"^\[line \d+(?:\s*\u2192\s*line \d+)*\]", text)
+    if source_url and prefix:
+        test_url = escape(f"{source_url}/{test_name}/test.py")
+        linked_prefix = re.sub(
+            r"line (\d+)",
+            lambda match: f'<a href="{test_url}#L{match[1]}">{match[0]}</a>',
+            prefix[0],
+        )
+        text = linked_prefix + text[prefix.end():]
+    return text
 
 
 def write_summary(results: list[dict], skipped: list[str]) -> None:
@@ -346,6 +363,14 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     }
     (RESULTS / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
+    failed_logs = {
+        result["test"]: read_log(Path(result["log"]))
+        for result in ordered if result["status"] == "FAIL"
+    }
+    failed_assertions = {
+        test_name: [line[7:] for line in log.splitlines() if line.startswith("[FAIL] ")]
+        for test_name, log in failed_logs.items()
+    }
     markdown = [
         "## Test Results Summary",
         "",
@@ -358,26 +383,39 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
         "|------|--------|----------|-------|",
     ]
     for result in ordered:
+        status = ":white_check_mark: PASS" if result["status"] == "PASS" else ":x: FAIL"
         error = result["error"].replace("|", "\\|").replace("\n", "<br>")
+        assertions = failed_assertions.get(result["test"], [])
+        if assertions:
+            error = f"{len(assertions)} assertion(s) failed (see details)"
         markdown.append(
-            f"| {result['test']} | {result['status']} | "
+            f"| {result['test']} | {status} | "
             f"{result['duration_seconds']:.2f}s | {error} |"
         )
     for test_name in sorted(skipped):
-        markdown.append(f"| {test_name} | SKIP | N/A | Skipped |")
+        markdown.append(f"| {test_name} | :fast_forward: SKIP | N/A | Skipped |")
     markdown.append("")
     for result in ordered:
         if result["status"] == "FAIL":
-            log = tail(Path(result["log"]))
+            assertions = failed_assertions[result["test"]]
+            detail = f"{len(assertions)} assertion(s) failed" if assertions else "failure log"
             markdown.extend([
                 "<details>",
-                f"<summary>{escape(result['test'])} - failure log (last 200 lines)</summary>",
-                "",
-                f"<pre>{escape(log)}</pre>",
-                "",
-                "</details>",
+                f"<summary>{escape(result['test'])} - {detail}</summary>",
                 "",
             ])
+            if assertions:
+                markdown.append("<ol>")
+                for assertion in assertions:
+                    markdown.append(f"<li>{format_assertion(assertion, result['test'])}</li>")
+                markdown.extend(["</ol>", ""])
+            else:
+                log = "".join(failed_logs[result["test"]].splitlines(keepends=True)[-200:])
+                markdown.extend([
+                    "Failure log (last 200 lines):", "",
+                    f"<pre>{escape(log)}</pre>", "",
+                ])
+            markdown.extend(["</details>", ""])
     (RESULTS / "summary.md").write_text("\n".join(markdown), encoding="utf-8")
 
     failures = "\n".join(result["test"] for result in ordered if result["status"] == "FAIL")

@@ -30,7 +30,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     response = s.post("/api/request",
                       {"url": "http://evil.example.com/test"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - explicitly blocked domain evil.example.com should be blocked")
+        response, 500, "explicitly blocked domain evil.example.com should be blocked")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -38,28 +38,28 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     response = s.post(
         "/api/request", {"url": "http://evil.example.com/test"}, headers={"X-Forwarded-For": "1.2.3.4"})
     collector.soft_assert_response_code_is_not(
-        response, 500, f"{response.text} - bypassed IP address should be allowed for evil.example.com")
+        response, 500, "bypassed IP address should be allowed for evil.example.com")
 
     response = s.post(
         "/api/request", {"url": "http://domain1.example.com/test"}, headers={"X-Forwarded-For": "1.2.3.4"})
     collector.soft_assert_response_code_is_not(
-        response, 500, f"{response.text} - bypassed IP address should be allowed for new domains")
+        response, 500, "bypassed IP address should be allowed for new domains")
 
     """Test that force protection off bypasses outbound domain blocking"""
     response = s.post("/api/request2",
                       {"url": "http://evil.example.com/test"})
     collector.soft_assert_response_code_is(
-        response, 200, f"{response.text} - force protection off should bypass outbound domain blocking")
+        response, 200, "force protection off should bypass outbound domain blocking")
 
     """Test that allowed domains can be accessed when blockNewOutgoingRequests is true"""
     response = s.post("/api/request", {"url": "http://safe.example.com"})
     collector.soft_assert_response_code_is(
-        response, 200, f"{response.text} - allowed domain should be allowed when blockNewOutgoingRequests is true")
+        response, 200, "allowed domain should be allowed when blockNewOutgoingRequests is true")
 
     """Test that new/unknown domains are blocked when blockNewOutgoingRequests is true"""
     response = s.post("/api/request", {"url": "http://domain2.example.com"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - new domain should be blocked when blockNewOutgoingRequests is true")
+        response, 500, "new domain should be blocked when blockNewOutgoingRequests is true")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -67,14 +67,14 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     # Test with uppercase hostname
     response = s.post("/api/request", {"url": "http://EVIL.EXAMPLE.COM"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - uppercase hostname EVIL.EXAMPLE.COM should be blocked (case-insensitive matching)")
+        response, 500, "uppercase hostname EVIL.EXAMPLE.COM should be blocked (case-insensitive matching)")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
     # Test with mixed case
     response = s.post("/api/request", {"url": "http://Evil.Example.Com"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - mixed case hostname Evil.Example.Com should be blocked (case-insensitive matching)")
+        response, 500, "mixed case hostname Evil.Example.Com should be blocked (case-insensitive matching)")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -84,7 +84,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     response = s.post(
         "/api/request", {"url": "http://xn--bse-sna.example.com"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - Punycode request xn--bse-sna.example.com should be blocked when Unicode domain böse.example.com is in blocklist")
+        response, 500, "Punycode request xn--bse-sna.example.com should be blocked when Unicode domain böse.example.com is in blocklist")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -93,7 +93,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
     # münchen.example.com is the Unicode form
     response = s.post("/api/request", {"url": "http://münchen.example.com"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - Unicode request münchen.example.com should be blocked when Unicode domain is in blocklist")
+        response, 500, "Unicode request münchen.example.com should be blocked when Unicode domain is in blocklist")
     if "InvalidURIError" not in response.text:
         collector.soft_assert_response_body_contains(
             response, "blocked an outbound connection")
@@ -105,13 +105,13 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
         "/api/request", {"url": "http://münchen-allowed.example.com"})
     if "InvalidURIError" not in response.text:
         collector.soft_assert_response_code_is(
-            response, 200, f"{response.text} - allowed Unicode domain münchen-allowed.example.com should be accessible")
+            response, 200, "allowed Unicode domain münchen-allowed.example.com should be accessible")
 
     # Should also work with Punycode form (xn--mnchen-allowed-gsb.example.com)
     response = s.post(
         "/api/request", {"url": "http://xn--mnchen-allowed-gsb.example.com"})
     collector.soft_assert_response_code_is(
-        response, 200, f"{response.text} - allowed Punycode domain xn--mnchen-allowed-gsb.example.com should be accessible")
+        response, 200, "allowed Punycode domain xn--mnchen-allowed-gsb.example.com should be accessible")
 
     # If the firewall supports percent-encoding, we test it
     test_percent_encoded = False
@@ -127,7 +127,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
         response = s.post(
             "/api/request", {"url": "http://b%C3%B6se.example.com"})
         collector.soft_assert_response_body_contains(
-            response, "blocked an outbound connection", f"{response.text} - percent-encoded hostname b%C3%B6se.example.com should not be allowed")
+            response, "blocked an outbound connection", "percent-encoded hostname b%C3%B6se.example.com should not be allowed")
 
     traffic_finished_at = int(time.time() * 1000)
     heartbeat, candidates = c.wait_for_heartbeat_after(
@@ -164,12 +164,12 @@ def test_new_domain_allowed_when_flag_disabled(collector, s: TestServer, c: Core
     response = s.post("/api/request",
                       {"url": "http://another-unknown.example.com"})
     collector.soft_assert_response_code_is(
-        response, 200, f"{response.text} - new domain should be allowed")
+        response, 200, "new domain should be allowed")
 
     """Test that explicitly blocked domains are still blocked when blockNewOutgoingRequests is false"""
     response = s.post("/api/request", {"url": "http://evil.example.com"})
     collector.soft_assert_response_code_is(
-        response, 500, f"{response.text} - explicitly blocked domain evil.example.com should still be blocked even when blockNewOutgoingRequests is false")
+        response, 500, "explicitly blocked domain evil.example.com should still be blocked even when blockNewOutgoingRequests is false")
     collector.soft_assert_response_body_contains(
         response, "blocked an outbound connection")
 
@@ -180,7 +180,7 @@ def test_detection_mode(collector, s: TestServer, c: CoreApi):
 
     response = s.post("/api/request", {"url": "http://evil.example.com"})
     collector.soft_assert_response_code_is(
-        response, 200, f"{response.text} - detection mode (block: false) should not block requests to evil.example.com")
+        response, 200, "detection mode (block: false) should not block requests to evil.example.com")
 
 
 def run_test(s: TestServer, c: CoreApi):

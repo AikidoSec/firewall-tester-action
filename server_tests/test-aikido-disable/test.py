@@ -25,7 +25,7 @@ def test_attacks_not_blocked(collector, s: TestServer):
         headers={"X-Forwarded-For": "1.2.3.4"}
     )
     collector.soft_assert_response_code_is(
-        response, 200, f"SQL injection should NOT be blocked when AIKIDO_DISABLE=true: {response.text}"
+        response, 200, "SQL injection should NOT be blocked when AIKIDO_DISABLE=true"
     )
 
     # 2. Path traversal attack - should NOT be blocked
@@ -34,7 +34,7 @@ def test_attacks_not_blocked(collector, s: TestServer):
         headers={"X-Forwarded-For": "1.2.3.4"}
     )
     collector.soft_assert_response_code_is(
-        response, 200, f"Path traversal should NOT be blocked when AIKIDO_DISABLE=true: {response.text}"
+        response, 200, "Path traversal should NOT be blocked when AIKIDO_DISABLE=true"
     )
 
     # 3. Shell injection attack - should NOT be blocked
@@ -44,7 +44,7 @@ def test_attacks_not_blocked(collector, s: TestServer):
         headers={"X-Forwarded-For": "1.2.3.4"}
     )
     collector.soft_assert_response_code_is(
-        response, 200, f"Shell injection should NOT be blocked when AIKIDO_DISABLE=true: {response.text}"
+        response, 200, "Shell injection should NOT be blocked when AIKIDO_DISABLE=true"
     )
 
 
@@ -59,7 +59,7 @@ def test_rate_limiting_not_enforced(collector, s: TestServer):
         )
         collector.soft_assert_response_code_is(
             response, 200,
-            f"Request {i+1} to /api/pets/ should NOT be rate limited when AIKIDO_DISABLE=true: {response.text}"
+            f"Request {i+1} to /api/pets/ should NOT be rate limited when AIKIDO_DISABLE=true"
         )
 
 
@@ -73,7 +73,7 @@ def test_blocked_users_not_blocked(collector, s: TestServer):
     )
     collector.soft_assert_response_code_is(
         response, 200,
-        f"Blocked user should NOT be blocked when AIKIDO_DISABLE=true: {response.text}"
+        "Blocked user should NOT be blocked when AIKIDO_DISABLE=true"
     )
 
 

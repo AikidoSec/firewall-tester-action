@@ -57,7 +57,7 @@ def run_test(s: TestServer, c: CoreApi):
             }
             response = s.post(url, body, headers=headers_with_ip)
             collector.soft_assert_response_code_is(
-                response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should not be blocked {response.text}"
+                response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should not be blocked"
             )
 
         # send attacks
@@ -65,45 +65,45 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get("/api/read?path=../secrets/key.txt",
                          headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request should not be blocked: {response.text}")
+            response, 200, "Request should not be blocked")
         # 2. sql injection attack
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"}, headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request should not be blocked: {response.text}")
+            response, 200, "Request should not be blocked")
         # 3. shell injection attack
         response = s.post(
             "/api/execute", {"userCommand": "whoami"}, headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request should not be blocked: {response.text}")
+            response, 200, "Request should not be blocked")
 
         # 4. bot blocking should be bypassed (send request with blocked user agent)
         # Using pattern like "1234googlebot1234" which matches the blockedUserAgents pattern "Googlebot"
         response = s.get(
             "/test_ratelimiting_2", headers={"X-Forwarded-For": ip["ip"], "User-Agent": "1234googlebot1234"})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request with blocked user agent should not be blocked from bypass IP {ip['ip']} ({ip['type']}): {response.text}")
+            response, 200, f"Request with blocked user agent should not be blocked from bypass IP {ip['ip']} ({ip['type']})")
 
         # 5. geo blocking should be bypassed (send request from IP that would normally be geo-blocked)
         # Note: Some bypass IPs (93.184.216.34 and 23.45.67.89) are in blockedIPAddresses ranges in start_firewall.json, so they should still work
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking: {response.text}")
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass geo blocking")
 
         # 6. route-level Admin IP restrictions should be bypassed (endpoint-level `allowedIPAddresses`)
         # The /test_ratelimiting_1 endpoint has allowedIPAddresses: ["185.245.255.212"], but bypassed IPs should still access it
         response = s.get(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass route-level Admin IP restrictions: {response.text}")
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass route-level Admin IP restrictions")
 
         # # 7. blocked user IDs should be bypassed (blockedUserIds)
         # User "789" is in blockedUserIds, but requests from bypassed IPs should still work
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": ip["ip"], "user": "789"})
         collector.soft_assert_response_code_is(
-            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs: {response.text}")
+            response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs")
 
     traffic_finished_at = int(time.time() * 1000)
     heartbeat, candidates = c.wait_for_heartbeat_after(

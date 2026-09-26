@@ -34,7 +34,7 @@ def check_pets_after_attack(collector, s, response, description):
         return
     pets = s.get("/api/pets/")
     if collector.soft_assert_response_code_is(pets, 200, f"Reading pets after {description}"):
-        collector.soft_assert('Gru' not in pets.text, f"Bypass for {description}, pets: {pets.text}")
+        collector.soft_assert('Gru' not in pets.text, f"Bypass for {description}")
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -44,32 +44,34 @@ def run_test(s: TestServer, c: CoreApi):
 
     response = s.get_raw("/api/pets/", headers={
         "user": "123456"})
+    response.read()
     collector.soft_assert_response_code_is(
-        response, 200, f"Expected 200 for user 123456 {response.read()}")
+        response, 200, "Expected 200 for user 123456")
 
     response = s.get_raw("/api/pets/", headers={
         "user": "789"})
+    response.read()
     collector.soft_assert_response_code_is(
-        response, 403, f"Expected 403 for user 789 {response.read()}")
+        response, 403, "Expected 403 for user 789")
 
     # ------ Bot blocking ------
 
     response = s.get("/api/pets/", headers={
         "User-Agent": "1234googlebot1234"})
     collector.soft_assert_response_code_is(
-        response, 403, f"Expected 403 for  {response.text}")
+        response, 403)
 
     # ------ Big request ------
     file_path = os.path.join(os.path.dirname(__file__), "test.json")
     with open(file_path, 'r', encoding="utf-8") as file:
         response = s.post("/api/create", json.load(file))
     collector.soft_assert_response_code_is(
-        response, 200, f"Expected 200 for /api/create {response.text}")
+        response, 200, "Expected 200 for /api/create")
 
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
     collector.soft_assert_response_code_is(
-        response, 500, f"Expected 500 for /api/create {response.text}")
+        response, 500, "Expected 500 for /api/create")
 
     # ------ Big Nested JSON ------
     body = '{"a":' + build_nested_json_text(8000) + ',"name":' + json.dumps(

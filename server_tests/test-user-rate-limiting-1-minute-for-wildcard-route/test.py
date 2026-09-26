@@ -21,7 +21,7 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(5):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429)
 
     # sleep for 10 seconds
     time.sleep(5)
@@ -32,15 +32,15 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            collector.soft_assert_response_code_is(response, 429, response.text)
+            collector.soft_assert_response_code_is(response, 429)
 
     for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(response, 429, response.text)
+        collector.soft_assert_response_code_is_not(response, 429)
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_code_is(response, 429, response.text)
+    collector.soft_assert_response_code_is(response, 429)
 
     collector.raise_if_failures()
 

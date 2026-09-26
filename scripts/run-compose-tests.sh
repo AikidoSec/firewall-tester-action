@@ -12,6 +12,14 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 action_path="${GITHUB_ACTION_PATH:-$(cd "$script_dir/.." && pwd)}"
+test_source_ref="${GITHUB_ACTION_REF:-}"
+if [ -e "$action_path/.git" ]; then
+  test_source_ref="$(git -C "$action_path" rev-parse HEAD 2>/dev/null || echo "$test_source_ref")"
+fi
+export TEST_SOURCE_URL=""
+if [ -n "$test_source_ref" ]; then
+  export TEST_SOURCE_URL="https://github.com/AikidoSec/firewall-tester-action/blob/$test_source_ref/server_tests"
+fi
 
 dockerfile_path="${DOCKERFILE_PATH:-${INPUT_DOCKERFILE_PATH:-}}"
 if [ -z "$dockerfile_path" ]; then

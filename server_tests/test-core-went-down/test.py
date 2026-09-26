@@ -70,7 +70,7 @@ def run_test(s: TestServer, c: CoreApi):
 
     for _ in range(5):
         response = s.get("/test_ratelimiting_1")
-        collector.soft_assert_response_code_is(response, 200, response.text)
+        collector.soft_assert_response_code_is(response, 200)
 
     time.sleep(5)
 
@@ -80,7 +80,7 @@ def run_test(s: TestServer, c: CoreApi):
             pass
         else:
             collector.soft_assert_response_code_is(
-                response, 429, response.text)
+                response, 429)
 
     c.set_mock_server_up()
 

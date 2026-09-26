@@ -54,7 +54,7 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf", timeout=10)
     collector.soft_assert_response_code_is(
-        response, response_code, f"[{response.text}]")
+        response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -76,23 +76,23 @@ def check_ssrf_bypassed_ip(collector, s, ip: str):
     response = s.post("/api/stored_ssrf", timeout=10,
                       headers={"X-Forwarded-For": ip})
     collector.soft_assert_response_code_is(
-        response, 200, f"[{response.text}] Bypassed IP {ip} should not be blocked")
+        response, 200, f"Bypassed IP {ip} should not be blocked")
 
 
 def check_stored_ssrf(collector, s, ip: str):
     response = s.post("/api/stored_ssrf", timeout=10)
     collector.soft_assert_response_code_is(
-        response, 500, f"evil-stored-ssrf-hostname -> {ip} [{response.text}]")
+        response, 500, f"evil-stored-ssrf-hostname -> {ip}")
     collector.soft_assert_response_body_contains(
-        response, "blocked", f"evil-stored-ssrf-hostname -> {ip} [{response.text}]")
+        response, "blocked", f"evil-stored-ssrf-hostname -> {ip}")
 
 
 def check_stored_ssrf_with_url(collector, s, domain: str, url: int):
     response = s.post("/api/stored_ssrf", {"urlIndex": url})
     collector.soft_assert_response_code_is(
-        response, 200, f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} ->  169.254.169.254 [{response.text}]")
+        response, 200, f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} ->  169.254.169.254")
     collector.soft_assert_response_body_contains(
-        response, "Success", f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} -> 169.254.169.254 [{response.text}]")
+        response, "Success", f"IP addresses for Google Cloud Metadata Service or direct IMDS IP access should be allowed: {domain} -> 169.254.169.254")
 
 
 def run_test(s: TestServer, c: CoreApi):

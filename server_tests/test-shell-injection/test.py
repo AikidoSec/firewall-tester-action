@@ -39,7 +39,7 @@ def check_shell_injection_command_post(collector, s, command):
     if " not found" in response.text or " must be a string without null bytes" in response.text:
         return
     collector.soft_assert_response_code_is_not(
-        response, 200, f"shell injection POST /api/execute {repr(command)} , response: {repr(response.text)[:100]}")
+        response, 200, f"shell injection POST /api/execute {repr(command)}")
 
 
 def check_shell_injection_command_get(collector, s, command):
@@ -47,7 +47,7 @@ def check_shell_injection_command_get(collector, s, command):
     if " not found" in response.text or " must be a string without null bytes" in response.text or " No such file or directory" in response.text:
         return
     collector.soft_assert_response_code_is_not(
-        response, 200, f"shell injection GET /api/execute/{repr(command)} , response: {repr(response.text)[:100]}")
+        response, 200, f"shell injection GET /api/execute/{repr(command)}")
 
 
 def run_test(s: TestServer, c: CoreApi):

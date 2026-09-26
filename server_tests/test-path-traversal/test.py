@@ -17,7 +17,7 @@ def check_path_traversal_with_event(collector, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.get("/api/read?path=../secrets/key.txt")
     collector.soft_assert_response_code_is(response, response_code,
-                                           f"Path traversal check failed {response.text}")
+                                           "Path traversal check failed")
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -41,7 +41,7 @@ def check_path_traversal(collector, query_string):
     if "File not found" in response.text:
         return
     collector.soft_assert_response_code_is_not(
-        response, 200, f"Path traversal check failed for {query_string} {response.text}")
+        response, 200, f"Path traversal check failed for {query_string}")
 
 
 def run_test(s: TestServer, c: CoreApi):

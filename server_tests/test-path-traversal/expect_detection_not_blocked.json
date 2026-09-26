@@ -1,0 +1,17 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "method": "GET",
+    "route": "/api/read",
+    "url": "REGEX:^https?://test-path-traversal(?::\\d+)?/api/read\\?path=\\.\\./secrets/key\\.txt$"
+  },
+  "attack": {
+    "kind": "path_traversal",
+    "blocked": false,
+    "source": "query",
+    "metadata": {}
+  },
+  "agent": {
+    "dryMode": true
+  }
+}

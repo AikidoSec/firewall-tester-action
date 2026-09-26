@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { RequestWithAppData } from '../types.js'
 import { captureEvent } from '../zen/events.js'
-import { getAppConfig } from '../zen/config.js'
+import { getAppConfig, markAppConfigSent } from '../zen/config.js'
 
 export function captureEventHandler(
   req: RequestWithAppData,
@@ -22,5 +22,7 @@ export function captureEventHandler(
     return
   }
 
-  res.json(getAppConfig(appData))
+  const config = getAppConfig(appData)
+  res.on('finish', () => markAppConfigSent(appData, config.configUpdatedAt))
+  res.json(config)
 }

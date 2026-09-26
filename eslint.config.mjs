@@ -27,7 +27,9 @@ export default [
       '**/dist',
       '**/linter',
       '**/node_modules',
-      '**/scripts'
+      '**/scripts',
+      '**/.tmp',
+      '**/zen-demo'
     ]
   },
   ...compat.extends(

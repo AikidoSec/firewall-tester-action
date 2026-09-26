@@ -1,0 +1,46 @@
+services:
+  test-stored-ssrf-no-context:
+    profiles:
+      - attacks
+      - ssrf
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    depends_on:
+      imds-mock:
+        condition: service_healthy
+      dns-mock-test-stored-ssrf-no-context:
+        condition: service_healthy
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-stored-ssrf-no-context
+      DATABASE_NAME: test-stored-ssrf-no-context
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-stored-ssrf-no-context${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
+    dns:
+      - ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
+        STORED_SSRF_NO_CONTEXT_DNS_IPV4}
+    networks:
+      default: null
+      imds-aws:
+        ipv4_address: 169.254.169.102
+      imds-alibaba:
+        ipv4_address: 100.100.100.102
+      imds-aws-ipv6: null
+
+  # DNS responder with mutable per-test records for stored SSRF hostnames.
+  dns-mock-test-stored-ssrf-no-context:
+    profiles:
+      - all
+      - attacks
+      - ssrf
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: dns-mock-template
+    networks:
+      default:
+        ipv4_address: ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
+          STORED_SSRF_NO_CONTEXT_DNS_IPV4}

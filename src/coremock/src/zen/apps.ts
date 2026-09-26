@@ -4,18 +4,18 @@ import { AppData } from '../types.js'
 const apps: AppData[] = []
 
 let id = 1
-export function createZenApp(): string {
+export function createZenApp(token?: string): string {
   const appId = id++
-  const token = `AIK_RUNTIME_1_${appId}_${generateRandomString(48)}`
+  const appToken = token ?? `AIK_RUNTIME_1_${appId}_${generateRandomString(48)}`
   const app = {
     id: appId,
-    token: token,
+    token: appToken,
     configUpdatedAt: Date.now()
   }
 
   apps.push(app)
 
-  return token
+  return appToken
 }
 
 export function getByToken(token: string) {

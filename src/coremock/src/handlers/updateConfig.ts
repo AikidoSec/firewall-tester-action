@@ -1,5 +1,5 @@
 import { Response } from 'express'
-import { updateAppConfig } from '../zen/config.js'
+import { getAppConfig, updateAppConfig } from '../zen/config.js'
 import { RequestWithAppData } from '../types.js'
 
 export function updateConfigHandler(
@@ -14,5 +14,9 @@ export function updateConfigHandler(
 
   const newConfig = req.body
 
-  res.json({ success: updateAppConfig(appData, newConfig) })
+  const success = updateAppConfig(appData, newConfig)
+  res.json({
+    success,
+    configUpdatedAt: getAppConfig(appData).configUpdatedAt
+  })
 }

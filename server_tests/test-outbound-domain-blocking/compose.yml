@@ -1,0 +1,65 @@
+services:
+  test-outbound-domain-blocking:
+    profiles:
+      - attacks
+      - policies
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-outbound-domain-blocking
+      DATABASE_NAME: test-outbound-domain-blocking
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-outbound-domain-blocking${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'
+      APP_HOSTS_ENTRIES: >-
+        11.22.33.44 böse.example.com|11.22.33.44 münchen.example.com|11.22.33.44
+        münchen-allowed.example.com
+    depends_on:
+      mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
+        condition: service_started
+    networks:
+      - default
+      - outbound-domain-blocking-test-outbound-domain-blocking
+
+  mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
+    profiles:
+      - all
+      - attacks
+      - policies
+    image: ${PYTHON_MOCK_IMAGE:?Set PYTHON_MOCK_IMAGE}
+    volumes:
+      - type: bind
+        source: ..
+        target: ${PYTHON_SIDECAR_DIR:?Set PYTHON_SIDECAR_DIR}
+        read_only: true
+    command:
+      python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
+    environment:
+      RESPONSE_BODY: '{"status":"ok"}'
+    networks:
+      outbound-domain-blocking-test-outbound-domain-blocking:
+        ipv4_address: 11.22.33.44
+        aliases:
+          - evil.example.com
+          - domain1.example.com
+          - domain2.example.com
+          - safe.example.com
+          - another-unknown.example.com
+          - unknown.example.com
+          - böse.example.com
+          - münchen.example.com
+          - münchen-allowed.example.com
+          - xn--bse-sna.example.com
+          - xn--mnchen-3ya.example.com
+          - xn--mnchen-allowed-gsb.example.com
+
+networks:
+  outbound-domain-blocking-test-outbound-domain-blocking:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-outbound-domain-blocking-test-outbound-domain-blocking
+    ipam:
+      config:
+        - subnet: 11.22.33.0/24

@@ -1,4 +1,5 @@
 import concurrent.futures
+from html import escape
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import socket
 import subprocess
 import sys
 import time
+import traceback
 
 import psycopg
 from psycopg import sql
@@ -289,7 +291,7 @@ def run_test(test_name: str) -> dict:
             exit_code = result.returncode
             error = "" if exit_code == 0 else f"Exit code {exit_code}"
         except Exception as exception:
-            print(f"Runner error: {exception}", file=output, flush=True)
+            traceback.print_exc(file=output)
             exit_code = 1
             error = str(exception)
 
@@ -364,6 +366,18 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     for test_name in sorted(skipped):
         markdown.append(f"| {test_name} | SKIP | N/A | Skipped |")
     markdown.append("")
+    for result in ordered:
+        if result["status"] == "FAIL":
+            log = tail(Path(result["log"]))
+            markdown.extend([
+                "<details>",
+                f"<summary>{escape(result['test'])} - failure log (last 200 lines)</summary>",
+                "",
+                f"<pre>{escape(log)}</pre>",
+                "",
+                "</details>",
+                "",
+            ])
     (RESULTS / "summary.md").write_text("\n".join(markdown), encoding="utf-8")
 
     failures = "\n".join(result["test"] for result in ordered if result["status"] == "FAIL")
@@ -390,12 +404,14 @@ def main() -> int:
                     run_setup(test_name, database)
     except Exception as exception:
         setup_seconds = round(time.monotonic() - setup_started, 2)
+        log_path = RESULTS / "suite-setup.log"
+        log_path.write_text(traceback.format_exc(), encoding="utf-8")
         result = {
             "test": test_name,
             "status": "FAIL",
             "duration_seconds": setup_seconds,
             "error": str(exception),
-            "log": "",
+            "log": str(log_path),
         }
         write_summary([result], skipped)
         print(f"SETUP FAILED: {exception}", flush=True)

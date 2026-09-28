@@ -36,7 +36,7 @@ def set_dns_mapping(ip: str, hostname: str):
     time.sleep(5)
 
 
-def check_ssrf_with_event(collector, response_code, expected_json):
+def check_ssrf_with_event(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf_2", timeout=10)
     collector.soft_assert_response_code_is(
@@ -62,7 +62,7 @@ def check_ssrf_with_event(collector, response_code, expected_json):
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
     set_dns_mapping("169.254.169.254", "evil-stored-ssrf-hostname")
-    check_ssrf_with_event(collector, 200, "expect_detection_blocked.json")
+    check_ssrf_with_event(collector, s, c, 200, "expect_detection_blocked.json")
     collector.raise_if_failures()
 
 

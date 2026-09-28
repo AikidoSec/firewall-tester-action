@@ -34,7 +34,7 @@ def run_test(s: TestServer, c: CoreApi):
     _ = s.post("/api/execute", {"userCommand": "`whoami`"},  headers={
         "X-Forwarded-For": "1.3.3.7", "Authorization": "Basic dXNlcjpwYXNzd29yZA=="})
 
-    logs = s.get_logs("test-logs-sensitive-data")
+    logs = s.get_logs()
     logs = logs.split("\n")
 
     for i, line in enumerate(logs, start=1):

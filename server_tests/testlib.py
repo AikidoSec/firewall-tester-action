@@ -255,7 +255,7 @@ class TestServer:
     def request(self, method, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_request_request(self.port, method, route, data, headers, benchmark, timeout)
 
-    def get_logs(self, container_name: str):
+    def get_logs(self):
         if not TEST_APP_LOG_FILE:
             raise RuntimeError("TEST_APP_LOG_FILE is required to read app logs")
 

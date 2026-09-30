@@ -62,6 +62,11 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
     all_events = c.get_events("detected_attack")
     new_events = all_events[len(start_events):]
 
+    if num_events == 0:
+        collector.soft_assert(len(new_events) == 0,
+                              f"Expected no new events, got {len(new_events)}")
+        return
+
     # Prerequisite: need at least num_events to check contents
     if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)}"):
         return

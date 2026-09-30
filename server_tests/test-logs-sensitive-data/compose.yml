@@ -14,7 +14,7 @@ services:
         DATABASE_URL_SUFFIX}'
     depends_on:
       log-collector-test-logs-sensitive-data:
-        condition: service_started
+        condition: service_healthy
     logging:
       driver: syslog
       options:

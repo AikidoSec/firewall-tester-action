@@ -20,7 +20,7 @@ services:
         münchen-allowed.example.com
     depends_on:
       mock-server-outbound-domain-blocking-test-outbound-domain-blocking:
-        condition: service_started
+        condition: service_healthy
     networks:
       - default
       - outbound-domain-blocking-test-outbound-domain-blocking
@@ -40,6 +40,16 @@ services:
       python ${PYTHON_MOCK_HTTP_SERVER_PATH:?Set PYTHON_MOCK_HTTP_SERVER_PATH}
     environment:
       RESPONSE_BODY: '{"status":"ok"}'
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1', timeout=1).read()
+      interval: 1s
+      timeout: 5s
+      retries: 30
     networks:
       outbound-domain-blocking-test-outbound-domain-blocking:
         ipv4_address: 11.22.33.44

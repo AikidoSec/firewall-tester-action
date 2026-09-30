@@ -1,0 +1,14 @@
+services:
+  test-demo-apps-generic-tests:
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-demo-apps-generic-tests
+      DATABASE_NAME: test-demo-apps-generic-tests
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-demo-apps-generic-tests${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

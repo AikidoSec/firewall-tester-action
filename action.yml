@@ -1,81 +1,97 @@
 name: Aikido Firewall Tester
-description: Aikido Firewall Tester
+description: Run Aikido firewall tester Compose tests
 author: AikidoSec
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
   icon: heart
   color: red
 
-# Define your inputs here.
 inputs:
   dockerfile_path:
     description: The path to the Dockerfile with the Aikido agent installed
     required: true
-  extra_args:
+  test_name:
     description:
-      Extra arguments to pass to the docker run command (only --env, -e and
-      --env-file are allowed)
-    required: false
-    default: ''
-  extra_build_args:
-    description:
-      Extra arguments to pass to the docker build command (e.g. "--build-arg
-      APP_VERSION=2.0.1")
-    required: false
-    default: ''
-  app_port:
-    description:
-      The port of the application to test, the one that is open when docker is
-      running
-    required: true
-    default: '8080'
-  max_parallel_tests:
-    description:
-      The maximum number of tests to run in parallel (for each test, a new
-      container will be spawned). Default is 10.
-    required: true
-    default: '10'
-  config_update_delay:
-    description:
-      The delay in seconds to wait after updating the config to ensure the
-      config is applied. Default is 60 seconds.
-    required: true
-    default: '60'
-  skip_tests:
-    description:
-      Comma-separated list of test names to skip (e.g.
-      "test_allowed_ip,test2,test3")
+      Optional single server_tests directory to run, for example
+      test-sql-injection
     required: false
     default: ''
   run_tests:
     description:
-      Comma-separated list of test names to run (e.g.
-      "test_allowed_ip,test2,test3"). If specified, only these tests will be
-      run. If not specified, all tests (except those in skip_tests) will be run.
+      Optional comma-separated list of tests to run. If omitted, the selected
+      test suite is run.
     required: false
     default: ''
-  test_timeout:
-    description: The timeout in seconds for each test. Default is 60 seconds.
-    required: false
-    default: '600'
-  sleep_before_test:
+  test_suite:
     description:
-      The number of seconds to sleep before starting the test. Default is 1
-      second.
+      Compose profile selecting the test suite when test_name/run_tests are not
+      set.
     required: false
-    default: '1'
+    default: 'all'
+  skip_tests:
+    description: Optional comma-separated list of test names to skip.
+    required: false
+    default: ''
   ignore_failures:
-    description:
-      If true, the action will exit with code 0 even if tests fail. Default is
-      false.
+    description: Exit successfully after reporting test failures.
     required: false
     default: 'false'
-  test_type:
-    description: The type of test to run. Default is 'server'.
+  build_args:
+    description:
+      Optional newline-separated Docker build args for the demo image, in
+      NAME=value format.
     required: false
-    default: 'server'
-
+    default: ''
+  app_port:
+    description: The port exposed by the application during Docker runtime
+    required: false
+    default: '8080'
+  max_parallel_tests:
+    description:
+      Maximum number of concurrent Compose operations and test workers
+    required: false
+    default: '20'
+  config_update_delay:
+    description: Delay in seconds after runtime configuration updates
+    required: false
+    default: '60'
+  app_env_file:
+    description: Optional env file passed to the application service
+    required: false
+    default: ''
+  app_env_file_2:
+    description: Optional second env file passed to the application service
+    required: false
+    default: ''
 runs:
-  using: node20
-  main: dist/index.js
+  using: composite
+  steps:
+    - name: Run Compose tests
+      shell: bash
+      env:
+        APP_ENV_FILE: ${{ inputs.app_env_file }}
+        APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
+        APP_PORT: ${{ inputs.app_port }}
+        BUILD_ARGS: ${{ inputs.build_args }}
+        CONFIG_UPDATE_DELAY: ${{ inputs.config_update_delay }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+        IGNORE_FAILURES: ${{ inputs.ignore_failures }}
+        MAX_PARALLEL_TESTS: ${{ inputs.max_parallel_tests }}
+        RUN_TESTS: ${{ inputs.run_tests }}
+        SKIP_TESTS: ${{ inputs.skip_tests }}
+        TEST_NAME: ${{ inputs.test_name }}
+        TEST_SUITE: ${{ inputs.test_suite }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run-compose-tests.sh"
+
+    - name: Clean up Compose tests
+      if: always()
+      shell: bash
+      env:
+        APP_ENV_FILE: ${{ inputs.app_env_file }}
+        APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
+        APP_PORT: ${{ inputs.app_port }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+        RUN_TESTS: ${{ inputs.run_tests }}
+        TEST_NAME: ${{ inputs.test_name }}
+        TEST_SUITE: ${{ inputs.test_suite }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/run-compose-tests.sh" cleanup

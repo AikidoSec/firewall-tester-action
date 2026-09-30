@@ -1,0 +1,129 @@
+include:
+  - ./server_tests/control-test-detects-attacks-when-started-under-load/compose.yml
+  - ./server_tests/control-test-graceful-restart/compose.yml
+  - ./server_tests/control-test-graceful-stop/compose.yml
+  - ./server_tests/control-test-install-aikido/compose.yml
+  - ./server_tests/control-test-kill-agent/compose.yml
+  - ./server_tests/control-test-restart/compose.yml
+  - ./server_tests/control-test-start-stop/compose.yml
+  - ./server_tests/control-test-update-aikido/compose.yml
+  - ./server_tests/test-aikido-disable/compose.yml
+  - ./server_tests/test-allow-traffic-by-countries/compose.yml
+  - ./server_tests/test-allowed-ip-for-routes/compose.yml
+  - ./server_tests/test-allowed-ip-for-wildcard-route/compose.yml
+  - ./server_tests/test-allowed-ip-most-restrictive/compose.yml
+  - ./server_tests/test-api-spec/compose.yml
+  - ./server_tests/test-block-traffic-by-countries/compose.yml
+  - ./server_tests/test-bypassed-ip/compose.yml
+  - ./server_tests/test-bypassed-ip-for-geo-blocking/compose.yml
+  - ./server_tests/test-bypassed-ip-for-rate-limiting/compose.yml
+  - ./server_tests/test-core-went-down/compose.yml
+  - ./server_tests/test-demo-apps-generic-tests/compose.yml
+  - ./server_tests/test-excluded-user-from-rate-limiting/compose.yml
+  - ./server_tests/test-force-protection-off/compose.yml
+  - ./server_tests/test-internet-not-available/compose.yml
+  - ./server_tests/test-invalid-token/compose.yml
+  - ./server_tests/test-logs-sensitive-data/compose.yml
+  - ./server_tests/test-no-token-set/compose.yml
+  - ./server_tests/test-outbound-domain-blocking/compose.yml
+  - ./server_tests/test-path-traversal/compose.yml
+  - ./server_tests/test-rate-limiting-group-id-1-minute/compose.yml
+  - ./server_tests/test-rate-limiting-retry-after/compose.yml
+  - ./server_tests/test-shell-injection/compose.yml
+  - ./server_tests/test-sql-injection/compose.yml
+  - ./server_tests/test-ssrf/compose.yml
+  - ./server_tests/test-ssrf-different-port/compose.yml
+  - ./server_tests/test-stored-ssrf/compose.yml
+  - ./server_tests/test-stored-ssrf-no-context/compose.yml
+  - ./server_tests/test-user-ip-from-proxy/compose.yml
+  - ./server_tests/test-user-rate-limiting-1-minute/compose.yml
+  - ./server_tests/test-user-rate-limiting-1-minute-enable-disable/compose.yml
+  - ./server_tests/test-user-rate-limiting-1-minute-for-wildcard-route/compose.yml
+  - ./server_tests/test-user-rate-limiting-1-minute-without-x-forwarded-for/compose.yml
+  - ./server_tests/test-wave-attack/compose.yml
+
+services:
+  # PostgreSQL database image shared by tests; each test uses its own database.
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE}
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?Set POSTGRES_ADMIN_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_ADMIN_USER:?Set POSTGRES_ADMIN_USER} -h
+          127.0.0.1 -p 5432
+      interval: 1s
+      timeout: 5s
+      retries: 180
+    networks:
+      default:
+        ipv4_address: ${POSTGRES_HOST_IPV4:?Set POSTGRES_HOST_IPV4}
+
+  # Core mock API image used by agents to fetch config and submit events.
+  core:
+    image: ${CORE_IMAGE:?Set CORE_IMAGE}
+    build:
+      context: .
+      dockerfile: ${CORE_DOCKERFILE:?Set CORE_DOCKERFILE}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e
+          "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    networks:
+      default:
+        ipv4_address: ${CORE_HOST_IPV4:?Set CORE_HOST_IPV4}
+
+  # Demo app image build target; tests run per-test app services from this image.
+  demo-app-image:
+    image: ${DEMO_IMAGE:?Set DEMO_IMAGE}
+    build:
+      context: ${DEMO_CONTEXT:?Set DEMO_CONTEXT to the demo app build context}
+      dockerfile: ${DEMO_DOCKERFILE:-Dockerfile}
+    profiles:
+      - build
+
+  # One Compose-managed runner performs all setup, waits for apps, and runs tests.
+  suite-runner:
+    extends:
+      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: suite-runner-template
+    depends_on:
+      postgres:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+
+  imds-mock:
+    extends:
+      file: ./server_tests/compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: imds-mock-template
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-default
+    ipam:
+      config:
+        - subnet: ${DEFAULT_NETWORK_SUBNET:?Set DEFAULT_NETWORK_SUBNET}
+  imds-aws:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-imds-aws
+    ipam:
+      config:
+        - subnet: 169.254.0.0/16
+  imds-alibaba:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-imds-alibaba
+    ipam:
+      config:
+        - subnet: 100.100.100.0/24
+  imds-aws-ipv6:
+    name: ${COMPOSE_PROJECT_NAME:-firewall-tester-action}-imds-aws-ipv6
+    enable_ipv6: ${IMDS_AWS_IPV6_ENABLE:?Set IMDS_AWS_IPV6_ENABLE}
+    ipam:
+      config:
+        - subnet: ${IMDS_AWS_IPV6_SUBNET:?Set IMDS_AWS_IPV6_SUBNET}

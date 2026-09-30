@@ -6,7 +6,8 @@ import {
   getBlockedUserAgents,
   getMonitoredIPAddresses,
   getMonitoredUserAgents,
-  getUserAgentDetails
+  getUserAgentDetails,
+  markAppConfigDelivered
 } from '../zen/config.js'
 
 export function listsHandler(req: RequestWithAppData, res: Response) {
@@ -21,6 +22,7 @@ export function listsHandler(req: RequestWithAppData, res: Response) {
   const monitoredIps = getMonitoredIPAddresses(req.appData)
   const userAgentDetails = getUserAgentDetails(req.appData)
 
+  res.on('finish', () => markAppConfigDelivered(req.appData!))
   res.json({
     success: true,
     serviceId: req.appData.id,

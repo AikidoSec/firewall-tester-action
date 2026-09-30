@@ -2,11 +2,8 @@ FROM ghcr.io/amitie10g/node-nanoserver:20-ltsc2022
 
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.json tsconfig.base.json ./
-COPY src ./src
-
-RUN npm ci
+COPY dist/coremock.cjs ./
 
 EXPOSE 3000
 
-ENTRYPOINT npm run start-core
+ENTRYPOINT ["node", "coremock.cjs"]

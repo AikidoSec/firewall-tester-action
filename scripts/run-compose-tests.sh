@@ -269,6 +269,7 @@ echo "Tests to run: ${#tests_to_run[@]}"
 up_args=(
   up
   --no-build
+  --no-color
   --timeout 10
   --exit-code-from suite-runner
 )
@@ -281,7 +282,7 @@ else
 fi
 
 set +e
-"${compose[@]}" "${up_args[@]}"
+"${compose[@]}" "${up_args[@]}" 2>&1 | tee "$results_dir/app-logs.txt"
 suite_status=$?
 set -e
 
@@ -290,7 +291,6 @@ if [ "$suite_status" -ne 0 ] && [ ! -f "$results_dir/suite-complete" ]; then
 fi
 
 if [ -f "$results_dir/suite-complete" ] && [ "${#tests_to_run[@]}" -gt 0 ]; then
-  "${compose[@]}" logs --no-color "${tests_to_run[@]}" > "$results_dir/app-logs.txt"
   if grep -Eiq 'Segmentation fault|core dumped|SIGSEGV' "$results_dir/app-logs.txt"; then
     if ! "${compose[@]}" run --rm --no-deps -T suite-runner python run_suite.py --check-app-logs; then
       suite_status=1

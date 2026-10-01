@@ -31,10 +31,8 @@ jobs:
 ```
 
 Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
-repository runs all Linux demo apps through a GitHub matrix.
-
-Each test has a fixed 15-minute execution timeout, separate from application
-startup readiness.
+repository runs all Linux demo apps through a GitHub matrix. Each test has a
+15-minute execution timeout.
 
 ## Inputs
 

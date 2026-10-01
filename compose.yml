@@ -126,4 +126,4 @@ networks:
     enable_ipv6: ${IMDS_AWS_IPV6_ENABLE:?Set IMDS_AWS_IPV6_ENABLE}
     ipam:
       config:
-        - subnet: ${IMDS_AWS_IPV6_SUBNET:?Set IMDS_AWS_IPV6_SUBNET}
+        - subnet: ${IMDS_AWS_IPV6_SUBNET:-}

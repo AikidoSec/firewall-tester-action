@@ -84,10 +84,13 @@ jobs:
     steps:
       - name: Checkout action
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: ${{ matrix.app.repository }}
           path: ./zen-demo
           ref: ${{ matrix.app.ref }}
@@ -110,10 +113,13 @@ jobs:
     steps:
       - name: Checkout action
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: Aikido-demo-apps/zen-demo-dotnet-framework
           path: ./zen-demo
           ref: main
@@ -147,10 +153,13 @@ jobs:
     steps:
       - name: Checkout action
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
           ref: main

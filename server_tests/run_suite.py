@@ -23,6 +23,7 @@ SERVER_TESTS = WORKSPACE / "server_tests"
 RESULTS = Path(os.environ.get("SUITE_RESULTS_DIR", r"C:\results" if IS_WINDOWS else "/results"))
 SETUP_COMPLETE = RESULTS / "setup-complete"
 SUITE_COMPLETE = RESULTS / "suite-complete"
+TEST_TIMEOUT_SECONDS = 15 * 60
 TESTS_WITHOUT_STARTUP_CONFIG = {
     "test-aikido-disable",
     "test-internet-not-available",
@@ -287,9 +288,14 @@ def run_test(test_name: str) -> dict:
                 stdout=output,
                 stderr=subprocess.STDOUT,
                 check=False,
+                timeout=TEST_TIMEOUT_SECONDS,
             )
             exit_code = result.returncode
             error = "" if exit_code == 0 else f"Exit code {exit_code}"
+        except subprocess.TimeoutExpired:
+            exit_code = 1
+            error = f"Test timed out after {TEST_TIMEOUT_SECONDS} seconds"
+            print(error, file=output, flush=True)
         except Exception as exception:
             traceback.print_exc(file=output)
             exit_code = 1
@@ -424,6 +430,29 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     )
 
 
+def check_app_logs() -> int:
+    summary = json.loads((RESULTS / "summary.json").read_text(encoding="utf-8"))
+    results = {result["test"]: result for result in summary["results"]}
+    crashed = set()
+    for line in (RESULTS / "app-logs.txt").read_text(encoding="utf-8", errors="replace").splitlines():
+        if not re.search(r"Segmentation fault|core dumped|SIGSEGV", line, re.IGNORECASE):
+            continue
+        service, separator, message = line.partition("|")
+        test_name = service.strip().rsplit("-", 1)[0]
+        if not separator or test_name not in results:
+            continue
+        result = results[test_name]
+        result["status"] = "FAIL"
+        if test_name not in crashed:
+            result["error"] = "; ".join(filter(None, [result["error"], "Application process crashed"]))
+        with Path(result["log"]).open("a", encoding="utf-8") as output:
+            print(f"\n[FAIL] Application process crashed: {message.strip()}", file=output)
+        crashed.add(test_name)
+
+    write_summary(list(results.values()), summary["skipped_tests"])
+    return 1 if crashed else 0
+
+
 def main() -> int:
     tests = csv_values("SUITE_TESTS")
     skipped = csv_values("SUITE_SKIPPED_TESTS")
@@ -492,7 +521,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(main())
+        raise SystemExit(check_app_logs() if sys.argv[1:] == ["--check-app-logs"] else main())
     except Exception as exception:
         print(f"Suite runner failed: {exception}", file=sys.stderr, flush=True)
         raise

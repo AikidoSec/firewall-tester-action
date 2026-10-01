@@ -21,7 +21,7 @@ jobs:
           path: ./zen-demo
           ref: main
 
-      - uses: AikidoSec/firewall-tester-action@v1
+      - uses: AikidoSec/firewall-tester-action@main
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
@@ -32,6 +32,9 @@ jobs:
 
 Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
 repository runs all Linux demo apps through a GitHub matrix.
+
+Each test has a fixed 15-minute execution timeout, separate from application
+startup readiness.
 
 ## Inputs
 

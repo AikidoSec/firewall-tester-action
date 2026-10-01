@@ -43366,7 +43366,7 @@ function generateConfig(app2) {
     success: true,
     serviceId: app2.id,
     configUpdatedAt: app2.configUpdatedAt,
-    heartbeatIntervalInMS: 10 * 60 * 1e3,
+    heartbeatIntervalInMS: 2 * 60 * 1e3,
     endpoints: [],
     blockedUserIds: [],
     allowedIPAddresses: [],

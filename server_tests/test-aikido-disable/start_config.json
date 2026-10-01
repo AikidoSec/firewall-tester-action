@@ -1,6 +1,5 @@
 {
   "block": true,
-  "heartbeatIntervalInMS": 600000,
   "endpoints": [
     {
       "method": "GET",

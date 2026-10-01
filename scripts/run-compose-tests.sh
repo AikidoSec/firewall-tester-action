@@ -147,31 +147,11 @@ cleanup_compose_project() {
   "${compose[@]}" down --timeout 10 -v --remove-orphans || true
 }
 
-print_windows_networks() {
-  if [ "$container_os" != "windows" ]; then
-    return
-  fi
-
-  local network_ids=()
-  echo "::group::Windows networks: $1"
-  mapfile -t network_ids < <(docker network ls -q)
-  if [ "${#network_ids[@]}" -gt 0 ]; then
-    docker network inspect \
-      --format 'ID={{.Id}} Name={{.Name}} Driver={{.Driver}} IPAM={{json .IPAM.Config}} Options={{json .Options}} Project={{index .Labels "com.docker.compose.project"}}' \
-      "${network_ids[@]}" || true
-  fi
-  echo "HNS networks:"
-  powershell.exe -NoProfile -NonInteractive -Command \
-    '$ErrorActionPreference = "Stop"; Get-HnsNetwork | Select-Object Id, Name, Type, Subnets | ConvertTo-Json -Depth 6' || true
-  echo "::endgroup::"
-}
-
 print_compose_diagnostics() {
   local container_ids=()
   local network_ids=()
 
   echo "Compose suite did not complete; collecting container diagnostics" >&2
-  print_windows_networks "after Compose failure"
   "${compose[@]}" ps -a || true
   docker ps -a --no-trunc \
     --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" || true
@@ -275,16 +255,13 @@ while IFS= read -r build_arg; do
   fi
 done <<< "$BUILD_ARGS"
 
-print_windows_networks "before cleanup"
 cleanup_compose_project
-print_windows_networks "before builds"
 
 "${compose[@]}" --profile build build \
   "${build_arg_flags[@]}" \
   demo-app-image
 
 "${compose[@]}" build core suite-runner
-print_windows_networks "after builds"
 
 echo "Selected tests: ${#selected_tests[@]}"
 echo "Tests to run: ${#tests_to_run[@]}"

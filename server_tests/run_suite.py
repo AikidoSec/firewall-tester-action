@@ -430,7 +430,7 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     )
 
 
-def check_app_logs() -> int:
+def check_for_app_crashes() -> int:
     summary = json.loads((RESULTS / "summary.json").read_text(encoding="utf-8"))
     results = {result["test"]: result for result in summary["results"]}
     crashed = set()
@@ -521,7 +521,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        raise SystemExit(check_app_logs() if sys.argv[1:] == ["--check-app-logs"] else main())
+        raise SystemExit(check_for_app_crashes() if sys.argv[1:] == ["--check-app-logs"] else main())
     except Exception as exception:
         print(f"Suite runner failed: {exception}", file=sys.stderr, flush=True)
         raise

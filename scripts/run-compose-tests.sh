@@ -31,7 +31,7 @@ APP_ENV_FILE="${APP_ENV_FILE:-}"
 APP_ENV_FILE_2="${APP_ENV_FILE_2:-}"
 APP_PORT="${APP_PORT:-8080}"
 BUILD_ARGS="${BUILD_ARGS:-}"
-CONFIG_UPDATE_DELAY="${CONFIG_UPDATE_DELAY:-60}"
+CONFIG_PROPAGATION_DELAY="${CONFIG_PROPAGATION_DELAY:-1}"
 IGNORE_FAILURES="${IGNORE_FAILURES:-false}"
 MAX_PARALLEL_TESTS="${MAX_PARALLEL_TESTS:-20}"
 RUN_TESTS="${RUN_TESTS:-}"
@@ -46,8 +46,8 @@ if ! [[ "$MAX_PARALLEL_TESTS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
-if ! [[ "$CONFIG_UPDATE_DELAY" =~ ^[0-9]+$ ]]; then
-  echo "CONFIG_UPDATE_DELAY must be a non-negative integer" >&2
+if ! [[ "$CONFIG_PROPAGATION_DELAY" =~ ^[0-9]+$ ]]; then
+  echo "CONFIG_PROPAGATION_DELAY must be a non-negative integer" >&2
   exit 2
 fi
 
@@ -100,7 +100,7 @@ export DEMO_CONTEXT="$(compose_path "$demo_context_absolute")"
 export DEMO_DOCKERFILE="$(basename "$dockerfile_path")"
 export APP_ENV_FILE="$(normalize_env_file "$APP_ENV_FILE")"
 export APP_ENV_FILE_2="$(normalize_env_file "$APP_ENV_FILE_2")"
-export APP_PORT CONFIG_UPDATE_DELAY STARTUP_TIMEOUT
+export APP_PORT CONFIG_PROPAGATION_DELAY STARTUP_TIMEOUT
 
 if [ -z "${COMPOSE_PROJECT_NAME:-}" ]; then
   if [ -n "$TEST_NAME" ]; then

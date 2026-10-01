@@ -44,16 +44,16 @@ jobs:
             repository: Aikido-demo-apps/zen-demo-python
             ref: main
             app_port: 8080
-            # 60s config poll + 15s worker cache refresh
-            config_update_delay: 75
+            # Workers refresh their cached configuration every 15s.
+            config_propagation_delay: 15
             build_args: ''
             ignore_failures: true
           - name: php
             repository: Aikido-demo-apps/zen-demo-php
             ref: main
             app_port: 8080
-            # 60s config poll + 60s request-processor refresh
-            config_update_delay: 120
+            # Request processors refresh their configuration every 60s.
+            config_propagation_delay: 60
             app_env_file: ./zen-demo/.env.qa
             build_args: ''
             ignore_failures: true
@@ -102,7 +102,8 @@ jobs:
           dockerfile_path: ./zen-demo/Dockerfile
           build_args: ${{ matrix.app.build_args }}
           app_port: ${{ matrix.app.app_port }}
-          config_update_delay: ${{ matrix.app.config_update_delay || 60 }}
+          config_propagation_delay:
+            ${{ matrix.app.config_propagation_delay || 1 }}
           ignore_failures: ${{ matrix.app.ignore_failures || false }}
           app_env_file: ${{ matrix.app.app_env_file }}
 

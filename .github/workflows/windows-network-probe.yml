@@ -1,0 +1,27 @@
+name: Windows network probe
+
+on:
+  push:
+    branches:
+      - debug/windows-network-startup-20261001
+
+permissions:
+  contents: read
+
+jobs:
+  networks:
+    name: Windows networks (${{ matrix.runner }})
+    runs-on: windows-2022
+    timeout-minutes: 8
+    strategy:
+      fail-fast: true
+      max-parallel: 5
+      matrix:
+        runner: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Create and remove QA networks
+        shell: pwsh
+        run: ./scripts/probe-windows-networks.ps1

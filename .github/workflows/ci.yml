@@ -12,6 +12,21 @@ permissions:
   contents: read
 
 jobs:
+  check-coremock-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run bundle:core
+      - run: git diff --exit-code -- dist/coremock.cjs
+
   server-tests-linux:
     name: ${{ matrix.app.name }}
     runs-on: ubuntu-latest
@@ -68,11 +83,14 @@ jobs:
             ignore_failures: true
     steps:
       - name: Checkout action
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: ${{ matrix.app.repository }}
           path: ./zen-demo
           ref: ${{ matrix.app.ref }}
@@ -94,11 +112,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout action
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: Aikido-demo-apps/zen-demo-dotnet-framework
           path: ./zen-demo
           ref: main
@@ -131,11 +152,14 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout action
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Checkout demo app
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: Aikido-demo-apps/zen-demo-php
           path: ./zen-demo
           ref: main

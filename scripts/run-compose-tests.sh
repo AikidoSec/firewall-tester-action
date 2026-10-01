@@ -190,6 +190,14 @@ selected_tests=()
 skip_test_names=()
 IFS=',' read -ra skip_test_names <<< "$SKIP_TESTS"
 
+for skipped_test in "${skip_test_names[@]}"; do
+  skipped_test="$(trim "$skipped_test")"
+  if [ -n "$skipped_test" ] && ! [[ "$skipped_test" =~ ^(test|control-test)-[a-z0-9-]+$ && -f "$action_path/server_tests/$skipped_test/test.py" ]]; then
+    echo "Unknown skipped test: $skipped_test. Use hyphenated test names, for example test-ssrf." >&2
+    exit 2
+  fi
+done
+
 add_selected_test() {
   local test_name="$1"
   if ! printf '%s\n' "${available_tests[@]}" | grep -Fxq "$test_name"; then
@@ -261,6 +269,7 @@ echo "Tests to run: ${#tests_to_run[@]}"
 up_args=(
   up
   --no-build
+  --no-color
   --timeout 10
   --exit-code-from suite-runner
 )
@@ -273,12 +282,20 @@ else
 fi
 
 set +e
-"${compose[@]}" "${up_args[@]}"
+"${compose[@]}" "${up_args[@]}" 2>&1 | tee "$results_dir/app-logs.txt"
 suite_status=$?
 set -e
 
 if [ "$suite_status" -ne 0 ] && [ ! -f "$results_dir/suite-complete" ]; then
   print_compose_diagnostics
+fi
+
+if [ -f "$results_dir/suite-complete" ] && [ "${#tests_to_run[@]}" -gt 0 ]; then
+  if grep -Eiq 'Segmentation fault|core dumped|SIGSEGV' "$results_dir/app-logs.txt"; then
+    if ! "${compose[@]}" run --rm --no-deps -T suite-runner python run_suite.py --check-app-logs; then
+      suite_status=1
+    fi
+  fi
 fi
 
 if [ -f "$results_dir/summary.md" ]; then

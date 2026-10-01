@@ -21,8 +21,7 @@ services:
         DATABASE_URL_PREFIX}test-stored-ssrf-no-context${DATABASE_URL_SUFFIX:?Set
         DATABASE_URL_SUFFIX}'
     dns:
-      - ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
-        STORED_SSRF_NO_CONTEXT_DNS_IPV4}
+      - ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set STORED_SSRF_NO_CONTEXT_DNS_IPV4}
     networks:
       default: null
       imds-aws:
@@ -42,5 +41,6 @@ services:
       service: dns-mock-template
     networks:
       default:
-        ipv4_address: ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
+        ipv4_address:
+          ${STORED_SSRF_NO_CONTEXT_DNS_IPV4:?Set
           STORED_SSRF_NO_CONTEXT_DNS_IPV4}

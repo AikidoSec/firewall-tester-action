@@ -13,15 +13,18 @@ jobs:
   run-firewall-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
           repository: Aikido-demo-apps/zen-demo-nodejs
           path: ./zen-demo
           ref: main
 
-      - uses: AikidoSec/firewall-tester-action@v1
+      - uses: AikidoSec/firewall-tester-action@main
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 3000
@@ -31,7 +34,8 @@ jobs:
 ```
 
 Set `test_name` or `run_tests` to run a smaller subset. The CI workflow in this
-repository runs all Linux demo apps through a GitHub matrix.
+repository runs all Linux demo apps through a GitHub matrix. Each test has a
+15-minute execution timeout.
 
 ## Inputs
 

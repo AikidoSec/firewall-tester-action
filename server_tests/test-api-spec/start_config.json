@@ -1,4 +1,4 @@
 {
   "receivedAnyStats": false,
-  "heartbeatIntervalInMS": 60000
+  "heartbeatIntervalInMS": 120000
 }

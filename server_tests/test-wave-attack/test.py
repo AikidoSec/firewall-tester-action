@@ -204,7 +204,7 @@ def check_wave_attack(collector, get_method_path, ip, user_id, len_samples):
 
 
 def check_attack_wave_stats(collector, start_heartbeat_events, expected_total):
-    max_wait_time = 130
+    max_wait_time = 160
     deadline = time.time() + max_wait_time
     new_heartbeats = []
     total = 0

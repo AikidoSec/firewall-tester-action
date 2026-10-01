@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  check-code:
+  check-coremock-bundle:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

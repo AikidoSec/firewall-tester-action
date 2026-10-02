@@ -51,10 +51,10 @@ inputs:
       Maximum number of concurrent Compose operations and test workers
     required: false
     default: '20'
-  config_update_delay:
-    description: Delay in seconds after runtime configuration updates
+  config_propagation_delay:
+    description: Config propagation delay in seconds after delivery to the agent
     required: false
-    default: '60'
+    default: '1'
   app_env_file:
     description: Optional env file passed to the application service
     required: false
@@ -73,7 +73,7 @@ runs:
         APP_ENV_FILE_2: ${{ inputs.app_env_file_2 }}
         APP_PORT: ${{ inputs.app_port }}
         BUILD_ARGS: ${{ inputs.build_args }}
-        CONFIG_UPDATE_DELAY: ${{ inputs.config_update_delay }}
+        CONFIG_PROPAGATION_DELAY: ${{ inputs.config_propagation_delay }}
         DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
         IGNORE_FAILURES: ${{ inputs.ignore_failures }}
         MAX_PARALLEL_TESTS: ${{ inputs.max_parallel_tests }}

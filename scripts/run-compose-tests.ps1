@@ -1,7 +1,7 @@
 param(
     [string] $DockerfilePath = $env:DOCKERFILE_PATH,
     [string] $BuildArgs = $env:BUILD_ARGS,
-    [string] $ConfigUpdateDelay = $env:CONFIG_UPDATE_DELAY,
+    [string] $ConfigPropagationDelay = $env:CONFIG_PROPAGATION_DELAY,
     [string] $AppPort = $env:APP_PORT,
     [string] $AppEnvFile = $env:APP_ENV_FILE,
     [string] $AppEnvFile2 = $env:APP_ENV_FILE_2,
@@ -45,7 +45,7 @@ function Convert-ToBashPath {
 
 $env:DOCKERFILE_PATH = Convert-ToBashPath $DockerfilePath
 $env:BUILD_ARGS = $BuildArgs
-$env:CONFIG_UPDATE_DELAY = $ConfigUpdateDelay
+$env:CONFIG_PROPAGATION_DELAY = $ConfigPropagationDelay
 $env:APP_PORT = $AppPort
 $env:APP_ENV_FILE = Convert-ToBashPath $AppEnvFile
 $env:APP_ENV_FILE_2 = Convert-ToBashPath $AppEnvFile2

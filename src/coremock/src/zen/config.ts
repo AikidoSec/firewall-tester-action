@@ -18,7 +18,7 @@ function generateConfig(app: AppData) {
     success: true,
     serviceId: app.id,
     configUpdatedAt: app.configUpdatedAt,
-    heartbeatIntervalInMS: 10 * 60 * 1000,
+    heartbeatIntervalInMS: 2 * 60 * 1000,
     endpoints: [],
     blockedUserIds: [],
     allowedIPAddresses: [],

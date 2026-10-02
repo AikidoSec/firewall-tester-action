@@ -4,8 +4,7 @@ import time
 import os
 
 
-CONFIG_PROPAGATION_DELAY_SECONDS = 1
-CONFIG_UPDATE_DELAY_SECONDS = int(os.environ.get("CONFIG_UPDATE_DELAY", "60"))
+CONFIG_PROPAGATION_DELAY_SECONDS = int(os.environ.get("CONFIG_PROPAGATION_DELAY", "1"))
 
 
 class CoreApi:
@@ -31,20 +30,19 @@ class CoreApi:
         response = requests.post(f"{self.core_url}/api/runtime/config",
                                  headers={"Authorization": f"{self.token}"}, json=config)
         response.raise_for_status()
-        time.sleep(CONFIG_UPDATE_DELAY_SECONDS)
+        self.wait_for_config_delivery()
         return response.json()
 
-    def wait_for_config_delivery(self, timeout_seconds: float) -> dict:
+    def wait_for_config_delivery(self, timeout_seconds: float = 120) -> dict:
         deadline = time.monotonic() + timeout_seconds
         last_error = None
 
         while time.monotonic() < deadline:
-            remaining_seconds = deadline - time.monotonic()
             try:
                 response = requests.get(
                     f"{self.core_url}/api/runtime/config/delivery",
                     headers={"Authorization": f"{self.token}"},
-                    timeout=min(5, max(0.1, remaining_seconds)),
+                    timeout=10,
                 )
                 response.raise_for_status()
                 delivery = response.json()
@@ -53,7 +51,7 @@ class CoreApi:
                     return delivery
             except (requests.RequestException, ValueError, KeyError) as error:
                 last_error = error
-            time.sleep(0.25)
+            time.sleep(1)
 
         raise TimeoutError(
             f"Agent did not fetch firewall lists for its current runtime "
@@ -69,7 +67,7 @@ class CoreApi:
         response = requests.post(f"{self.core_url}/api/runtime/firewall/lists",
                                  headers={"Authorization": f"{self.token}"}, json=firewall)
         response.raise_for_status()
-        time.sleep(CONFIG_UPDATE_DELAY_SECONDS)
+        self.wait_for_config_delivery()
         return response.json()
 
     def update_runtime_firewall_file(self, file_name: str) -> dict:

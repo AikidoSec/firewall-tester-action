@@ -97,7 +97,7 @@ jobs:
           submodules: recursive
 
       - name: Run Compose tests
-        uses: $/
+        uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           build_args: ${{ matrix.app.build_args }}
@@ -126,23 +126,8 @@ jobs:
           ref: main
           submodules: recursive
 
-      - name: Start Docker
-        shell: pwsh
-        run: |
-          Start-Service docker -ErrorAction SilentlyContinue
-
-          for ($i = 0; $i -lt 60; $i++) {
-            docker version
-            if ($LASTEXITCODE -eq 0) {
-              exit 0
-            }
-            Start-Sleep -Seconds 2
-          }
-
-          throw 'Docker daemon did not become ready.'
-
       - name: Run Compose tests
-        uses: $/
+        uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 80
@@ -167,7 +152,7 @@ jobs:
           submodules: recursive
 
       - name: Run Compose control tests
-        uses: $/
+        uses: ./
         with:
           dockerfile_path: ./zen-demo/Dockerfile.qa-control-apache-mod-php
           app_port: 8080

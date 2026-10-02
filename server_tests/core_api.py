@@ -75,9 +75,12 @@ class CoreApi:
             firewall = json.load(f)
         return self.update_runtime_firewall_json(firewall)
 
-    def get_events(self, filter_type: str = None) -> list:
+    def get_events(self, filter_type: str = None, include_headers: bool = False) -> list:
         response = requests.get(
-            f"{self.core_url}/api/runtime/events", headers={"Authorization": f"{self.token}"})
+            f"{self.core_url}/api/runtime/events",
+            headers={"Authorization": f"{self.token}"},
+            params={"includeHeaders": "true"} if include_headers else None,
+        )
         events = response.json()
         if filter_type:
             events = [event for event in events if event['type'] == filter_type]

@@ -43599,7 +43599,7 @@ function normalizeTypesInApiSpec(schema) {
   }
   return schema;
 }
-function captureEvent(event, app2) {
+function captureEvent(event, app2, requestHeaders) {
   if (!events.has(app2.id)) {
     events.set(app2.id, []);
   }
@@ -43612,10 +43612,13 @@ function captureEvent(event, app2) {
       route.apispec = normalizeTypesInApiSpec(route.apispec);
     });
   }
-  events.get(app2.id).push(event);
+  events.get(app2.id).push({ event, requestHeaders });
 }
-function listEvents(app2) {
-  return events.get(app2.id) || [];
+function listEvents(app2, includeHeaders = false) {
+  const capturedEvents = events.get(app2.id) ?? [];
+  return capturedEvents.map(
+    ({ event, requestHeaders }) => includeHeaders ? { ...event, requestHeaders } : event
+  );
 }
 
 // src/coremock/src/handlers/listEvents.ts
@@ -43625,7 +43628,7 @@ function listEventsHandler(req, res) {
     res.status(401).json({ message: "App is missing" });
     return;
   }
-  const events2 = listEvents(appData);
+  const events2 = listEvents(appData, req.query.includeHeaders === "true");
   res.json(events2);
 }
 
@@ -43637,7 +43640,13 @@ function captureEventHandler(req, res) {
     return;
   }
   const event = req.body;
-  captureEvent(event, appData);
+  captureEvent(event, appData, {
+    "X-Agent-Platform": req.get("X-Agent-Platform") ?? null,
+    "X-Agent-Version": req.get("X-Agent-Version") ?? null,
+    "X-Agent-Hostname": req.get("X-Agent-Hostname") ?? null,
+    "X-Agent-IP-Address": req.get("X-Agent-IP-Address") ?? null,
+    "X-Agent-Session-Id": req.get("X-Agent-Session-Id") ?? null
+  });
   if (event.type === "detected_attack") {
     res.json({
       success: true

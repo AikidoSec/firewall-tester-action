@@ -13,7 +13,13 @@ export function captureEventHandler(
     return
   }
   const event = req.body
-  captureEvent(event, appData)
+  captureEvent(event, appData, {
+    'X-Agent-Platform': req.get('X-Agent-Platform') ?? null,
+    'X-Agent-Version': req.get('X-Agent-Version') ?? null,
+    'X-Agent-Hostname': req.get('X-Agent-Hostname') ?? null,
+    'X-Agent-IP-Address': req.get('X-Agent-IP-Address') ?? null,
+    'X-Agent-Session-Id': req.get('X-Agent-Session-Id') ?? null
+  })
 
   if (event.type === 'detected_attack') {
     res.json({

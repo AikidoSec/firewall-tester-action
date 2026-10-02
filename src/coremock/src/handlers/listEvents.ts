@@ -11,6 +11,6 @@ export function listEventsHandler(
     res.status(401).json({ message: 'App is missing' })
     return
   }
-  const events = listEvents(appData)
+  const events = listEvents(appData, req.query.includeHeaders === 'true')
   res.json(events)
 }

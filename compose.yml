@@ -12,6 +12,7 @@ include:
   - ./server_tests/test-allowed-ip-for-routes/compose.yml
   - ./server_tests/test-allowed-ip-for-wildcard-route/compose.yml
   - ./server_tests/test-allowed-ip-most-restrictive/compose.yml
+  - ./server_tests/test-agent-request-headers/compose.yml
   - ./server_tests/test-api-spec/compose.yml
   - ./server_tests/test-block-traffic-by-countries/compose.yml
   - ./server_tests/test-bypassed-ip/compose.yml

@@ -13,7 +13,7 @@ export function captureEventHandler(
     return
   }
   const event = req.body
-  captureEvent(event, appData)
+  captureEvent(event, appData, req.headers)
 
   if (event.type === 'detected_attack') {
     res.json({

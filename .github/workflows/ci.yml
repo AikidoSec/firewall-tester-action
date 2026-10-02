@@ -97,7 +97,7 @@ jobs:
           submodules: recursive
 
       - name: Run Compose tests
-        uses: ./
+        uses: $/
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           build_args: ${{ matrix.app.build_args }}
@@ -127,7 +127,7 @@ jobs:
           submodules: recursive
 
       - name: Run Compose tests
-        uses: ./
+        uses: $/
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 80
@@ -152,7 +152,7 @@ jobs:
           submodules: recursive
 
       - name: Run Compose control tests
-        uses: ./
+        uses: $/
         with:
           dockerfile_path: ./zen-demo/Dockerfile.qa-control-apache-mod-php
           app_port: 8080

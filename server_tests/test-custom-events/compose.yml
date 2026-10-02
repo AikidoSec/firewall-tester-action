@@ -1,0 +1,14 @@
+services:
+  test-custom-events:
+    profiles:
+      - core-integration
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-custom-events
+      DATABASE_NAME: test-custom-events
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-custom-events${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

@@ -1,2 +1,2 @@
-requests==2.33.0
+requests==2.34.0
 psycopg[binary]==3.3.4

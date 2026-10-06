@@ -18,6 +18,7 @@ include:
   - ./server_tests/test-bypassed-ip-for-geo-blocking/compose.yml
   - ./server_tests/test-bypassed-ip-for-rate-limiting/compose.yml
   - ./server_tests/test-core-went-down/compose.yml
+  - ./server_tests/test-custom-events/compose.yml
   - ./server_tests/test-demo-apps-generic-tests/compose.yml
   - ./server_tests/test-excluded-user-from-rate-limiting/compose.yml
   - ./server_tests/test-force-protection-off/compose.yml

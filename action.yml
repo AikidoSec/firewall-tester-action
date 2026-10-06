@@ -66,6 +66,14 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Set up Docker Compose
+      if: runner.os == 'Windows'
+      uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a
+      with:
+        # Bundled Compose ignores --parallel when starting containers.
+        # From 5.5.1, containers start one at a time while tests still run in parallel.
+        version: v5.5.1
+
     - name: Run Compose tests
       shell: bash
       env:

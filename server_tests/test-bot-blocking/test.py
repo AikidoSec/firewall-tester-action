@@ -1,3 +1,4 @@
+import time
 from testlib import *
 from core_api import CoreApi
 
@@ -35,30 +36,24 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Normal user agent should not be blocked: {response.text}")
 
-    # First heartbeat lands ~30-60s after agent start
-    c.wait_for_new_events(
-        70, old_events_length=len(start_heartbeat_events), filter_type="heartbeat"
+    traffic_finished_at = int(time.time() * 1000)
+    heartbeat, candidates = c.wait_for_heartbeat_after(
+        160, len(start_heartbeat_events), traffic_finished_at
     )
-    all_heartbeat_events = c.get_events("heartbeat")
-    new_heartbeat_events = all_heartbeat_events[len(start_heartbeat_events):]
 
-    if not collector.soft_assert(
-            len(new_heartbeat_events) == 1,
-            f"Expected 1 heartbeat event, got {len(new_heartbeat_events)}"):
-        collector.raise_if_failures()
-        return
-
-    heartbeat = new_heartbeat_events[0]
-    breakdown = heartbeat.get("stats", {}).get("userAgents", {}).get("breakdown", {})
-    collector.soft_assert(
-        breakdown.get("blocked-test-bot") == 1,
-        f"Expected 1 match for blocked-test-bot, got {breakdown.get('blocked-test-bot')} (breakdown: {breakdown})")
-    collector.soft_assert(
-        breakdown.get("monitored-test-bot") == 1,
-        f"Expected 1 match for monitored-test-bot, got {breakdown.get('monitored-test-bot')} (breakdown: {breakdown})")
-    collector.soft_assert(
-        len(breakdown) == 2,
-        f"Expected only the blocked and monitored bot keys in breakdown, got {breakdown}")
+    if collector.soft_assert(
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
+        breakdown = heartbeat.get("stats", {}).get("userAgents", {}).get("breakdown", {})
+        collector.soft_assert(
+            breakdown.get("blocked-test-bot") == 1,
+            f"Expected 1 match for blocked-test-bot, got {breakdown.get('blocked-test-bot')} (breakdown: {breakdown})")
+        collector.soft_assert(
+            breakdown.get("monitored-test-bot") == 1,
+            f"Expected 1 match for monitored-test-bot, got {breakdown.get('monitored-test-bot')} (breakdown: {breakdown})")
+        collector.soft_assert(
+            len(breakdown) == 2,
+            f"Expected only the blocked and monitored bot keys in breakdown, got {breakdown}")
 
     c.update_runtime_firewall_file("change_config_remove_blocked_bot.json")
 

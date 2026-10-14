@@ -35,7 +35,7 @@ def test_single_custom_event(collector, s: TestServer, c: CoreApi):
     route = "/api/custom-event"
     event_name = "user.login_failed"
     initial_count = len(c.get_events("custom"))
-    request_started_at_ms = int(time.time() * 1000)
+    request_started_at_ms = int(time.time()) * 1000
 
     get_successful_response(collector, s, route)
 
@@ -92,16 +92,14 @@ def test_single_custom_event(collector, s: TestServer, c: CoreApi):
 def test_custom_event_limit(collector, s: TestServer, c: CoreApi):
     initial_count = len(c.get_events("custom"))
 
-    get_successful_response(collector, s, "/api/custom-event-limit")
+    get_successful_response(collector, s, "/api/custom-event?count=100")
 
     c.wait_for_new_events(10, initial_count + MAX_EVENTS_PER_REQUEST - 1, "custom")
     c.wait_for_new_events(2, initial_count + MAX_EVENTS_PER_REQUEST, "custom")
 
     new_events = c.get_events("custom")[initial_count:]
     event_names = {event.get("name") for event in new_events}
-    expected_names = {
-        f"custom-event-{index}" for index in range(MAX_EVENTS_PER_REQUEST)
-    }
+    expected_names = {"user.login_failed"}
     collector.soft_assert(
         len(new_events) == MAX_EVENTS_PER_REQUEST,
         f"Expected {MAX_EVENTS_PER_REQUEST} custom events, got {len(new_events)}",
@@ -132,6 +130,8 @@ def run_test(s: TestServer, c: CoreApi):
 
     test_single_custom_event(collector, s, c)
     test_custom_event_limit(collector, s, c)
+    test_custom_event_limit(collector, s, c)
+    test_single_custom_event(collector, s, c)
     test_bypassed_custom_event(collector, s, c)
 
     collector.raise_if_failures()

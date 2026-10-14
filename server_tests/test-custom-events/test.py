@@ -130,6 +130,7 @@ def run_test(s: TestServer, c: CoreApi):
 
     test_single_custom_event(collector, s, c)
     test_custom_event_limit(collector, s, c)
+    # The event limit must reset for each request, even after it is reached.
     test_custom_event_limit(collector, s, c)
     test_single_custom_event(collector, s, c)
     test_bypassed_custom_event(collector, s, c)

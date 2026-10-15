@@ -43686,14 +43686,14 @@ function listsHandler(req, res) {
         ips: allowedIps
       }
     ] : [],
-    monitoredIPAddresses: monitoredIps.length > 0 ? monitoredIps : [
+    monitoredIPAddresses: monitoredIps.length > 0 ? [
       {
         key: "geoip/Belgium;BE",
         source: "geoip",
         description: "geo restrictions",
         ips: monitoredIps
       }
-    ]
+    ] : []
   });
 }
 
@@ -43714,13 +43714,13 @@ function updateListsHandler(req, res) {
   if (req.body.blockedIPAddresses && Array.isArray(req.body.blockedIPAddresses)) {
     updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses);
   }
-  if (req.body.blockedUserAgents && typeof req.body.blockedUserAgents === "string") {
+  if (typeof req.body.blockedUserAgents === "string") {
     updateBlockedUserAgents(req.appData, req.body.blockedUserAgents);
   }
   if (req.body.allowedIPAddresses && Array.isArray(req.body.allowedIPAddresses)) {
     updateAllowedIPAddresses(req.appData, req.body.allowedIPAddresses);
   }
-  if (req.body.monitoredUserAgents && typeof req.body.monitoredUserAgents === "string") {
+  if (typeof req.body.monitoredUserAgents === "string") {
     updateMonitoredUserAgents(req.appData, req.body.monitoredUserAgents);
   }
   if (req.body.monitoredIPAddresses && Array.isArray(req.body.monitoredIPAddresses)) {

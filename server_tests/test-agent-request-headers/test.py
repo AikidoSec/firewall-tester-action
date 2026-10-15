@@ -16,11 +16,8 @@ AGENT_HEADERS = (
 
 
 def get_start_event(c):
-    events = c.get_events("started", include_headers=True)
-    if not events:
-        assert c.wait_for_new_events(10, 0, "started"), "Expected a startup event"
-        events = c.get_events("started", include_headers=True)
-    return events[-1]
+    assert c.wait_for_new_events(10, 0, "started"), "Expected a startup event"
+    return c.get_events("started", include_headers=True)[-1]
 
 
 def send_attack_and_get_event(s, c):
@@ -36,22 +33,17 @@ def send_attack_and_get_event(s, c):
 
 def run_test(s: TestServer, c: CoreApi):
     events = [get_start_event(c), send_attack_and_get_event(s, c)]
-    expected_headers = {
-        header: events[0]["requestHeaders"].get(header)
-        for header in AGENT_HEADERS
-    }
+    expected_headers = events[0]["requestHeaders"]
 
     for event in events:
-        headers = {
-            header: event["requestHeaders"].get(header)
-            for header in AGENT_HEADERS
-        }
-        assert headers == expected_headers, (
-            f"Agent request headers changed from {expected_headers} to {headers}"
-        )
+        headers = event["requestHeaders"]
         for header in AGENT_HEADERS:
-            assert isinstance(headers[header], str) and headers[header], (
+            value = headers.get(header)
+            assert isinstance(value, str) and value, (
                 f"Expected {header} on the {event['type']} event, got {headers}"
+            )
+            assert value == expected_headers.get(header), (
+                f"{header} changed from {expected_headers.get(header)} to {value}"
             )
 
         agent = event["agent"]

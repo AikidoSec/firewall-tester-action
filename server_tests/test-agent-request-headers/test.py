@@ -73,5 +73,5 @@ def run_test(s: TestServer, c: CoreApi):
 
 
 if __name__ == "__main__":
-    args, s, c = init_server_and_core()
+    _, s, c = init_server_and_core()
     run_test(s, c)

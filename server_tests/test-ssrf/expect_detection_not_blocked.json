@@ -1,0 +1,18 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "method": "POST",
+    "route": "/api/request",
+    "url": "REGEX:^https?://test-ssrf(?::\\d+)?/api/request$"
+  },
+  "attack": {
+    "kind": "ssrf",
+    "blocked": false,
+    "source": "body",
+    "path": ".url",
+    "metadata": {
+      "hostname": "127.0.0.1",
+      "port": "4000"
+    }
+  }
+}

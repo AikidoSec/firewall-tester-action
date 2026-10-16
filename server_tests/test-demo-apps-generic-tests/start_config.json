@@ -1,0 +1,9 @@
+{
+  "block": true,
+  "success": true,
+  "endpoints": [],
+  "blockedUserIds": ["789"],
+  "allowedIPAddresses": [],
+  "receivedAnyStats": true,
+  "blockedIPAddresses": []
+}

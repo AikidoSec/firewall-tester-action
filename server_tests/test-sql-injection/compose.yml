@@ -1,0 +1,16 @@
+services:
+  test-sql-injection:
+    profiles:
+      - attacks
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-sql-injection
+      DATABASE_NAME: test-sql-injection
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-sql-injection${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

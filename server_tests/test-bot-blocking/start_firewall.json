@@ -1,0 +1,17 @@
+{
+  "blockedIPAddresses": [],
+  "allowedIPAddresses": [],
+  "monitoredIPAddresses": [],
+  "blockedUserAgents": "BlockedTestBot",
+  "monitoredUserAgents": "MonitoredTestBot",
+  "userAgentDetails": [
+    {
+      "key": "blocked-test-bot",
+      "pattern": "BlockedTestBot"
+    },
+    {
+      "key": "monitored-test-bot",
+      "pattern": "MonitoredTestBot"
+    }
+  ]
+}

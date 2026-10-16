@@ -1,0 +1,17 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "method": "POST",
+    "route": "/api/create",
+    "url": "REGEX:^https?://test-sql-injection(?::\\d+)?/api/create$"
+  },
+  "attack": {
+    "kind": "sql_injection",
+    "blocked": false,
+    "source": "body",
+    "metadata": {}
+  },
+  "agent": {
+    "dryMode": true
+  }
+}

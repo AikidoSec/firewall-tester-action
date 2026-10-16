@@ -1,0 +1,9 @@
+FROM ghcr.io/amitie10g/node-nanoserver:20-ltsc2022
+
+WORKDIR /app
+
+COPY dist/coremock.cjs ./
+
+EXPOSE 3000
+
+ENTRYPOINT ["node", "coremock.cjs"]

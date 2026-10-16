@@ -1,0 +1,7 @@
+{
+  "type": "heartbeat",
+  "hostnames": [
+    { "hostname": "evil.example.com", "port": 80, "hits": 1 },
+    { "hostname": "domain2.example.com", "port": 80, "hits": 1 }
+  ]
+}

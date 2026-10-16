@@ -31,21 +31,13 @@ export function updateListsHandler(req: RequestWithAppData, res: Response) {
   }
 
   if (
-    !req.body.blockedIPAddresses ||
-    !Array.isArray(req.body.blockedIPAddresses)
+    req.body.blockedIPAddresses &&
+    Array.isArray(req.body.blockedIPAddresses)
   ) {
-    res.status(400).json({
-      message: 'blockedIPAddresses is missing or invalid'
-    })
-    return
+    updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses)
   }
 
-  updateBlockedIPAddresses(req.appData, req.body.blockedIPAddresses)
-
-  if (
-    req.body.blockedUserAgents &&
-    typeof req.body.blockedUserAgents === 'string'
-  ) {
+  if (typeof req.body.blockedUserAgents === 'string') {
     updateBlockedUserAgents(req.appData, req.body.blockedUserAgents)
   }
 
@@ -56,10 +48,7 @@ export function updateListsHandler(req: RequestWithAppData, res: Response) {
     updateAllowedIPAddresses(req.appData, req.body.allowedIPAddresses)
   }
 
-  if (
-    req.body.monitoredUserAgents &&
-    typeof req.body.monitoredUserAgents === 'string'
-  ) {
+  if (typeof req.body.monitoredUserAgents === 'string') {
     updateMonitoredUserAgents(req.appData, req.body.monitoredUserAgents)
   }
 

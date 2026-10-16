@@ -1,9 +1,9 @@
 {
   "name": "GitHub Actions (TypeScript)",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:20",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20-bookworm",
   "postCreateCommand": "npm install -g @aikidosec/safe-chain && safe-chain setup --include-python && npm install  && pip install -r requirements.txt --break-system-packages",
   "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2.12.3": {},
     "ghcr.io/devcontainers/features/python:1": {}
   },
   "customizations": {

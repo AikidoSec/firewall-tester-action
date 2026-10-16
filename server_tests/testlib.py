@@ -4,16 +4,50 @@ import requests
 import argparse
 from core_api import CoreApi
 import json
-import subprocess
 import random
 import string
 import inspect
 import os
 import http.client
 import re
+from urllib.parse import quote
+
+_sessions = {}
+_raw_connections = {}
+TEST_SERVER_HOST = os.environ.get("TEST_SERVER_HOST", "localhost")
+TEST_CORE_HOST = os.environ.get("TEST_CORE_HOST", "localhost")
+TEST_CONTROL_SERVER_HOST = os.environ.get("TEST_CONTROL_SERVER_HOST", TEST_SERVER_HOST)
+TEST_APP_LOG_FILE = os.environ.get("TEST_APP_LOG_FILE")
 
 
-def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET"):
+def get_session(port):
+    if port not in _sessions:
+        _sessions[port] = requests.Session()
+    return _sessions[port]
+
+
+def get_raw_connection(port, host=TEST_SERVER_HOST, timeout=100):
+    key = (host, port)
+    if key not in _raw_connections:
+        _raw_connections[key] = http.client.HTTPConnection(host, port, timeout=timeout)
+    return _raw_connections[key]
+
+
+def percent_encode_non_ascii(route):
+    return "".join(char if char.isascii() else quote(char) for char in route)
+
+
+def wrap_raw_response(raw_response, port, route, host=TEST_SERVER_HOST):
+    response = requests.Response()
+    response.status_code = raw_response.status
+    response.headers = requests.structures.CaseInsensitiveDict(raw_response.getheaders())
+    response._content = raw_response.read()
+    response.url = f"http://{host}:{port}{route}"
+    response.read = lambda: response.content
+    return response
+
+
+def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False, method="GET", host=TEST_SERVER_HOST, timeout=100):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
@@ -21,15 +55,19 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     for attempt in range(3):
         try:
             if raw:
-                conn = http.client.HTTPConnection("localhost", port)
-                conn.request(method, route, headers=headers)
-                r = conn.getresponse()
+                conn = get_raw_connection(port, host, timeout)
+                conn.request(method, percent_encode_non_ascii(route), headers=headers)
+                raw_response = conn.getresponse()
+                r = wrap_raw_response(raw_response, port, route, host)
             else:
-                r = requests.get(
-                    f"http://localhost:{port}{route}", headers=headers)
+                r = get_session(port).get(f"http://{host}:{port}{route}", headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
+            if raw:
+                conn = _raw_connections.pop((host, port), None)
+                if conn is not None:
+                    conn.close()
             if attempt == 2:  # Last attempt
                 return None
             time.sleep(0.1)  # Brief delay before retry
@@ -45,15 +83,16 @@ def localhost_get_request(port, route="", headers={}, benchmark=False, raw=False
     return r
 
 
-def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100):
+def localhost_post_request(port, route, data, headers={}, benchmark=False, timeout=100, host=TEST_SERVER_HOST, raw=False):
     global benchmarks, s
 
     start_time = datetime.datetime.now()
+    payload = {"data": data} if raw else {"json": data}
 
     for attempt in range(3):
         try:
-            r = requests.post(f"http://localhost:{port}{route}",
-                              json=data, headers=headers, timeout=timeout)
+            r = requests.post(f"http://{host}:{port}{route}",
+                              **payload, headers=headers, timeout=timeout)
             break  # Success, exit retry loop
         except Exception as e:
             print(f"Error (attempt {attempt + 1}/3): {e}")
@@ -68,8 +107,8 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
     return r
 
 
-def localhost_request_request(port, method, route, data, headers, benchmark, timeout):
-    return requests.request(method, f"http://localhost:{port}{route}", json=data, headers=headers, timeout=timeout)
+def localhost_request_request(port, method, route, data, headers, benchmark, timeout, host=TEST_SERVER_HOST):
+    return requests.request(method, f"http://{host}:{port}{route}", json=data, headers=headers, timeout=timeout)
 
 
 def init_server_and_core():
@@ -79,12 +118,11 @@ def init_server_and_core():
     parser.add_argument("--control_server_port", type=int, required=False)
     parser.add_argument("--token", type=str, required=True)
     parser.add_argument("--core_port", type=int, default=3000)
-    parser.add_argument("--config_update_delay", type=int, default=60)
     args = parser.parse_args()
 
     server = TestServer(port=args.server_port, token=args.token)
-    core = CoreApi(token=args.token, core_url=f"http://localhost:{args.core_port}", test_name=args.test_name,
-                   config_update_delay=args.config_update_delay)
+    core = CoreApi(token=args.token, core_url=f"http://{TEST_CORE_HOST}:{args.core_port}",
+                   test_name=args.test_name)
     if args.control_server_port:
         control_server = TestControlServer(port=args.control_server_port)
         return args, server, core, control_server
@@ -111,7 +149,7 @@ class TestControlServer:
 
     def check_health(self):
         for i in range(5):
-            r = localhost_get_request(self.port, "/health")
+            r = localhost_get_request(self.port, "/health", host=TEST_CONTROL_SERVER_HOST)
             if r and r.status_code == 200:
                 break
             time.sleep((i + 1) * 3)
@@ -121,7 +159,7 @@ class TestControlServer:
             r, "\"status\":\"healthy\"", f"Health check failed: {r.text}")
 
     def status_is_running(self, running: bool):
-        r = localhost_get_request(self.port, "/status")
+        r = localhost_get_request(self.port, "/status", host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Status check failed: {r.text}")
         if running:
             assert_response_body_contains(
@@ -131,67 +169,67 @@ class TestControlServer:
                 r, "stopped", f"Server is not stopped {r.text}")
 
     def start_server(self):
-        r = localhost_post_request(self.port, "/start_server", {})
+        r = localhost_post_request(self.port, "/start_server", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Start server failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
         time.sleep(3)
 
     def stop_server(self):
-        r = localhost_post_request(self.port, "/stop_server", {})
+        r = localhost_post_request(self.port, "/stop_server", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(
             r, 200, f"Stop server failed: {r.text} {self.get_server_logs()}")
         assert_response_body_contains(
             r, "\"is_running\":false", message=f"Server is not stopped {self.get_server_logs()}")
 
     def restart(self):
-        r = localhost_post_request(self.port, "/restart", {})
+        r = localhost_post_request(self.port, "/restart", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Restart failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
 
     def graceful_restart(self):
-        r = localhost_post_request(self.port, "/graceful-restart", {})
+        r = localhost_post_request(self.port, "/graceful-restart", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Graceful restart failed: {r.text}")
         assert_response_body_contains(
             r, "\"is_running\":true", f"Server is not running {r.text}")
         time.sleep(3)
 
     def graceful_stop_server(self):
-        r = localhost_post_request(self.port, "/graceful-stop", {})
+        r = localhost_post_request(self.port, "/graceful-stop", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Graceful stop failed: {r.text}")
         time.sleep(3)
 
     def get_server_logs(self, type="error", lines=1000):
         response = localhost_get_request(
-            self.port, f"/get-server-logs?type={type}&lines={lines}")
+            self.port, f"/get-server-logs?type={type}&lines={lines}", host=TEST_CONTROL_SERVER_HOST)
         return response.text if response else None
 
     def uninstall_aikido(self):
-        r = localhost_post_request(self.port, "/uninstall-aikido", {})
+        r = localhost_post_request(self.port, "/uninstall-aikido", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Uninstall aikido failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Uninstall aikido failed: {r.text}")
 
     def install_aikido(self):
-        r = localhost_post_request(self.port, "/install-aikido", {})
+        r = localhost_post_request(self.port, "/install-aikido", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Install aikido failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Install aikido failed: {r.text}")
 
     def install_aikido_version(self, version: str):
         r = localhost_post_request(
-            self.port, "/install-aikido-version", {"version": version})
+            self.port, "/install-aikido-version", {"version": version}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(
             r, 200, f"Install aikido version failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Install aikido version failed: {r.text}")
 
     def config_test(self):
-        return localhost_get_request(self.port, "/config-test")
+        return localhost_get_request(self.port, "/config-test", host=TEST_CONTROL_SERVER_HOST)
 
     def kill_agent(self):
-        r = localhost_post_request(self.port, "/kill-aikido-agent", {})
+        r = localhost_post_request(self.port, "/kill-aikido-agent", {}, host=TEST_CONTROL_SERVER_HOST)
         assert_response_code_is(r, 200, f"Kill aikido agent failed: {r.text}")
         assert_response_body_contains(
             r, "\"status\":\"success\"", f"Kill aikido agent failed: {r.text}")
@@ -202,26 +240,36 @@ class TestServer:
         self.port = port
         self.token = token
 
-    def get(self, route="", headers={}, benchmark=False):
-        return localhost_get_request(self.port, route, headers, benchmark)
+    def get(self, route="", headers={}, benchmark=False, timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, timeout=timeout)
 
-    def get_raw(self, route="", headers={}, benchmark=False, method="GET"):
-        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method)
+    def get_raw(self, route="", headers={}, benchmark=False, method="GET", timeout=100):
+        return localhost_get_request(self.port, route, headers, benchmark, raw=True, method=method, timeout=timeout)
 
     def post(self, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_post_request(self.port, route, data, headers, benchmark, timeout)
 
+    def post_raw(self, route="", data="", headers={}, benchmark=False, timeout=100):
+        return localhost_post_request(self.port, route, data, headers, benchmark, timeout, raw=True)
+
     def request(self, method, route="", data={}, headers={}, benchmark=False, timeout=100):
         return localhost_request_request(self.port, method, route, data, headers, benchmark, timeout)
 
-    def get_logs(self, container_name: str):
-        # this gets the logs from the server (docker logs <container_name>)
-        logs = subprocess.check_output(
-            ["docker", "logs", container_name], stderr=subprocess.STDOUT)
-        return logs.decode("utf-8")
+    def get_logs(self):
+        if not TEST_APP_LOG_FILE:
+            raise RuntimeError("TEST_APP_LOG_FILE is required to read app logs")
+
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if os.path.exists(TEST_APP_LOG_FILE):
+                with open(TEST_APP_LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
+                    return f.read()
+            time.sleep(0.5)
+
+        raise RuntimeError(f"App log file does not exist: {TEST_APP_LOG_FILE}")
 
 
-def assert_event_contains_subset(event, event_subset, dry_mode=False):
+def assert_event_contains_subset(event, event_subset, dry_mode=False, _path=""):
     """
     Recursively checks that all keys and values in the subset JSON exist in the event JSON
     and have the same values. If a key in the subset is a list, all its elements must exist in the
@@ -229,6 +277,7 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
 
     :param event: The event JSON dictionary
     :param subset: The subset JSON dictionary
+    :param _path: Internal parameter tracking the current JSON path for error messages
     :raises AssertionError: If the subset is not fully contained within the event
     """
     def result(assertion_error):
@@ -236,31 +285,38 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
             return False
         raise assertion_error
 
-    print(f"Searching {event_subset} in {event} (dry_mode = {dry_mode})...")
+    path_label = _path or "(root)"
+    print(f"Searching {event_subset} in {event} at {path_label} (dry_mode = {dry_mode})...")
 
     if event is None:
-        print(f"Event is None!")
+        print(f"Event is None at {path_label}!")
         return False
 
     if isinstance(event_subset, dict):
         found_all_keys = True
         for key, value in event_subset.items():
+            child_path = f"{_path}.{key}" if _path else key
             if key not in event:
-                return result(AssertionError(f"Key '{key}' not found in '{event}'."))
-            if not assert_event_contains_subset(event[key], value, dry_mode):
+                return result(AssertionError(
+                    f"Key '{key}' not found at path '{child_path}'. "
+                    f"Available keys: {list(event.keys()) if isinstance(event, dict) else type(event).__name__}"))
+            if not assert_event_contains_subset(event[key], value, dry_mode, child_path):
                 found_all_keys = False
         return found_all_keys
     elif isinstance(event_subset, list):
         if not isinstance(event, list):
-            return result(AssertionError(f"Expected a list in event but found '{event}'."))
-        for event_subset_item in event_subset:
+            return result(AssertionError(
+                f"Expected a list at path '{path_label}' but found {type(event).__name__}: '{event}'"))
+        for idx, event_subset_item in enumerate(event_subset):
             found_item = False
             for event_item in event:
-                if assert_event_contains_subset(event_item, event_subset_item, dry_mode=True):
+                if assert_event_contains_subset(event_item, event_subset_item, dry_mode=True, _path=f"{path_label}[{idx}]"):
                     found_item = True
                     break
             if not found_item:
-                return result(AssertionError(f"Item '{event_subset_item}' not found in {event}."))
+                return result(AssertionError(
+                    f"Item not found at path '{path_label}[{idx}]': "
+                    f"expected '{event_subset_item}' but no matching element in {json.dumps(event, default=str)[:500]}"))
     else:
         # {\n  \"command\": \"`whoami`\"\n} and {\"command\": \"`whoami`\"} are the same string
         try:
@@ -276,10 +332,13 @@ def assert_event_contains_subset(event, event_subset, dry_mode=False):
             if re.match(regex, event):
                 return True
             else:
-                return result(AssertionError(f"Value mismatch: {event} does not match regex: {regex}"))
+                return result(AssertionError(
+                    f"Regex mismatch at path '{path_label}': "
+                    f"'{event}' does not match pattern '{regex}'"))
 
         if event_subset != event:
-            return result(AssertionError(f"Value mismatch: {event_subset} != {event}"))
+            return result(AssertionError(
+                f"Value mismatch at path '{path_label}': expected '{event_subset}', got '{event}'"))
 
     return True
 
@@ -320,6 +379,13 @@ def assert_response_body_contains(response, text, message=None):
         assert text in response.text, f"Test '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
 
 
+def assert_response_body_does_not_contain(response, text, message=None):
+    if message is None:
+        assert text not in response.text, f"Test '{text}' is part of response body: {response.text}"
+    else:
+        assert text not in response.text, f"Test '{text}' is part of response body: {json.dumps(response.text)}. Message: {message}"
+
+
 def assert_events_length_is(events, length):
     assert isinstance(events, list), "Error: Events is not a list."
     assert len(
@@ -339,11 +405,105 @@ def assert_started_event_is_valid(event):
 def assert_event_contains_subset_file(event, event_subset_file):
     caller_frame = inspect.currentframe().f_back
     caller_filename = caller_frame.f_code.co_filename
+    caller_lineno = caller_frame.f_lineno
+    subset_path = os.path.join(os.path.dirname(caller_filename), event_subset_file)
     event_subset = None
-    with open(os.path.join(os.path.dirname(caller_filename), event_subset_file), 'r') as file:
+    with open(subset_path, 'r', encoding="utf-8") as file:
         event_subset = json.load(file)
-    assert event_subset
-    assert_event_contains_subset(event, event_subset)
+    assert event_subset, f"Subset file '{event_subset_file}' is empty or invalid"
+    try:
+        assert_event_contains_subset(event, event_subset)
+    except AssertionError as e:
+        raise AssertionError(
+            f"[line {caller_lineno}] Event does not match subset file '{event_subset_file}': {e}"
+        ) from None
+
+
+class AssertionCollector:
+    """
+    Collects assertion failures to report all at once instead of failing on the first one.
+    Use soft_assert() for independent checks that should all be evaluated.
+    For prerequisite checks (where subsequent code depends on the result),
+    use soft_assert() + early return pattern:
+        if not collector.soft_assert(condition, msg):
+            return  # dependent code can't run
+    Call raise_if_failures() at the end to report all collected failures.
+    """
+
+    FAILURE_MARKER = "[FAIL]"
+
+    def __init__(self):
+        self.failures = []
+
+    def _get_test_caller_frames(self, max_frames=3):
+        """Walk the stack and return up to max_frames frames from test.py (outermost first)."""
+        frames = []
+        for frame_info in inspect.stack():
+            if frame_info.filename.endswith("test.py"):
+                frames.append(frame_info.lineno)
+                if len(frames) >= max_frames:
+                    break
+        frames.reverse()
+        return frames
+
+    def soft_assert(self, condition, message="Assertion failed"):
+        """Record failure but continue execution. Returns True if passed, False if failed."""
+        if not condition:
+            frames = self._get_test_caller_frames()
+            if frames:
+                refs = " → ".join(f"line {ln}" for ln in frames)
+                prefix = f"[{refs}] "
+            else:
+                prefix = ""
+            self.failures.append(f"{prefix}{message}")
+            return False
+        return True
+
+    def add_failure(self, message):
+        """Directly add a failure message to the collector."""
+        self.failures.append(message)
+
+    def soft_assert_response_code_is(self, response, status_code, message=None):
+        actual = get_response_status_code(response)
+        msg = f"Expected status {status_code}, got {actual}"
+        if message:
+            msg += f"; {message}"
+        return self.soft_assert(actual == status_code, msg)
+
+    def soft_assert_response_code_is_not(self, response, status_code, message=None):
+        actual = get_response_status_code(response)
+        msg = f"Status code should not be {status_code}, got {actual}"
+        if message:
+            msg += f"; {message}"
+        return self.soft_assert(actual != status_code, msg)
+
+    def soft_assert_response_body_contains(self, response, text, message=None):
+        msg = f"Text '{text}' is not part of response body"
+        if message:
+            msg += f"; {message}"
+        return self.soft_assert(text in response.text, msg)
+
+    def soft_assert_response_body_does_not_contain(self, response, text, message=None):
+        msg = f"Text '{text}' is part of response body"
+        if message:
+            msg += f"; {message}"
+        return self.soft_assert(text not in response.text, msg)
+
+    @property
+    def has_failures(self):
+        return len(self.failures) > 0
+
+    @property
+    def failure_count(self):
+        return len(self.failures)
+
+    def raise_if_failures(self):
+        """Raise combined AssertionError with all collected failures."""
+        if self.failures:
+            lines = [f"{len(self.failures)} assertion(s) failed:"]
+            for i, failure in enumerate(self.failures, 1):
+                lines.append(f"{self.FAILURE_MARKER} {failure}")
+            raise AssertionError("\n".join(lines))
 
 
 def assert_line_contains_sensitive_data(line, line_number):

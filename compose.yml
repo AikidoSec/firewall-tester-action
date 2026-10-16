@@ -24,6 +24,7 @@ include:
   - ./server_tests/test-demo-apps-generic-tests/compose.yml
   - ./server_tests/test-excluded-user-from-rate-limiting/compose.yml
   - ./server_tests/test-force-protection-off/compose.yml
+  - ./server_tests/test-idor-protection/compose.yml
   - ./server_tests/test-internet-not-available/compose.yml
   - ./server_tests/test-invalid-token/compose.yml
   - ./server_tests/test-ip-lists-monitoring/compose.yml

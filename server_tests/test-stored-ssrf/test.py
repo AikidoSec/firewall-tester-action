@@ -151,6 +151,20 @@ def run_test(s: TestServer, c: CoreApi):
     # 169.254.169.254 (url=3) is an IP, not a hostname resolution spoofing case, should not be blocked
     check_stored_ssrf_with_url(collector, s, "169.254.169.254", 3)
 
+    # Trailing-dot hostnames resolve identically, so they must preserve the
+    # distinction between spoofed hostnames and trusted metadata hostnames.
+    set_dns_mapping("169.254.169.254", "evil-stored-ssrf-hostname.")
+    response = s.post("/api/stored_ssrf", {"urlIndex": 4}, timeout=10)
+    collector.soft_assert_response_code_is(
+        response, 500,
+        f"evil-stored-ssrf-hostname. (trailing dot) should be blocked [{response.text}]")
+    collector.soft_assert_response_body_contains(
+        response, "blocked",
+        f"evil-stored-ssrf-hostname. (trailing dot) should be blocked [{response.text}]")
+
+    check_stored_ssrf_with_url(collector, s, "metadata.google.internal.", 5)
+    check_stored_ssrf_with_url(collector, s, "metadata.goog.", 6)
+
     collector.raise_if_failures()
 
 

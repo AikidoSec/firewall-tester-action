@@ -95,7 +95,7 @@ def run_test(s: TestServer, c: CoreApi):
         "file://localhost/etc/passwd",
         "/.%2e/.%2e/.%2e/.%2e/.%2e/.%2e/etc/passwd",
         "/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/%%32%65%%32%65/etc/passwd",
-        "%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd"
+        "%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/%2e%2e/etc/passwd",
     ]
 
     for path in paths:
@@ -132,6 +132,68 @@ def run_test(s: TestServer, c: CoreApi):
             # encoded first value
             f"path=%2E%2E%2Fsecrets%2Fkey.txt&path={path}",
 
+        ]
+
+        for variant in variants:
+            check_path_traversal(collector, "/api/read?" + variant)
+            check_path_traversal(collector, "/api/read2?" + variant)
+
+    tilde_paths = [
+        # current user
+        "~",
+        "~/",
+        "~/secrets/key.txt",
+
+        # current user - encoded ~
+        "%7E",
+        "%7E/",
+        "%7E/secrets/key.txt",
+
+        "%7e",
+        "%7e/",
+        "%7e/secrets/key.txt",
+
+        # current user - double-encoded ~
+        "%257E",
+        "%257E/",
+        "%257E/secrets/key.txt",
+
+        "%257e",
+        "%257e/",
+        "%257e/secrets/key.txt",
+
+        # named user
+        "~root",
+        "~root/",
+        "~root/secrets/key.txt",
+
+        # named user - encoded ~
+        "%7Eroot",
+        "%7Eroot/",
+        "%7Eroot/secrets/key.txt",
+
+        "%7eroot",
+        "%7eroot/",
+        "%7eroot/secrets/key.txt",
+
+        # named user - double-encoded ~
+        "%257Eroot",
+        "%257Eroot/",
+        "%257Eroot/secrets/key.txt",
+
+        "%257eroot",
+        "%257eroot/",
+        "%257eroot/secrets/key.txt",
+    ]
+
+    for path in tilde_paths:
+        variants = [
+            f"path={path}",
+            f"path={path}&path=",
+            f"path=&path={path}",
+            f"path[]={path}",
+            f"path[0]={path}&path[1]=",
+            f"path[]={path}&path[]=",
         ]
 
         for variant in variants:

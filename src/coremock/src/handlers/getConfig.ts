@@ -1,5 +1,5 @@
 import { Response } from 'express'
-import { getAppConfig } from '../zen/config.js'
+import { getAppConfig, markAppConfigSent } from '../zen/config.js'
 import { RequestWithAppData } from '../types.js'
 
 export function getConfigHandler(req: RequestWithAppData, res: Response): void {
@@ -9,5 +9,7 @@ export function getConfigHandler(req: RequestWithAppData, res: Response): void {
     return
   }
 
-  res.json(getAppConfig(appData))
+  const config = getAppConfig(appData)
+  res.on('finish', () => markAppConfigSent(appData, config.configUpdatedAt))
+  res.json(config)
 }

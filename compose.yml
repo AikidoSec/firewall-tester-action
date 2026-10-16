@@ -12,17 +12,21 @@ include:
   - ./server_tests/test-allowed-ip-for-routes/compose.yml
   - ./server_tests/test-allowed-ip-for-wildcard-route/compose.yml
   - ./server_tests/test-allowed-ip-most-restrictive/compose.yml
+  - ./server_tests/test-agent-request-headers/compose.yml
   - ./server_tests/test-api-spec/compose.yml
   - ./server_tests/test-block-traffic-by-countries/compose.yml
+  - ./server_tests/test-bot-blocking/compose.yml
   - ./server_tests/test-bypassed-ip/compose.yml
   - ./server_tests/test-bypassed-ip-for-geo-blocking/compose.yml
   - ./server_tests/test-bypassed-ip-for-rate-limiting/compose.yml
   - ./server_tests/test-core-went-down/compose.yml
+  - ./server_tests/test-custom-events/compose.yml
   - ./server_tests/test-demo-apps-generic-tests/compose.yml
   - ./server_tests/test-excluded-user-from-rate-limiting/compose.yml
   - ./server_tests/test-force-protection-off/compose.yml
   - ./server_tests/test-internet-not-available/compose.yml
   - ./server_tests/test-invalid-token/compose.yml
+  - ./server_tests/test-ip-lists-monitoring/compose.yml
   - ./server_tests/test-logs-sensitive-data/compose.yml
   - ./server_tests/test-no-token-set/compose.yml
   - ./server_tests/test-outbound-domain-blocking/compose.yml

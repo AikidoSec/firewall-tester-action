@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { IncomingHttpHeaders } from 'http'
 import { AppData } from '../types.js'
 
-const events = new Map()
+type CapturedEvent = {
+  event: any
+  requestHeaders: IncomingHttpHeaders
+}
+
+const events = new Map<number, CapturedEvent[]>()
 
 function normalizeTypesInApiSpec(schema: any): any {
   if (Array.isArray(schema)) {
@@ -30,7 +36,11 @@ function normalizeTypesInApiSpec(schema: any): any {
   return schema
 }
 
-export function captureEvent(event: any, app: AppData) {
+export function captureEvent(
+  event: any,
+  app: AppData,
+  requestHeaders: IncomingHttpHeaders
+) {
   if (!events.has(app.id)) {
     events.set(app.id, [])
   }
@@ -45,9 +55,12 @@ export function captureEvent(event: any, app: AppData) {
     })
   }
 
-  events.get(app.id).push(event)
+  events.get(app.id)!.push({ event, requestHeaders })
 }
 
-export function listEvents(app: AppData) {
-  return events.get(app.id) || []
+export function listEvents(app: AppData, includeHeaders = false) {
+  const capturedEvents = events.get(app.id) ?? []
+  return capturedEvents.map(({ event, requestHeaders }) =>
+    includeHeaders ? { ...event, requestHeaders } : event
+  )
 }

@@ -20118,7 +20118,8 @@ var require_utils3 = __commonJS({
     var mime = require_mime_types();
     var proxyaddr = require_proxy_addr();
     var qs = require_lib2();
-    var querystring = require("querystring");
+    var querystring = require("node:querystring");
+    var { Buffer: Buffer2 } = require("node:buffer");
     exports2.methods = METHODS.map((method) => method.toLowerCase());
     exports2.etag = createETagGenerator({ weak: false });
     exports2.wetag = createETagGenerator({ weak: true });
@@ -20222,13 +20223,13 @@ var require_utils3 = __commonJS({
     };
     function createETagGenerator(options) {
       return function generateETag(body, encoding) {
-        var buf = !Buffer.isBuffer(body) ? Buffer.from(body, encoding) : body;
+        var buf = !Buffer2.isBuffer(body) ? Buffer2.from(body, encoding) : body;
         return etag(buf, options);
       };
     }
     function parseExtendedQueryString(str) {
       return qs.parse(str, {
-        allowPrototypes: true
+        plainObjects: true
       });
     }
   }
@@ -21597,7 +21598,7 @@ var require_application = __commonJS({
     };
     app2.listen = function listen() {
       var server2 = http.createServer(this);
-      var args = Array.prototype.slice.call(arguments);
+      var args = slice.call(arguments);
       if (typeof args[args.length - 1] === "function") {
         var done = args[args.length - 1] = once(args[args.length - 1]);
         server2.once("error", done);
@@ -22406,9 +22407,8 @@ var require_request = __commonJS({
       var accept = accepts(this);
       return accept.charsets.apply(accept, arguments);
     };
-    req.acceptsLanguages = function() {
-      var accept = accepts(this);
-      return accept.languages.apply(accept, arguments);
+    req.acceptsLanguages = function(...languages) {
+      return accepts(this).languages(...languages);
     };
     req.range = function range(size, options) {
       var range2 = this.get("Range");
@@ -22434,9 +22434,9 @@ var require_request = __commonJS({
       return typeis(this, arr);
     };
     defineGetter(req, "protocol", function protocol() {
-      var proto = this.connection.encrypted ? "https" : "http";
+      var proto = this.socket.encrypted ? "https" : "http";
       var trust = this.app.get("trust proxy fn");
-      if (!trust(this.connection.remoteAddress, 0)) {
+      if (!trust(this.socket.remoteAddress, 0)) {
         return proto;
       }
       var header = this.get("X-Forwarded-Proto") || proto;
@@ -22469,7 +22469,7 @@ var require_request = __commonJS({
     defineGetter(req, "host", function host() {
       var trust = this.app.get("trust proxy fn");
       var val = this.get("X-Forwarded-Host");
-      if (!val || !trust(this.connection.remoteAddress, 0)) {
+      if (!val || !trust(this.socket.remoteAddress, 0)) {
         val = this.get("Host");
       } else if (val.indexOf(",") !== -1) {
         val = val.substring(0, val.indexOf(",")).trimRight();
@@ -23481,6 +23481,7 @@ var require_response = __commonJS({
     "use strict";
     var contentDisposition = require_content_disposition();
     var createError = require_http_errors();
+    var deprecate = require_depd()("express");
     var encodeUrl = require_encodeurl();
     var escapeHtml = require_escape_html();
     var http = require("node:http");
@@ -23498,6 +23499,7 @@ var require_response = __commonJS({
     var extname = path.extname;
     var resolve = path.resolve;
     var vary = require_vary();
+    var { Buffer: Buffer2 } = require("node:buffer");
     var res = Object.create(http.ServerResponse.prototype);
     module2.exports = res;
     res.status = function status(code) {
@@ -23561,12 +23563,12 @@ var require_response = __commonJS({
       var generateETag = !this.get("ETag") && typeof etagFn === "function";
       var len;
       if (chunk !== void 0) {
-        if (Buffer.isBuffer(chunk)) {
+        if (Buffer2.isBuffer(chunk)) {
           len = chunk.length;
         } else if (!generateETag && chunk.length < 1e3) {
-          len = Buffer.byteLength(chunk, encoding);
+          len = Buffer2.byteLength(chunk, encoding);
         } else {
-          chunk = Buffer.from(chunk, encoding);
+          chunk = Buffer2.from(chunk, encoding);
           encoding = void 0;
           len = chunk.length;
         }
@@ -23805,6 +23807,15 @@ var require_response = __commonJS({
         status = arguments[0];
         address = arguments[1];
       }
+      if (!address) {
+        deprecate("Provide a url argument");
+      }
+      if (typeof address !== "string") {
+        deprecate("Url must be a string");
+      }
+      if (typeof status !== "number") {
+        deprecate("Status must be a number");
+      }
       address = this.location(address).get("Location");
       this.format({
         text: function() {
@@ -23819,7 +23830,7 @@ var require_response = __commonJS({
         }
       });
       this.status(status);
-      this.set("Content-Length", Buffer.byteLength(body));
+      this.set("Content-Length", Buffer2.byteLength(body));
       if (this.req.method === "HEAD") {
         this.end();
       } else {

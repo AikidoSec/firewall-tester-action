@@ -3,6 +3,18 @@ import time
 from testlib import *
 from core_api import CoreApi
 
+'''
+Tests client-IP resolution with AIKIDO_TRUST_PROXY=true and
+AIKIDO_CLIENT_IP_HEADER=X-Real-IP.
+
+1. Send a request with X-Real-IP; expect the IP from that header.
+2. Send a request without X-Real-IP; expect the connecting client's IP.
+3. Wait for both users in a heartbeat and verify their lastIpAddress values.
+
+Separate user IDs prevent the two requests from overwriting each other's
+lastIpAddress.
+'''
+
 REAL_CLIENT_IP = "11.22.33.44"
 USER_ID_WITH_PROXY_HEADER = "42"
 USER_ID_WITHOUT_PROXY_HEADER = "43"

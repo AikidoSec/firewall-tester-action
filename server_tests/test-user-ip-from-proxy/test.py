@@ -1,59 +1,89 @@
-import socket
 import time
+from socket import gethostname, gethostbyname
 from testlib import *
 from core_api import CoreApi
 
 '''
-Tests client-IP resolution with AIKIDO_TRUST_PROXY=true and
-AIKIDO_CLIENT_IP_HEADER=X-Real-IP.
+Tests that when AIKIDO_TRUST_PROXY=true and AIKIDO_CLIENT_IP_HEADER=X-Real-IP,
+the user's lastIpAddress in heartbeat events reflects the resolved client IP
+from the proxy header — not the raw TCP connection IP (e.g. Docker bridge).
 
-1. Send a request with X-Real-IP; expect the IP from that header.
-2. Send a request without X-Real-IP; expect the connecting client's IP.
-3. Wait for both users in a heartbeat and verify their lastIpAddress values.
+1. Send requests with a user header and X-Real-IP proxy header.
+2. Wait for a heartbeat event.
+3. Verify the user's lastIpAddress matches X-Real-IP, not the container IP.
 
-Separate user IDs prevent the two requests from overwriting each other's
-lastIpAddress.
+Also check a request without X-Real-IP. The runner's container IP is the
+expected client IP because the runner and app are separate containers.
 '''
 
 REAL_CLIENT_IP = "11.22.33.44"
-USER_ID_WITH_PROXY_HEADER = "42"
+USER_ID = "42"
 USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 
 def run_test(s: TestServer, c: CoreApi):
+    collector = AssertionCollector()
+
     start_events = c.get_events("heartbeat")
 
-    response = s.get("/api/pets/", headers={
-        "user": USER_ID_WITH_PROXY_HEADER,
-        "X-Real-IP": REAL_CLIENT_IP
-    })
-    assert_response_code_is(response, 200)
-
-    with socket.create_connection((TEST_SERVER_HOST, s.port), timeout=10) as connection:
-        client_ip = connection.getsockname()[0]
-        server_ip = connection.getpeername()[0]
-        assert client_ip != server_ip, "Client and server IPs must differ for this test"
+    for _ in range(3):
+        response = s.get("/api/pets/", headers={
+            "user": USER_ID,
+            "X-Real-IP": REAL_CLIENT_IP
+        })
+        collector.soft_assert_response_code_is(response, 200)
+        time.sleep(0.5)
 
     response = s.get("/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
-    assert_response_code_is(response, 200)
-
-    expected_ips = {
-        USER_ID_WITH_PROXY_HEADER: REAL_CLIENT_IP,
-        USER_ID_WITHOUT_PROXY_HEADER: client_ip,
-    }
+    collector.soft_assert_response_code_is(response, 200)
 
     traffic_finished_at = int(time.time() * 1000)
     heartbeat, candidates = c.wait_for_heartbeat_after(
         160, len(start_events), traffic_finished_at,
-        predicate=lambda event: set(expected_ips).issubset(
-            str(user["id"]) for user in (event.get("users") or []))
+        predicate=lambda event: any(
+            str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER
+            for user in (event.get("users") or []))
     )
 
-    assert heartbeat is not None, f"Both users were not reported in {len(candidates)} heartbeat(s)"
-    reported_ips = {str(user["id"]): user["lastIpAddress"] for user in heartbeat["users"]}
-    for user_id, expected_ip in expected_ips.items():
-        actual_ip = reported_ips[user_id].removeprefix("::ffff:")
-        assert actual_ip == expected_ip, f"User {user_id}: expected IP {expected_ip}, got {actual_ip}"
+    if not collector.soft_assert(
+            heartbeat is not None,
+            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
+        collector.raise_if_failures()
+        return
+
+    users = heartbeat.get("users", [])
+
+    if not collector.soft_assert(len(users) >= 1, f"Expected at least 1 user in heartbeat, got {len(users)}"):
+        collector.raise_if_failures()
+        return
+
+    target_user = None
+    for user in users:
+        if str(user.get("id")) == USER_ID:
+            target_user = user
+            break
+
+    if not collector.soft_assert(target_user is not None, f"User {USER_ID} not found in heartbeat users: {users}"):
+        collector.raise_if_failures()
+        return
+
+    last_ip = target_user.get("lastIpAddress", "")
+
+    collector.soft_assert(
+        last_ip == REAL_CLIENT_IP,
+        f"User lastIpAddress should be '{REAL_CLIENT_IP}' (from X-Real-IP header), "
+        f"but got '{last_ip}' (likely the Docker bridge/proxy IP)")
+
+    user_without_proxy = next(user for user in users
+                              if str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER)
+    expected_ip = gethostbyname(gethostname())
+    actual_ip = user_without_proxy.get("lastIpAddress", "").removeprefix("::ffff:")
+    collector.soft_assert(
+        actual_ip == expected_ip,
+        f"User {USER_ID_WITHOUT_PROXY_HEADER} lastIpAddress should be '{expected_ip}' "
+        f"(the test runner's IP), but got '{actual_ip}'")
+
+    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

@@ -15,8 +15,8 @@ from the proxy header — not the raw TCP connection IP (e.g. Docker bridge).
 '''
 
 REAL_CLIENT_IP = "11.22.33.44"
-USER_ID = "42"
-SOCKET_USER_ID = "43"
+USER_ID_WITH_PROXY_HEADER = "42"
+USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -26,7 +26,7 @@ def run_test(s: TestServer, c: CoreApi):
 
     for _ in range(3):
         response = s.get("/api/pets/", headers={
-            "user": USER_ID,
+            "user": USER_ID_WITH_PROXY_HEADER,
             "X-Real-IP": REAL_CLIENT_IP
         })
         collector.soft_assert_response_code_is(response, 200)
@@ -38,7 +38,7 @@ def run_test(s: TestServer, c: CoreApi):
         socket_ip = connection.sock.getsockname()[0]
         server_ip = connection.sock.getpeername()[0]
         assert socket_ip != server_ip, "Client and server IPs must differ for the socket IP check"
-        connection.request("GET", "/api/pets/", headers={"user": SOCKET_USER_ID})
+        connection.request("GET", "/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
         response = connection.getresponse()
         response.read()
         collector.soft_assert_response_code_is(response, 200)
@@ -48,7 +48,7 @@ def run_test(s: TestServer, c: CoreApi):
     traffic_finished_at = int(time.time() * 1000)
     heartbeat, candidates = c.wait_for_heartbeat_after(
         160, len(start_events), traffic_finished_at,
-        predicate=lambda event: {USER_ID, SOCKET_USER_ID}.issubset(
+        predicate=lambda event: {USER_ID_WITH_PROXY_HEADER, USER_ID_WITHOUT_PROXY_HEADER}.issubset(
             str(user.get("id")) for user in (event.get("users") or []))
     )
 
@@ -64,7 +64,7 @@ def run_test(s: TestServer, c: CoreApi):
         collector.raise_if_failures()
         return
 
-    for user_id, expected_ip in ((USER_ID, REAL_CLIENT_IP), (SOCKET_USER_ID, socket_ip)):
+    for user_id, expected_ip in ((USER_ID_WITH_PROXY_HEADER, REAL_CLIENT_IP), (USER_ID_WITHOUT_PROXY_HEADER, socket_ip)):
         target_user = next((user for user in users if str(user.get("id")) == user_id), None)
         if not collector.soft_assert(target_user is not None, f"User {user_id} not found in heartbeat users: {users}"):
             continue

@@ -11,9 +11,8 @@ from the proxy header — not the raw TCP connection IP (e.g. Docker bridge).
 1. Send requests with a user header and X-Real-IP proxy header.
 2. Wait for a heartbeat event.
 3. Verify the user's lastIpAddress matches X-Real-IP, not the container IP.
-
-Also check a request without X-Real-IP. The runner's container IP is the
-expected client IP because the runner and app are separate containers.
+4. Verify a request without X-Real-IP reports the runner's container IP.
+   The runner and app are separate containers, so the runner is the client.
 '''
 
 REAL_CLIENT_IP = "11.22.33.44"

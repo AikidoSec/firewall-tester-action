@@ -1,4 +1,5 @@
 import time
+from socket import gethostname, gethostbyname
 from testlib import *
 from core_api import CoreApi
 
@@ -10,10 +11,13 @@ from the proxy header — not the raw TCP connection IP (e.g. Docker bridge).
 1. Send requests with a user header and X-Real-IP proxy header.
 2. Wait for a heartbeat event.
 3. Verify the user's lastIpAddress matches X-Real-IP, not the container IP.
+4. Verify a request without X-Real-IP reports the runner's container IP.
+   The runner and app are separate containers, so the runner is the client.
 '''
 
 REAL_CLIENT_IP = "11.22.33.44"
 USER_ID = "42"
+USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -29,9 +33,15 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(response, 200)
         time.sleep(0.5)
 
+    response = s.get("/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
+    collector.soft_assert_response_code_is(response, 200)
+
     traffic_finished_at = int(time.time() * 1000)
     heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at
+        160, len(start_events), traffic_finished_at,
+        predicate=lambda event: any(
+            str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER
+            for user in (event.get("users") or []))
     )
 
     if not collector.soft_assert(
@@ -62,6 +72,15 @@ def run_test(s: TestServer, c: CoreApi):
         last_ip == REAL_CLIENT_IP,
         f"User lastIpAddress should be '{REAL_CLIENT_IP}' (from X-Real-IP header), "
         f"but got '{last_ip}' (likely the Docker bridge/proxy IP)")
+
+    user_without_proxy = next(user for user in users
+                              if str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER)
+    expected_ip = gethostbyname(gethostname())
+    actual_ip = user_without_proxy.get("lastIpAddress", "").removeprefix("::ffff:")
+    collector.soft_assert(
+        actual_ip == expected_ip,
+        f"User {USER_ID_WITHOUT_PROXY_HEADER} lastIpAddress should be '{expected_ip}' "
+        f"(the test runner's IP), but got '{actual_ip}'")
 
     collector.raise_if_failures()
 

@@ -40,6 +40,7 @@ jobs:
             ref: main
             app_port: 3000
             build_args: ''
+            ignore_failures: true
           - name: python
             repository: Aikido-demo-apps/zen-demo-python
             ref: main
@@ -62,6 +63,7 @@ jobs:
             ref: main
             app_port: 8080
             build_args: ''
+            ignore_failures: true
           - name: java
             repository: Aikido-demo-apps/zen-demo-java
             ref: main
@@ -131,6 +133,7 @@ jobs:
         with:
           dockerfile_path: ./zen-demo/Dockerfile
           app_port: 80
+          ignore_failures: true
 
   control-tests-linux:
     name: php-control

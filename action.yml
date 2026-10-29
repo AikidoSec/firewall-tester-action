@@ -47,8 +47,7 @@ inputs:
     required: false
     default: '8080'
   max_parallel_tests:
-    description:
-      Maximum number of concurrent Compose operations and test workers
+    description: Maximum number of apps running their tests at the same time
     required: false
     default: '20'
   config_propagation_delay:

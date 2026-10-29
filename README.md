@@ -55,9 +55,8 @@ repository runs all Linux demo apps through a GitHub matrix. Each test has a
 
 ## Running Locally
 
-Python 3.9 or newer, Docker, and Docker Compose are required on the host. Each
-test starts its app, runs in the shared runner, and stops its app before the
-next test takes that slot. Supporting services stay up for the suite.
+Each test starts its app, runs in the shared runner, and stops its app before
+the next test takes that slot. Supporting services stay up for the suite.
 
 Clone a demo app into `./zen-demo`:
 

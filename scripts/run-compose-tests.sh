@@ -266,23 +266,10 @@ cleanup_compose_project
 echo "Selected tests: ${#selected_tests[@]}"
 echo "Tests to run: ${#tests_to_run[@]}"
 
-up_args=(
-  up
-  --no-build
-  --no-color
-  --timeout 10
-  --exit-code-from suite-runner
-)
-
-if [ -n "$TEST_NAME" ] || [ -n "$RUN_TESTS" ] || [ -n "$SKIP_TESTS" ]; then
-  echo "Compose services to start: ${#tests_to_run[@]}"
-  up_args+=(suite-runner "${tests_to_run[@]}")
-else
-  echo "Compose profile: $active_test_profile"
-fi
-
 set +e
-"${compose[@]}" "${up_args[@]}" 2>&1 | tee "$results_dir/app-logs.txt"
+PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8 \
+  python "$action_path/scripts/run-compose-suite.py" "$results_dir" "${compose[@]}" \
+  2>&1 | tee "$results_dir/app-logs.txt"
 suite_status=$?
 set -e
 

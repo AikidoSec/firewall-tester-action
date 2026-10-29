@@ -48,12 +48,16 @@ repository runs all Linux demo apps through a GitHub matrix. Each test has a
 | `skip_tests`               | Optional comma-separated list of tests to skip                  |
 | `build_args`               | Optional newline-separated Docker build args for the demo image |
 | `app_port`                 | Port exposed by the application during Docker runtime           |
-| `max_parallel_tests`       | Maximum concurrent Compose operations and tests (default: 20)   |
+| `max_parallel_tests`       | Maximum apps running their tests at the same time (default: 20) |
 | `config_propagation_delay` | Config propagation delay after delivery (default: 1 second)     |
 | `app_env_file`             | Optional env file passed to the application service             |
 | `app_env_file_2`           | Optional second env file passed to the application service      |
 
 ## Running Locally
+
+Python 3.9 or newer, Docker, and Docker Compose are required on the host. Each
+test starts its app, runs in the shared runner, and stops its app before the
+next test takes that slot. Supporting services stay up for the suite.
 
 Clone a demo app into `./zen-demo`:
 

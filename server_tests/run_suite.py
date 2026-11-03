@@ -1,4 +1,3 @@
-import concurrent.futures
 from html import escape
 import json
 import os
@@ -457,6 +456,25 @@ def main() -> int:
     tests = csv_values("SUITE_TESTS")
     skipped = csv_values("SUITE_SKIPPED_TESTS")
 
+    if sys.argv[1:] == ["--summarize"]:
+        results = [json.loads((RESULTS / f"{name}.json").read_text(encoding="utf-8")) for name in tests]
+        write_summary(results, skipped)
+        SUITE_COMPLETE.touch()
+        return 1 if any(result["status"] == "FAIL" for result in results) else 0
+
+    if len(sys.argv) == 3 and sys.argv[1] == "--test" and sys.argv[2] in tests:
+        result = run_test(sys.argv[2])
+        (RESULTS / f"{result['test']}.json").write_text(json.dumps(result), encoding="utf-8")
+        print(f"{result['status']} {result['test']} ({result['duration_seconds']:.2f}s)", flush=True)
+        if result["status"] == "FAIL":
+            print(f"--- {result['test']} log ---", flush=True)
+            print(tail(Path(result["log"])), end="", flush=True)
+            print(f"--- end {result['test']} log ---", flush=True)
+        return 0 if result["status"] == "PASS" else 1
+
+    if sys.argv[1:]:
+        raise ValueError(f"Unknown suite runner arguments: {sys.argv[1:]}")
+
     RESULTS.mkdir(parents=True, exist_ok=True)
     SETUP_COMPLETE.unlink(missing_ok=True)
     SUITE_COMPLETE.unlink(missing_ok=True)
@@ -488,35 +506,8 @@ def main() -> int:
     print(f"SETUP COMPLETE ({setup_seconds:.2f}s)", flush=True)
     SETUP_COMPLETE.touch()
 
-    results = []
-    if tests:
-        print(f"RUNTIME SERVICES READY ({len(tests)} tests)", flush=True)
-
-        configured_workers = os.environ.get("SUITE_MAX_WORKERS")
-        max_workers = min(
-            len(tests), int(configured_workers) if configured_workers else len(tests)
-        )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(run_test, test_name): test_name
-                for test_name in tests
-            }
-            for future in concurrent.futures.as_completed(futures):
-                result = future.result()
-                results.append(result)
-                print(
-                    f"{result['status']} {result['test']} "
-                    f"({result['duration_seconds']:.2f}s)",
-                    flush=True,
-                )
-                if result["status"] == "FAIL":
-                    print(f"--- {result['test']} log ---", flush=True)
-                    print(tail(Path(result["log"])), end="", flush=True)
-                    print(f"--- end {result['test']} log ---", flush=True)
-
-    write_summary(results, skipped)
-    SUITE_COMPLETE.touch()
-    return 1 if any(result["status"] == "FAIL" for result in results) else 0
+    while True:
+        time.sleep(3600)
 
 
 if __name__ == "__main__":

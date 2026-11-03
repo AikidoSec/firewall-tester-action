@@ -266,23 +266,61 @@ cleanup_compose_project
 echo "Selected tests: ${#selected_tests[@]}"
 echo "Tests to run: ${#tests_to_run[@]}"
 
-up_args=(
-  up
-  --no-build
-  --no-color
-  --timeout 10
-  --exit-code-from suite-runner
+run_compose_test() {
+  set -euo pipefail
+  local test_name="$1"
+  local results_dir="$2"
+  shift 2
+  local compose=("$@")
+  local test_status=0
+  trap '"${compose[@]}" stop --timeout 10 "$test_name" || exit 255' EXIT
+
+  "${compose[@]}" start "$test_name" || exit 255
+  "${compose[@]}" exec -T suite-runner python run_suite.py --test "$test_name" || test_status=$?
+  if [ "$test_status" -gt 1 ] || [ ! -f "$results_dir/$test_name.json" ]; then
+    echo "Test runner failed for $test_name" >&2
+    exit 255
+  fi
+  exit 0
+}
+export -f run_compose_test
+
+run_compose_suite() (
+  set -euo pipefail
+  trap '"${compose[@]}" logs --no-color' EXIT
+  "${compose[@]}" up --no-start --no-build suite-runner "${tests_to_run[@]}"
+
+  created_services="$("${compose[@]}" ps --all --services)"
+  support_services=()
+  while IFS= read -r service; do
+    if [ -n "$service" ] && [ ! -f "$action_path/server_tests/$service/test.py" ]; then
+      support_services+=("$service")
+    fi
+  done <<< "$created_services"
+  if [ "${#support_services[@]}" -eq 0 ]; then
+    echo "No supporting services were created" >&2
+    exit 1
+  fi
+  "${compose[@]}" start --wait --wait-timeout "$STARTUP_TIMEOUT" "${support_services[@]}"
+
+  if [ "${#tests_to_run[@]}" -gt 0 ]; then
+    printf '%s\0' "${tests_to_run[@]}" |
+      xargs -0 -P "$MAX_PARALLEL_TESTS" -I '{}' \
+        bash -c 'run_compose_test "$@"' _ '{}' "$results_dir" "${compose[@]}"
+  fi
+
+  running_services="$("${compose[@]}" ps --status running --services "${support_services[@]}")"
+  if [ "$(printf '%s\n' "${support_services[@]}" | sort)" != "$(sort <<< "$running_services")" ]; then
+    echo "A supporting service stopped before the suite finished" >&2
+    exit 1
+  fi
+  trap - EXIT
+  "${compose[@]}" logs --no-color
+  "${compose[@]}" exec -T suite-runner python run_suite.py --summarize
 )
 
-if [ -n "$TEST_NAME" ] || [ -n "$RUN_TESTS" ] || [ -n "$SKIP_TESTS" ]; then
-  echo "Compose services to start: ${#tests_to_run[@]}"
-  up_args+=(suite-runner "${tests_to_run[@]}")
-else
-  echo "Compose profile: $active_test_profile"
-fi
-
 set +e
-"${compose[@]}" "${up_args[@]}" 2>&1 | tee "$results_dir/app-logs.txt"
+run_compose_suite 2>&1 | tee "$results_dir/app-logs.txt"
 suite_status=$?
 set -e
 

@@ -35,6 +35,7 @@ include:
   - ./server_tests/test-rate-limiting-retry-after/compose.yml
   - ./server_tests/test-shell-injection/compose.yml
   - ./server_tests/test-sql-injection/compose.yml
+  - ./server_tests/test-sql-injection-xml/compose.yml
   - ./server_tests/test-ssrf/compose.yml
   - ./server_tests/test-ssrf-different-port/compose.yml
   - ./server_tests/test-stored-ssrf/compose.yml

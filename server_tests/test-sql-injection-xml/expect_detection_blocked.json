@@ -1,0 +1,17 @@
+{
+  "type": "detected_attack",
+  "request": {
+    "method": "POST",
+    "route": "/api/create-xml",
+    "url": "REGEX:^https?://test-sql-injection-xml(?::\\d+)?/api/create-xml$"
+  },
+  "attack": {
+    "kind": "sql_injection",
+    "blocked": true,
+    "source": "REGEX:^(xml|body)$",
+    "metadata": {}
+  },
+  "agent": {
+    "dryMode": false
+  }
+}

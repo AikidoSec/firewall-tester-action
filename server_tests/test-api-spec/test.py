@@ -70,22 +70,23 @@ def get_api_spec_simple():
 
 
 def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
     with open(c.get_full_path("expect_api_spec.json"), encoding="utf-8") as file:
         expected_report = json.load(file)
     assert expected_report, "Expected heartbeat fixture expect_api_spec.json is empty"
+    check_reported_schema(s, c, expected_report)
 
+
+@with_heartbeats
+def check_reported_schema(s, c, expected_report, collector, heartbeats):
     # Keep both requests in the same heartbeat so their schemas can be merged.
-    c.track_heartbeats(collector).wait_for_next_report()
+    heartbeats.wait_for_next_interval()
     collector.raise_if_failures()
-    heartbeats = c.track_heartbeats(collector)
 
     for request in (get_api_spec_with_body(), get_api_spec_simple()):
         response = s.post(*request)
         collector.soft_assert_response_code_is(response, 200)
 
     heartbeats.wait_for_entries([expected_report])
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

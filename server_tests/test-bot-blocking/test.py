@@ -13,11 +13,8 @@ MONITORED_BOT_UA = "Mozilla/5.0 MonitoredTestBot/1.0"
 NORMAL_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NormalBrowser/1.0"
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    heartbeats = c.track_heartbeats(collector)
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     response = s.get("/api/pets/", headers={"User-Agent": BLOCKED_BOT_UA})
     collector.soft_assert_response_code_is(
         response, 403, f"Blocked bot should be blocked: {response.text}")
@@ -51,8 +48,6 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/", headers={"User-Agent": BLOCKED_BOT_UA})
     collector.soft_assert_response_code_is(
         response, 403, f"Bot should be blocked again after restoring blockedUserAgents: {response.text}")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

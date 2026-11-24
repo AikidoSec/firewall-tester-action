@@ -2,7 +2,8 @@ import datetime
 import time
 import requests
 import argparse
-from core_api import CoreApi
+from core_api import CoreApi, Heartbeats
+from functools import wraps
 import json
 import random
 import string
@@ -109,6 +110,17 @@ def localhost_post_request(port, route, data, headers={}, benchmark=False, timeo
 
 def localhost_request_request(port, method, route, data, headers, benchmark, timeout, host=TEST_SERVER_HOST):
     return requests.request(method, f"http://{host}:{port}{route}", json=data, headers=headers, timeout=timeout)
+
+
+def with_heartbeats(test):
+    @wraps(test)
+    def run(s, c, *args, **kwargs):
+        collector = AssertionCollector()
+        heartbeats = Heartbeats(c, collector)
+        test(s, c, *args, collector=collector, heartbeats=heartbeats, **kwargs)
+        collector.raise_if_failures()
+
+    return run
 
 
 def init_server_and_core():

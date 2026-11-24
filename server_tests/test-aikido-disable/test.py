@@ -88,16 +88,12 @@ def assert_disabled_agent_reports_no_traffic(collector, s, heartbeats):
         collector.soft_assert(routes is not None and len(routes) == 0, f"Disabled agent reported routes: {routes}")
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    heartbeats = c.track_heartbeats(collector)
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     test_attacks_not_blocked(collector, s)
     test_rate_limiting_not_enforced(collector, s)
     test_blocked_users_not_blocked(collector, s)
     assert_disabled_agent_reports_no_traffic(collector, s, heartbeats)
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

@@ -18,10 +18,9 @@ CONTROL_IP = "1.2.3.4"
 IP_LIST_KEY = "geoip/Belgium;BE"
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     expected = {IP_LIST_KEY: len(MATCHING_IPS)}
-    blocking = c.track_heartbeats(collector)
 
     for entry in MATCHING_IPS:
         response = s.get("/api/pets/", headers={"X-Forwarded-For": entry["ip"]})
@@ -34,10 +33,10 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should not be blocked: {response.text}")
 
-    blocking.wait_for_breakdown("ipAddresses", expected)
+    heartbeats.wait_for_breakdown("ipAddresses", expected)
 
     c.update_runtime_firewall_file("change_config_monitor_mode.json")
-    monitoring = c.track_heartbeats(collector)
+    heartbeats.checkpoint()
 
     for entry in MATCHING_IPS:
         response = s.get("/api/pets/", headers={"X-Forwarded-For": entry["ip"]})
@@ -51,9 +50,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should still not be blocked: {response.text}")
 
-    monitoring.wait_for_breakdown("ipAddresses", expected)
-
-    collector.raise_if_failures()
+    heartbeats.wait_for_breakdown("ipAddresses", expected)
 
 
 if __name__ == "__main__":

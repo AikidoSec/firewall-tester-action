@@ -13,10 +13,8 @@ This test verifies that:
 """
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-    heartbeats = c.track_heartbeats(collector)
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     for _ in range(3):
         response = s.post("/api/create", {"name": "test2", "age": 34})
         collector.soft_assert_response_code_is(
@@ -45,8 +43,6 @@ def run_test(s: TestServer, c: CoreApi):
 
     attacks = heartbeats.attacks_detected()
     collector.soft_assert(attacks == 0, f"Attacks detected should be 0, found {attacks}")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

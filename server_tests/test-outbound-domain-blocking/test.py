@@ -22,10 +22,7 @@ Tests the outbound domain blocking feature:
 11. Tests that detection mode (block: false) doesn't block
 '''
 
-def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
-
-    heartbeats = c.track_heartbeats(collector)
-
+def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     """Test that explicitly blocked domains are always blocked"""
     response = s.post("/api/request",
                       {"url": "http://evil.example.com/test"})
@@ -160,15 +157,12 @@ def test_detection_mode(collector, s: TestServer, c: CoreApi):
         response, 200, "detection mode (block: false) should not block requests to evil.example.com")
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    test_explicitly_blocked_domain(collector, s, c)
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
+    test_explicitly_blocked_domain(collector, s, heartbeats)
 
    # test_new_domain_allowed_when_flag_disabled(collector, s, c)
     # test_detection_mode(collector, s, c)
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

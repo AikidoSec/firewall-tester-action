@@ -255,11 +255,8 @@ def check_wave_attack_with_bypass_ip(collector, ip, user_id):
         f"Test sent 15 suspicious requests with bypass IP {ip} (allowedIPAddresses). Expected 0 attack wave events, but got {len(new_events)} event(s)")
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    heartbeats = c.track_heartbeats(collector)
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     check_wave_attack(collector, get_random_path_filename,
                       "2.16.53.5", "1234", len(filenames))
     check_wave_attack(collector, get_random_path_directory,
@@ -283,8 +280,6 @@ def run_test(s: TestServer, c: CoreApi):
     check_wave_attack_with_same_ip_sliding_window_and_LRU(
         collector, "2.16.53.9", "1238")
     check_wave_attack_with_bypass_ip(collector, "2.16.53.10", "1239")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

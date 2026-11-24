@@ -20,11 +20,8 @@ USER_ID = "42"
 USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    heartbeats = c.track_heartbeats(collector)
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     for _ in range(3):
         response = s.get("/api/pets/", headers={
             "user": USER_ID,
@@ -53,8 +50,6 @@ def run_test(s: TestServer, c: CoreApi):
         actual_ip == expected_ip,
         f"User {USER_ID_WITHOUT_PROXY_HEADER} lastIpAddress should be '{expected_ip}' "
         f"(the test runner's IP), but got '{actual_ip}'")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

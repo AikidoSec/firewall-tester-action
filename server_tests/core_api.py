@@ -97,9 +97,6 @@ class CoreApi:
             max_wait_time -= 1
         return False
 
-    def track_heartbeats(self, collector):
-        return Heartbeats(self, collector)
-
     def set_mock_server_down(self):
         response = requests.post(
             f"{self.core_url}/api/runtime/apps/down", headers={"Authorization": f"{self.token}"})
@@ -120,7 +117,10 @@ class Heartbeats:
     def __init__(self, core, collector):
         self.core = core
         self.collector = collector
-        self._all_reports = core.get_events("heartbeat")
+        self.checkpoint()
+
+    def checkpoint(self):
+        self._all_reports = self.core.get_events("heartbeat")
         self._start_index = len(self._all_reports)
 
     @property
@@ -156,8 +156,9 @@ class Heartbeats:
             if fresh:
                 yield fresh
 
-    def wait_for_next_report(self):
-        return next(self._poll_reports(), [])
+    def wait_for_next_interval(self):
+        if next(self._poll_reports(), None):
+            self.checkpoint()
 
     def entries(self, field, *, since_startup=False):
         reports = self._all_reports if since_startup else self.reports

@@ -30,9 +30,8 @@ def get_request_data():
     return url, body, headers
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     # IPs that should be bypassed according to start_config.json
     bypass_ips = [
         {"ip": "93.184.216.34",    "type": "public IPv4"},
@@ -42,8 +41,6 @@ def run_test(s: TestServer, c: CoreApi):
         {"ip": "2606:2800:220:1:248:1893:25c8:1946",      "type": "single IPv6"},
         {"ip": "2001:0db9:abcd:1234::5678", "type": "CIDR 2001:0db9:abcd:1234::/64"},
     ]
-
-    heartbeats = c.track_heartbeats(collector)
 
     # Send multiple requests from each bypass IP and ensure they are never blocked
     for ip in bypass_ips:
@@ -120,8 +117,6 @@ def run_test(s: TestServer, c: CoreApi):
             for name, operation in operations.items():
                 detected = operation.get("attacksDetected", {}).get("total")
                 collector.soft_assert(detected == 0, f"Expected zero attacks for {name}, got {detected}")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

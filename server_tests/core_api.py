@@ -193,12 +193,12 @@ class Heartbeats:
         return entries
 
     def wait_for_breakdown(self, category, expected):
-        return self._wait_for_counts(self._reports_after_requests(), category, "breakdown", expected)
+        return self.wait_for_counts(category, "breakdown", expected, updates=self._reports_after_requests())
 
-    def wait_for_counts(self, category, field, expected):
-        return self._wait_for_counts(self._poll_reports(), category, field, expected)
+    def wait_for_counts(self, category, field, expected, *, updates=None):
+        if updates is None:
+            updates = self._poll_reports()
 
-    def _wait_for_counts(self, reports, category, field, expected):
         def totals():
             result = Counter()
             for report in self._reports:
@@ -208,7 +208,7 @@ class Heartbeats:
             return result
 
         target = Counter(expected)
-        for _ in reports:
+        for _ in updates:
             if totals() >= target:
                 break
         observed = dict(totals())

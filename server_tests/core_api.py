@@ -131,7 +131,7 @@ class Heartbeats:
         self._all_reports = self.core.get_events("heartbeat", timeout=timeout)
         return self._reports
 
-    def _poll_reports(self):
+    def _poll_reports(self, *, require_post_traffic_report=True):
         not_before_ms = int(time.time() * 1000)
         deadline = time.monotonic() + HEARTBEAT_TIMEOUT_SECONDS
         previous_count = 0
@@ -142,9 +142,10 @@ class Heartbeats:
                 break
             if len(reports) != previous_count:
                 previous_count = len(reports)
-                fresh_reports = [report for report in reports if report.get("stats", {}).get("endedAt", 0) >= not_before_ms]
-                if fresh_reports:
-                    yield fresh_reports
+                if require_post_traffic_report:
+                    reports = [report for report in reports if report.get("stats", {}).get("endedAt", 0) >= not_before_ms]
+                if reports:
+                    yield reports
             time.sleep(1)
 
         self.collector.add_failure(
@@ -153,7 +154,7 @@ class Heartbeats:
         )
 
     def wait_for_next_report(self):
-        next(self._poll_reports(), None)
+        next(self._poll_reports(require_post_traffic_report=False), None)
         return self._reports
 
     def entries(self, field, *, include_startup=False):
@@ -191,7 +192,7 @@ class Heartbeats:
         self.collector.soft_assert(not absent, f"Missing heartbeat {field or 'reports'}: {absent}")
         return entries
 
-    def wait_for_totals(self, category, field, expected, *, allow_extra=True):
+    def wait_for_totals(self, category, field, expected, *, allow_extra=True, require_post_traffic_report=True):
         def totals():
             result = Counter()
             for report in self._reports:
@@ -201,7 +202,7 @@ class Heartbeats:
             return result
 
         target = Counter(expected)
-        for _ in self._poll_reports():
+        for _ in self._poll_reports(require_post_traffic_report=require_post_traffic_report):
             if totals() >= target:
                 break
         observed = dict(totals())

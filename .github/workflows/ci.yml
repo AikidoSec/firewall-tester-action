@@ -132,12 +132,12 @@ jobs:
         shell: pwsh
         run: |
           Start-Service docker -ErrorAction Stop
-          foreach ($attempt in 1..60) {
+          foreach ($attempt in 1..15) {
             docker info --format '{{.OSType}}'
             if ($LASTEXITCODE -eq 0) { exit 0 }
             Start-Sleep -Seconds 2
           }
-          throw 'Docker did not respond within two minutes.'
+          throw 'Docker did not respond within 30 seconds.'
 
       - name: Run Compose tests
         uses: $/

@@ -36,8 +36,8 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/")
     collector.soft_assert_response_code_is(response, 200, "GET /api/pets")
 
-    heartbeats.wait_for_request_count(2)
-    for route in heartbeats.entries("routes", include_startup=True):
+    heartbeats.wait_for_counts("requests", "total", 2, since_startup=True)
+    for route in heartbeats.entries("routes", since_startup=True):
         collector.soft_assert(
             route["path"] not in ("/api/create", "/api/read"),
             f"Heartbeat should not contain routes with protection off: {route}",

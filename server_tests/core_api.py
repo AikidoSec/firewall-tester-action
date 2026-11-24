@@ -124,12 +124,12 @@ class Heartbeats:
         self._start_index = len(self._all_reports)
 
     @property
-    def _reports(self):
+    def reports(self):
         return self._all_reports[self._start_index:]
 
     def read(self, *, timeout=None):
         self._all_reports = self.core.get_events("heartbeat", timeout=timeout)
-        return self._reports
+        return self.reports
 
     def _poll_reports(self):
         deadline = time.monotonic() + HEARTBEAT_TIMEOUT_SECONDS
@@ -146,7 +146,7 @@ class Heartbeats:
 
         self.collector.add_failure(
             f"{self.core.test_name}: heartbeat check timed out after {HEARTBEAT_TIMEOUT_SECONDS}s. "
-            f"Received {len(self._reports)} report(s): {json.dumps(self._reports)}"
+            f"Received {len(self.reports)} report(s): {json.dumps(self.reports)}"
         )
 
     def _reports_after_requests(self):
@@ -159,8 +159,8 @@ class Heartbeats:
     def wait_for_next_report(self):
         return next(self._poll_reports(), [])
 
-    def entries(self, field, *, include_startup=False):
-        reports = self._all_reports if include_startup else self._reports
+    def entries(self, field, *, since_startup=False):
+        reports = self._all_reports if since_startup else self.reports
         return [entry for report in reports for entry in (report.get(field) or [])]
 
     def wait_for_entries(self, expected, *, field=None, key=None):
@@ -195,16 +195,22 @@ class Heartbeats:
     def wait_for_breakdown(self, category, expected):
         return self.wait_for_counts(category, "breakdown", expected, updates=self._reports_after_requests())
 
-    def wait_for_counts(self, category, field, expected, *, updates=None):
+    def wait_for_counts(self, category, field, expected, *, since_startup=False, updates=None):
         if updates is None:
-            updates = self._poll_reports()
+            updates = self._reports_after_requests() if since_startup else self._poll_reports()
+        scalar = isinstance(expected, int)
+        if scalar:
+            expected = {field: expected}
 
         def totals():
             result = Counter()
-            for report in self._reports:
-                counters = report.get("stats", {}).get(category, {}).get(field)
-                if isinstance(counters, dict):
-                    result.update(counters)
+            reports = self._all_reports if since_startup else self.reports
+            for report in reports:
+                value = report.get("stats", {}).get(category, {}).get(field, 0)
+                if scalar:
+                    result[field] += value
+                elif isinstance(value, dict):
+                    result.update(value)
             return result
 
         target = Counter(expected)
@@ -216,16 +222,5 @@ class Heartbeats:
         self.collector.soft_assert(actual == expected, f"Expected {category}.{field} counts {expected}, got {observed}")
         return observed
 
-    def wait_for_request_count(self, expected):
-        def count():
-            return sum(report.get("stats", {}).get("requests", {}).get("total", 0) for report in self._all_reports)
-
-        for _ in self._reports_after_requests():
-            if count() >= expected:
-                break
-        observed = count()
-        self.collector.soft_assert(observed == expected, f"Expected {expected} requests since startup, got {observed}")
-        return self._reports
-
     def attacks_detected(self):
-        return sum(report["stats"]["requests"]["attacksDetected"]["total"] for report in self._reports)
+        return sum(report["stats"]["requests"]["attacksDetected"]["total"] for report in self.reports)

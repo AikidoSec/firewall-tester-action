@@ -104,14 +104,14 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs")
 
-    reports = heartbeats.wait_for_request_count(1)
+    heartbeats.wait_for_counts("requests", "total", 1, since_startup=True)
     for route in heartbeats.entries("routes"):
         collector.soft_assert(
             not ("POST" in route["method"] and "/api/create" in route["path"]),
             f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data")
     attacks = heartbeats.attacks_detected()
     collector.soft_assert(attacks == 0, f"Attacks detected should be 0, found {attacks}")
-    for report in reports:
+    for report in heartbeats.reports:
         stats = report["stats"]
         rate_limited = stats["requests"].get("rateLimited")
         collector.soft_assert(rate_limited == 0, f"Expected rateLimited to be 0, got {rate_limited}")

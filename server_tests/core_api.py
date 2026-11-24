@@ -200,8 +200,7 @@ class Heartbeats:
         if updates is None:
             updates = self._reports_after_requests() if since_startup else self._poll_reports()
         scalar = isinstance(expected, int)
-        if scalar:
-            expected = {field: expected}
+        expected_counts = {field: expected} if scalar else expected
 
         def totals():
             result = Counter()
@@ -214,13 +213,15 @@ class Heartbeats:
                     result.update(value)
             return result
 
-        target = Counter(expected)
+        target = Counter(expected_counts)
         for _ in updates:
             if totals() >= target:
                 break
         observed = dict(totals())
-        actual = {name: observed.get(name, 0) for name in expected}
-        self.collector.soft_assert(actual == expected, f"Expected {category}.{field} counts {expected}, got {observed}")
+        actual = {name: observed.get(name, 0) for name in expected_counts}
+        self.collector.soft_assert(
+            actual == expected_counts, f"Expected {category}.{field} counts {expected_counts}, got {observed}"
+        )
         return observed
 
     def attacks_detected(self):

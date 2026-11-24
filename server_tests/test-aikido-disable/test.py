@@ -77,7 +77,7 @@ def test_blocked_users_not_blocked(collector, s: TestServer):
     )
 
 
-def check_disabled_heartbeats(collector, s, heartbeats):
+def assert_disabled_agent_reports_no_traffic(collector, s, heartbeats):
     s.get("/api/pets/")
     time.sleep(70)
 
@@ -85,7 +85,7 @@ def check_disabled_heartbeats(collector, s, heartbeats):
         requests = report.get("stats", {}).get("requests", {})
         collector.soft_assert(requests.get("total", 0) == 0, f"Disabled agent reported request statistics: {requests}")
         routes = report.get("routes", [])
-        collector.soft_assert(not routes, f"Disabled agent reported routes: {routes}")
+        collector.soft_assert(routes is not None and len(routes) == 0, f"Disabled agent reported routes: {routes}")
 
 
 def run_test(s: TestServer, c: CoreApi):
@@ -95,7 +95,7 @@ def run_test(s: TestServer, c: CoreApi):
     test_attacks_not_blocked(collector, s)
     test_rate_limiting_not_enforced(collector, s)
     test_blocked_users_not_blocked(collector, s)
-    check_disabled_heartbeats(collector, s, heartbeats)
+    assert_disabled_agent_reports_no_traffic(collector, s, heartbeats)
 
     collector.raise_if_failures()
 

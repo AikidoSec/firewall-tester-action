@@ -97,8 +97,8 @@ class CoreApi:
             max_wait_time -= 1
         return False
 
-    def track_heartbeats(self, collector, *, include_startup=False):
-        return Heartbeats(self, collector, include_startup)
+    def track_heartbeats(self, collector):
+        return Heartbeats(self, collector)
 
     def set_mock_server_down(self):
         response = requests.post(
@@ -117,10 +117,10 @@ class CoreApi:
 
 
 class Heartbeats:
-    def __init__(self, core, collector, include_startup):
+    def __init__(self, core, collector):
         self.core = core
         self.collector = collector
-        self._all_reports = [] if include_startup else core.get_events("heartbeat")
+        self._all_reports = core.get_events("heartbeat")
         self._start_index = len(self._all_reports)
 
     @property
@@ -156,8 +156,9 @@ class Heartbeats:
         next(self._poll_reports(), None)
         return self._reports
 
-    def entries(self, field):
-        return [entry for report in self._reports for entry in (report.get(field) or [])]
+    def entries(self, field, *, include_startup=False):
+        reports = self._all_reports if include_startup else self._reports
+        return [entry for report in reports for entry in (report.get(field) or [])]
 
     def wait_for_entries(self, expected, *, field=None, key=None):
         from testlib import assert_event_contains_subset
@@ -172,7 +173,15 @@ class Heartbeats:
 
         entries = []
         for fresh_reports in self._poll_reports():
-            entries = self.entries(field) if field is not None else fresh_reports
+            if field is not None:
+                # A complete fresh report takes precedence over older entries with the same key.
+                for report in fresh_reports:
+                    entries = report.get(field) or []
+                    if not missing(entries):
+                        return entries
+                entries = self.entries(field)
+            else:
+                entries = fresh_reports
             if not missing(entries):
                 return entries
 
@@ -199,8 +208,16 @@ class Heartbeats:
         actual = {name: observed.get(name, 0) for name in expected} if allow_extra else observed
         self.collector.soft_assert(actual == expected, f"Expected {category}.{field} counts {expected}, got {observed}")
 
-    def requests_since_startup(self):
-        return sum(report.get("stats", {}).get("requests", {}).get("total", 0) for report in self._all_reports)
+    def wait_for_request_count(self, expected):
+        def count():
+            return sum(report.get("stats", {}).get("requests", {}).get("total", 0) for report in self._all_reports)
+
+        for _ in self._poll_reports():
+            if count() >= expected:
+                break
+        observed = count()
+        self.collector.soft_assert(observed == expected, f"Expected {expected} requests since startup, got {observed}")
+        return self._reports
 
     def attacks_detected(self):
         return sum(report["stats"]["requests"]["attacksDetected"]["total"] for report in self._reports)

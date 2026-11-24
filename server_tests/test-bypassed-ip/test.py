@@ -104,11 +104,7 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs")
 
-    reports = heartbeats.wait_for_next_report()
-    requests_total = heartbeats.requests_since_startup()
-    collector.soft_assert(
-        requests_total == 1,
-        f"Only the initial request should be counted, found {requests_total}")
+    reports = heartbeats.wait_for_request_count(1)
     for route in heartbeats.entries("routes"):
         collector.soft_assert(
             not ("POST" in route["method"] and "/api/create" in route["path"]),

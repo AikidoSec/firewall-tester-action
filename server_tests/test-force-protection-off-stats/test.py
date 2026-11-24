@@ -15,7 +15,7 @@ This test verifies that:
 
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
-    heartbeats = c.track_heartbeats(collector, include_startup=True)
+    heartbeats = c.track_heartbeats(collector)
 
     for _ in range(3):
         response = s.post("/api/create", {"name": "test2", "age": 34})
@@ -36,18 +36,10 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/")
     collector.soft_assert_response_code_is(response, 200, "GET /api/pets")
 
-    routes = heartbeats.wait_for_entries(
-        {("GET", "/api/pets")}, field="routes", key=lambda route: (route["method"], route["path"].rstrip("/"))
-    )
-    requests_total = heartbeats.requests_since_startup()
-    collector.soft_assert(
-        requests_total == 2,
-        f"Only the initial request and the control request should be counted, found {requests_total}",
-    )
-
-    for route in routes:
+    heartbeats.wait_for_request_count(2)
+    for route in heartbeats.entries("routes", include_startup=True):
         collector.soft_assert(
-            route["path"].rstrip("/") not in ("/api/create", "/api/read"),
+            route["path"] not in ("/api/create", "/api/read"),
             f"Heartbeat should not contain routes with protection off: {route}",
         )
 

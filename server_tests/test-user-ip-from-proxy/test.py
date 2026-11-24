@@ -36,19 +36,17 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
     collector.soft_assert_response_code_is(response, 200)
 
-    users = heartbeats.wait_for_entries(
-        {USER_ID, USER_ID_WITHOUT_PROXY_HEADER}, field="users", key=lambda user: str(user.get("id")))
+    users = heartbeats.wait_for_entries({USER_ID, USER_ID_WITHOUT_PROXY_HEADER}, field="users", key="id")
     collector.raise_if_failures()
 
-    target_user = next(user for user in users if str(user.get("id")) == USER_ID)
-    last_ip = target_user.get("lastIpAddress", "")
+    users_by_id = {str(user.get("id")): user for user in users}
+    last_ip = users_by_id[USER_ID].get("lastIpAddress", "")
     collector.soft_assert(
         last_ip == REAL_CLIENT_IP,
         f"User lastIpAddress should be '{REAL_CLIENT_IP}' (from X-Real-IP header), "
         f"but got '{last_ip}' (likely the Docker bridge/proxy IP)")
 
-    user_without_proxy = next(user for user in users
-                              if str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER)
+    user_without_proxy = users_by_id[USER_ID_WITHOUT_PROXY_HEADER]
     expected_ip = gethostbyname(gethostname())
     actual_ip = user_without_proxy.get("lastIpAddress", "").removeprefix("::ffff:")
     collector.soft_assert(

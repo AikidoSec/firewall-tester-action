@@ -35,8 +35,10 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Normal user agent should not be blocked: {response.text}")
 
-    heartbeats.wait_for_totals(
-        "userAgents", "breakdown", {"blocked-test-bot": 1, "monitored-test-bot": 1}, allow_extra=False)
+    expected = {"blocked-test-bot": 1, "monitored-test-bot": 1}
+    breakdown = heartbeats.wait_for_breakdown("userAgents", expected)
+    unexpected = breakdown.keys() - expected.keys()
+    collector.soft_assert(not unexpected, f"Unexpected bot groups in heartbeat: {sorted(unexpected)}")
 
     c.update_runtime_firewall_file("change_config_remove_blocked_bot.json")
 

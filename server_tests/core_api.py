@@ -131,8 +131,7 @@ class Heartbeats:
         self._all_reports = self.core.get_events("heartbeat", timeout=timeout)
         return self._reports
 
-    def _poll_reports(self, *, require_post_traffic_report=True):
-        not_before_ms = int(time.time() * 1000)
+    def _poll_reports(self):
         deadline = time.monotonic() + HEARTBEAT_TIMEOUT_SECONDS
         previous_count = 0
         while (remaining := deadline - time.monotonic()) > 0:
@@ -140,12 +139,9 @@ class Heartbeats:
                 reports = self.read(timeout=remaining)
             except requests.Timeout:
                 break
-            if len(reports) != previous_count:
+            if len(reports) > previous_count:
                 previous_count = len(reports)
-                if require_post_traffic_report:
-                    reports = [report for report in reports if report.get("stats", {}).get("endedAt", 0) >= not_before_ms]
-                if reports:
-                    yield reports
+                yield reports
             time.sleep(1)
 
         self.collector.add_failure(
@@ -153,9 +149,15 @@ class Heartbeats:
             f"Received {len(self._reports)} report(s): {json.dumps(self._reports)}"
         )
 
+    def _reports_after_requests(self):
+        finished_at = int(time.time() * 1000)
+        for reports in self._poll_reports():
+            fresh = [report for report in reports if report.get("stats", {}).get("endedAt", 0) >= finished_at]
+            if fresh:
+                yield fresh
+
     def wait_for_next_report(self):
-        next(self._poll_reports(require_post_traffic_report=False), None)
-        return self._reports
+        return next(self._poll_reports(), [])
 
     def entries(self, field, *, include_startup=False):
         reports = self._all_reports if include_startup else self._reports
@@ -166,23 +168,21 @@ class Heartbeats:
 
         def missing(entries):
             if key is not None:
-                return set(expected).difference(map(key, entries))
+                return set(map(str, expected)) - {str(entry.get(key)) for entry in entries}
             return [
                 item for item in expected
                 if not any(assert_event_contains_subset(entry, item, dry_mode=True) for entry in entries)
             ]
 
         entries = []
-        for fresh_reports in self._poll_reports():
-            if field is not None:
-                # A complete fresh report takes precedence over older entries with the same key.
+        for fresh_reports in self._reports_after_requests():
+            if key is not None:
+                # An older user entry can carry a different lastIpAddress for the same ID.
                 for report in fresh_reports:
                     entries = report.get(field) or []
                     if not missing(entries):
                         return entries
-                entries = self.entries(field)
-            else:
-                entries = fresh_reports
+            entries = self.entries(field) if field is not None else fresh_reports
             if not missing(entries):
                 return entries
 
@@ -192,7 +192,13 @@ class Heartbeats:
         self.collector.soft_assert(not absent, f"Missing heartbeat {field or 'reports'}: {absent}")
         return entries
 
-    def wait_for_totals(self, category, field, expected, *, allow_extra=True, require_post_traffic_report=True):
+    def wait_for_breakdown(self, category, expected):
+        return self._wait_for_counts(self._reports_after_requests(), category, "breakdown", expected)
+
+    def wait_for_attack_wave_counts(self, *, total, blocked):
+        self._wait_for_counts(self._poll_reports(), "requests", "attackWaves", {"total": total, "blocked": blocked})
+
+    def _wait_for_counts(self, reports, category, field, expected):
         def totals():
             result = Counter()
             for report in self._reports:
@@ -202,18 +208,19 @@ class Heartbeats:
             return result
 
         target = Counter(expected)
-        for _ in self._poll_reports(require_post_traffic_report=require_post_traffic_report):
+        for _ in reports:
             if totals() >= target:
                 break
         observed = dict(totals())
-        actual = {name: observed.get(name, 0) for name in expected} if allow_extra else observed
+        actual = {name: observed.get(name, 0) for name in expected}
         self.collector.soft_assert(actual == expected, f"Expected {category}.{field} counts {expected}, got {observed}")
+        return observed
 
     def wait_for_request_count(self, expected):
         def count():
             return sum(report.get("stats", {}).get("requests", {}).get("total", 0) for report in self._all_reports)
 
-        for _ in self._poll_reports():
+        for _ in self._reports_after_requests():
             if count() >= expected:
                 break
         observed = count()

@@ -34,7 +34,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should not be blocked: {response.text}")
 
-    blocking.wait_for_totals("ipAddresses", "breakdown", expected)
+    blocking.wait_for_breakdown("ipAddresses", expected)
 
     c.update_runtime_firewall_file("change_config_monitor_mode.json")
     monitoring = c.track_heartbeats(collector)
@@ -51,7 +51,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should still not be blocked: {response.text}")
 
-    monitoring.wait_for_totals("ipAddresses", "breakdown", expected)
+    monitoring.wait_for_breakdown("ipAddresses", expected)
 
     collector.raise_if_failures()
 

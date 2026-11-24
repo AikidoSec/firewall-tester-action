@@ -34,6 +34,7 @@ include:
   - ./server_tests/test-path-traversal/compose.yml
   - ./server_tests/test-rate-limiting-group-id-1-minute/compose.yml
   - ./server_tests/test-rate-limiting-retry-after/compose.yml
+  - ./server_tests/test-request-count-exclusions/compose.yml
   - ./server_tests/test-shell-injection/compose.yml
   - ./server_tests/test-sql-injection/compose.yml
   - ./server_tests/test-ssrf/compose.yml

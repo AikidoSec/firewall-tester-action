@@ -195,8 +195,8 @@ class Heartbeats:
     def wait_for_breakdown(self, category, expected):
         return self._wait_for_counts(self._reports_after_requests(), category, "breakdown", expected)
 
-    def wait_for_attack_wave_counts(self, *, total, blocked):
-        self._wait_for_counts(self._poll_reports(), "requests", "attackWaves", {"total": total, "blocked": blocked})
+    def wait_for_counts(self, category, field, expected):
+        return self._wait_for_counts(self._poll_reports(), category, field, expected)
 
     def _wait_for_counts(self, reports, category, field, expected):
         def totals():

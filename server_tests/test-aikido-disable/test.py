@@ -77,49 +77,25 @@ def test_blocked_users_not_blocked(collector, s: TestServer):
     )
 
 
-def test_no_heartbeat_or_start_events(collector, s, c: CoreApi, initial_heartbeat_events):
-    """Test that heartbeat and start events are NOT sent when AIKIDO_DISABLE=true"""
+def check_disabled_heartbeats(collector, s, heartbeats):
     s.get("/api/pets/")
-    # Wait for potential heartbeat interval (70 seconds to be sure)
-    # If heartbeats were being sent, we'd expect at least one
     time.sleep(70)
 
-    # Check that no new heartbeat events were sent
-    current_heartbeat_events = c.get_events("heartbeat")
-    new_heartbeat_count = len(current_heartbeat_events) - \
-        len(initial_heartbeat_events)
-
-    # When disabled, either no heartbeats are sent, or if they are sent, they should contain no stats
-    if new_heartbeat_count > 0:
-        # If heartbeats are sent, verify they contain no meaningful statistics
-        for event in current_heartbeat_events[len(initial_heartbeat_events):]:
-            # Stats should either be absent or show zero activity
-            if "stats" in event:
-                stats = event["stats"]
-                if "requests" in stats:
-                    # Disabled agents must not collect request statistics.
-                    collector.soft_assert(
-                        stats["requests"].get("total", 0) == 0,
-                        f"When AIKIDO_DISABLE=true, heartbeat should not contain request statistics: {stats}"
-                    )
-
-            # Routes should be empty.
-            if "routes" in event:
-                collector.soft_assert(
-                    len(event.get("routes", [])) == 0,
-                    f"When AIKIDO_DISABLE=true, no API routes should be tracked: {event['routes']}"
-                )
+    for report in heartbeats.read():
+        requests = report.get("stats", {}).get("requests", {})
+        collector.soft_assert(requests.get("total", 0) == 0, f"Disabled agent reported request statistics: {requests}")
+        routes = report.get("routes", [])
+        collector.soft_assert(not routes, f"Disabled agent reported routes: {routes}")
 
 
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    initial_heartbeat_events = c.get_events("heartbeat")
+    heartbeats = c.track_heartbeats(collector)
     test_attacks_not_blocked(collector, s)
     test_rate_limiting_not_enforced(collector, s)
     test_blocked_users_not_blocked(collector, s)
-    test_no_heartbeat_or_start_events(
-        collector, s, c, initial_heartbeat_events)
+    check_disabled_heartbeats(collector, s, heartbeats)
 
     collector.raise_if_failures()
 

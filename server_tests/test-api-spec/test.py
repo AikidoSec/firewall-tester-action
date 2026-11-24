@@ -1,10 +1,7 @@
-import requests
-import time
-import sys
+import json
+
 from testlib import *
 from core_api import CoreApi
-import os
-
 
 '''
 1. Sets up a simple config.
@@ -72,55 +69,22 @@ def get_api_spec_simple():
     return url, body, headers
 
 
-def run_api_spec_tests(collector, fns, expected_json, s: TestServer, c: CoreApi):
-    start_events = c.get_events("heartbeat")
-    # Keep both requests in the same heartbeat so their schemas can be merged.
-    if not collector.soft_assert(
-            c.wait_for_new_events(160, len(start_events), "heartbeat"),
-            "Expected a fresh heartbeat before sending API-schema test requests"):
-        return
-    start_events = c.get_events("heartbeat")
-
-    for fn in fns:
-        response = s.post(*fn())
-        collector.soft_assert_response_code_is(response, 200)
-
-    traffic_finished_at = int(time.time() * 1000)
-    last_error = None
-
-    def contains_api_spec(heartbeat):
-        nonlocal last_error
-        try:
-            assert_event_contains_subset_file(heartbeat, expected_json)
-            return True
-        except AssertionError as e:
-            last_error = e
-            return False
-
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at,
-        predicate=contains_api_spec
-    )
-
-    if not collector.soft_assert(
-            heartbeat is not None,
-            str(last_error) if last_error is not None else
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        return
-    try:
-        assert_event_contains_subset_file(heartbeat, expected_json)
-    except AssertionError as e:
-        collector.add_failure(str(e))
-
-
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
+    with open(c.get_full_path("expect_api_spec.json"), encoding="utf-8") as file:
+        expected_report = json.load(file)
+    assert expected_report, "Expected heartbeat fixture expect_api_spec.json is empty"
 
-    run_api_spec_tests(collector, [
-        get_api_spec_with_body,
-        get_api_spec_simple,
-    ], "expect_api_spec.json", s, c)
+    # Keep both requests in the same heartbeat so their schemas can be merged.
+    c.track_heartbeats(collector).wait_for_next_report()
+    collector.raise_if_failures()
+    heartbeats = c.track_heartbeats(collector)
 
+    for request in (get_api_spec_with_body(), get_api_spec_simple()):
+        response = s.post(*request)
+        collector.soft_assert_response_code_is(response, 200)
+
+    heartbeats.wait_for_entries([expected_report])
     collector.raise_if_failures()
 
 

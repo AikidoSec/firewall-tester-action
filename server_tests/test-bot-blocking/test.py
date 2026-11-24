@@ -1,4 +1,3 @@
-import time
 from testlib import *
 from core_api import CoreApi
 
@@ -17,7 +16,7 @@ NORMAL_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) NormalBrowser/1.0"
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    start_heartbeat_events = c.get_events("heartbeat")
+    heartbeats = c.track_heartbeats(collector)
 
     response = s.get("/api/pets/", headers={"User-Agent": BLOCKED_BOT_UA})
     collector.soft_assert_response_code_is(
@@ -36,24 +35,8 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Normal user agent should not be blocked: {response.text}")
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_heartbeat_events), traffic_finished_at
-    )
-
-    if collector.soft_assert(
-            heartbeat is not None,
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        breakdown = heartbeat.get("stats", {}).get("userAgents", {}).get("breakdown", {})
-        collector.soft_assert(
-            breakdown.get("blocked-test-bot") == 1,
-            f"Expected 1 match for blocked-test-bot, got {breakdown.get('blocked-test-bot')} (breakdown: {breakdown})")
-        collector.soft_assert(
-            breakdown.get("monitored-test-bot") == 1,
-            f"Expected 1 match for monitored-test-bot, got {breakdown.get('monitored-test-bot')} (breakdown: {breakdown})")
-        collector.soft_assert(
-            len(breakdown) == 2,
-            f"Expected only the blocked and monitored bot keys in breakdown, got {breakdown}")
+    heartbeats.wait_for_totals(
+        "userAgents", "breakdown", {"blocked-test-bot": 1, "monitored-test-bot": 1}, allow_extra=False)
 
     c.update_runtime_firewall_file("change_config_remove_blocked_bot.json")
 

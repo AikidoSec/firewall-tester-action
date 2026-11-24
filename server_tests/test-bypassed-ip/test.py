@@ -43,8 +43,7 @@ def run_test(s: TestServer, c: CoreApi):
         {"ip": "2001:0db9:abcd:1234::5678", "type": "CIDR 2001:0db9:abcd:1234::/64"},
     ]
 
-    # Baseline events before sending any traffic for this test
-    start_heartbeat_events = c.get_events("heartbeat")
+    heartbeats = c.track_heartbeats(collector)
 
     # Send multiple requests from each bypass IP and ensure they are never blocked
     for ip in bypass_ips:
@@ -105,50 +104,26 @@ def run_test(s: TestServer, c: CoreApi):
         collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs")
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_heartbeat_events), traffic_finished_at
-    )
-
-    all_heartbeat_events = c.get_events("heartbeat")
-    if not collector.soft_assert(
-            heartbeat is not None,
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        collector.raise_if_failures()
-        return
-
-    # routes should not contain  "method": "POST", "path": "/api/create",
-    for route in heartbeat["routes"]:
-        collector.soft_assert(
-            not ("POST" in route["method"] and "/api/create" in route["path"]),
-            f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data")
-
-    # The initial request can be emitted just before or just after this test
-    # takes its heartbeat baseline, so inspect the token's full event stream.
-    requests_total = sum(
-        event.get("stats", {}).get("requests", {}).get("total", 0)
-        for event in all_heartbeat_events
-    )
+    reports = heartbeats.wait_for_next_report()
+    requests_total = heartbeats.requests_since_startup()
     collector.soft_assert(
         requests_total == 1,
         f"Only the initial request should be counted, found {requests_total}")
-    # attacksDetected
-    collector.soft_assert(
-        heartbeat["stats"]["requests"]["attacksDetected"]["total"] == 0,
-        f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}")
-    # rateLimited
-    collector.soft_assert(
-        "rateLimited" in heartbeat["stats"]["requests"] and heartbeat["stats"]["requests"]["rateLimited"] == 0,
-        f"Rate limited should be 0, found {heartbeat['stats']['requests'].get('rateLimited', 'not found')}")
-
-    if "operations" in heartbeat["stats"]:
-        for stat in heartbeat["stats"]["operations"].values():
-            collector.soft_assert(
-                stat["attacksDetected"]["total"] == 0,
-                f"Attacks detected should be 0: {stat}, found {stat['attacksDetected']['total']}")
-    else:
-        collector.add_failure(
-            f"'operations' key not found in heartbeat stats: {list(heartbeat['stats'].keys())}")
+    for route in heartbeats.entries("routes"):
+        collector.soft_assert(
+            not ("POST" in route["method"] and "/api/create" in route["path"]),
+            f"Heartbeat event should not contain route POST /api/create: {route}, bypassed IPs should not generate stats or API spec data")
+    attacks = heartbeats.attacks_detected()
+    collector.soft_assert(attacks == 0, f"Attacks detected should be 0, found {attacks}")
+    for report in reports:
+        stats = report["stats"]
+        rate_limited = stats["requests"].get("rateLimited")
+        collector.soft_assert(rate_limited == 0, f"Expected rateLimited to be 0, got {rate_limited}")
+        operations = stats.get("operations")
+        if collector.soft_assert(isinstance(operations, dict), f"Expected operations in heartbeat stats, got {operations}"):
+            for name, operation in operations.items():
+                detected = operation.get("attacksDetected", {}).get("total")
+                collector.soft_assert(detected == 0, f"Expected zero attacks for {name}, got {detected}")
 
     collector.raise_if_failures()
 

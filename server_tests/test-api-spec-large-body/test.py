@@ -1,4 +1,3 @@
-import time
 from testlib import *
 from core_api import CoreApi
 
@@ -29,51 +28,25 @@ def get_large_body_request():
     return url, body, headers
 
 
-def find_route(heartbeat, method, path):
-    for route in heartbeat.get("routes", []):
-        if route.get("method") == method and route.get("path") == path:
-            return route
-    return None
+def has_create_query_schema(route):
+    return (
+        route.get("method") == "POST"
+        and route.get("path") == "/api/create"
+        and route.get("apispec", {}).get("query")
+    )
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    start_events = c.get_events("heartbeat")
-    if not collector.soft_assert(
-            c.wait_for_new_events(160, len(start_events), "heartbeat"),
-            "Expected a fresh heartbeat before sending the large body request"):
-        collector.raise_if_failures()
-        return
-    start_events = c.get_events("heartbeat")
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
+    heartbeats.wait_for_next_interval()
+    collector.raise_if_failures()
     response = s.post(*get_large_body_request())
     collector.soft_assert_response_code_is(response, 200)
 
-    traffic_finished_at = int(time.time() * 1000)
-    last_error = None
-
-    def has_route_with_query_spec(heartbeat):
-        nonlocal last_error
-        route = find_route(heartbeat, "POST", "/api/create")
-        if route is None or not route.get("apispec", {}).get("query"):
-            last_error = "Expected /api/create with a query schema in the heartbeat"
-            return False
-        return True
-
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at,
-        predicate=has_route_with_query_spec
-    )
-
-    if not collector.soft_assert(
-            heartbeat is not None,
-            last_error or
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        collector.raise_if_failures()
+    route = heartbeats.wait_for_entry("routes", has_create_query_schema)
+    if not collector.soft_assert(route is not None, "Expected /api/create with a query schema in the heartbeat"):
         return
 
-    route = find_route(heartbeat, "POST", "/api/create")
     apispec = route["apispec"]
     collector.soft_assert(
         "body" not in apispec or not apispec["body"],
@@ -81,8 +54,6 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert(
         apispec.get("auth") == [{"type": "http", "scheme": "bearer"}],
         f"Expected auth info to still be reported, got: {apispec.get('auth')}")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

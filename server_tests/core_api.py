@@ -164,6 +164,14 @@ class Heartbeats:
         reports = self._all_reports if since_startup else self.reports
         return [entry for report in reports for entry in (report.get(field) or [])]
 
+    def wait_for_entry(self, field, predicate):
+        for reports in self._reports_after_requests():
+            for report in reports:
+                for entry in report.get(field) or []:
+                    if predicate(entry):
+                        return entry
+        return None
+
     def wait_for_entries(self, expected, *, field=None, key=None):
         from testlib import assert_event_contains_subset
 

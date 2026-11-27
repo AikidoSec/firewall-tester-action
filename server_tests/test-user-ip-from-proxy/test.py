@@ -20,11 +20,8 @@ USER_ID = "42"
 USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    start_events = c.get_events("heartbeat")
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     for _ in range(3):
         response = s.get("/api/pets/", headers={
             "user": USER_ID,
@@ -36,53 +33,23 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
     collector.soft_assert_response_code_is(response, 200)
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at,
-        predicate=lambda event: any(
-            str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER
-            for user in (event.get("users") or []))
-    )
+    users = heartbeats.wait_for_entries({USER_ID, USER_ID_WITHOUT_PROXY_HEADER}, field="users", key="id")
+    collector.raise_if_failures()
 
-    if not collector.soft_assert(
-            heartbeat is not None,
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        collector.raise_if_failures()
-        return
-
-    users = heartbeat.get("users", [])
-
-    if not collector.soft_assert(len(users) >= 1, f"Expected at least 1 user in heartbeat, got {len(users)}"):
-        collector.raise_if_failures()
-        return
-
-    target_user = None
-    for user in users:
-        if str(user.get("id")) == USER_ID:
-            target_user = user
-            break
-
-    if not collector.soft_assert(target_user is not None, f"User {USER_ID} not found in heartbeat users: {users}"):
-        collector.raise_if_failures()
-        return
-
-    last_ip = target_user.get("lastIpAddress", "")
-
+    users_by_id = {str(user.get("id")): user for user in users}
+    last_ip = users_by_id[USER_ID].get("lastIpAddress", "")
     collector.soft_assert(
         last_ip == REAL_CLIENT_IP,
         f"User lastIpAddress should be '{REAL_CLIENT_IP}' (from X-Real-IP header), "
         f"but got '{last_ip}' (likely the Docker bridge/proxy IP)")
 
-    user_without_proxy = next(user for user in users
-                              if str(user.get("id")) == USER_ID_WITHOUT_PROXY_HEADER)
+    user_without_proxy = users_by_id[USER_ID_WITHOUT_PROXY_HEADER]
     expected_ip = gethostbyname(gethostname())
     actual_ip = user_without_proxy.get("lastIpAddress", "").removeprefix("::ffff:")
     collector.soft_assert(
         actual_ip == expected_ip,
         f"User {USER_ID_WITHOUT_PROXY_HEADER} lastIpAddress should be '{expected_ip}' "
         f"(the test runner's IP), but got '{actual_ip}'")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

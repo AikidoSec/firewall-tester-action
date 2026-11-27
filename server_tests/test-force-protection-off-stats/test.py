@@ -13,11 +13,8 @@ This test verifies that:
 """
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    start_heartbeat_events = c.get_events("heartbeat")
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     for _ in range(3):
         response = s.post("/api/create", {"name": "test2", "age": 34})
         collector.soft_assert_response_code_is(
@@ -37,40 +34,15 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/api/pets/")
     collector.soft_assert_response_code_is(response, 200, "GET /api/pets")
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_heartbeat_events), traffic_finished_at
-    )
-    all_heartbeat_events = c.get_events("heartbeat")
-    if not collector.soft_assert(
-        heartbeat is not None,
-        f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)",
-    ):
-        collector.raise_if_failures()
-        return
+    heartbeats.wait_for_counts("requests", "total", 2, since_startup=True)
+    for route in heartbeats.entries("routes", since_startup=True):
+        collector.soft_assert(
+            route["path"] not in ("/api/create", "/api/read"),
+            f"Heartbeat should not contain routes with protection off: {route}",
+        )
 
-    requests_total = sum(
-        event.get("stats", {}).get("requests", {}).get("total", 0)
-        for event in all_heartbeat_events
-    )
-    collector.soft_assert(
-        requests_total == 2,
-        f"Only the initial request and the control request should be counted, found {requests_total}",
-    )
-
-    for event in all_heartbeat_events:
-        for route in event.get("routes", []):
-            collector.soft_assert(
-                route["path"] not in ("/api/create", "/api/read"),
-                f"Heartbeat should not contain routes with protection off: {route}",
-            )
-
-    collector.soft_assert(
-        heartbeat["stats"]["requests"]["attacksDetected"]["total"] == 0,
-        f"Attacks detected should be 0, found {heartbeat['stats']['requests']['attacksDetected']['total']}",
-    )
-
-    collector.raise_if_failures()
+    attacks = heartbeats.attacks_detected()
+    collector.soft_assert(attacks == 0, f"Attacks detected should be 0, found {attacks}")
 
 
 if __name__ == "__main__":

@@ -17,10 +17,12 @@ import os
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    for _ in range(5):
+    for i in range(5):
         response = s.get(
             "/",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(
+            response, 200, f"GET / request {i + 1} is within the five-request limit for this client"
+        )
 
     # sleep for 10 seconds
     time.sleep(10)
@@ -31,19 +33,25 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            collector.soft_assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(
+                response, 429, f"GET / request {i + 6} exceeds the five-request limit for this client"
+            )
 
-    for _ in range(100):
+    for i in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(
+            response, 200,
+            f"GET /api/pets/ request {i + 1} is within this route's separate 100-request limit",
+        )
 
     # check that the rate limiting is working
     for i in range(10):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
         collector.soft_assert_response_code_is(
-            response, 429, "Expected 429 for /api/pets/")
+            response, 429, f"GET /api/pets/ request {i + 101} exceeds the 100-request limit for this client"
+        )
 
     tests = [
         "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
@@ -67,13 +75,15 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
 
         collector.soft_assert_response_code_is_not(
-            response, 200, f"Should not be 200 for {test} ")
+            response, 200, f"GET {test} should not succeed once the /api/pets/ limit is exhausted")
 
     for i in range(10):
         response = s.get_raw(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": "2.16.53.5"})
         collector.soft_assert_response_code_is(
-            response, 200, "Expected 200 for /test_ratelimiting_1")
+            response, 200,
+            f"GET /test_ratelimiting_1 request {i + 1} is within its separate 10-request limit for this client",
+        )
 
     tests = [
         "/test_ratelimiting_1", "/test_ratelimiting_1/", "/test_ratelimiting_1/.//", "//test_ratelimiting_1",
@@ -95,7 +105,7 @@ def run_test(s: TestServer, c: CoreApi):
     for test in tests:
         response = s.get_raw(test, headers={"X-Forwarded-For": "2.16.53.5"})
         collector.soft_assert_response_code_is_not(
-            response, 200, f"Should not be 200 for {test} ")
+            response, 200, f"GET {test} should not succeed once the /test_ratelimiting_1 limit is exhausted")
 
     # Headers: X-Http-Method-Override, X-HTTP-Method-Override, X-Http-Method, X-HTTP-Method, X-Method-Override
     for header in ["X-Http-Method-Override", "X-HTTP-Method-Override", "X-Http-Method", "X-HTTP-Method", "X-Method-Override"]:

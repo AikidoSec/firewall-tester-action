@@ -12,7 +12,7 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 action_path="${GITHUB_ACTION_PATH:-$(cd "$script_dir/.." && pwd)}"
-test_source_ref="${GITHUB_ACTION_REF:-}"
+test_source_ref="${TEST_SOURCE_REF:-${GITHUB_ACTION_REF:-}}"
 if [ -e "$action_path/.git" ]; then
   test_source_ref="$(git -C "$action_path" rev-parse HEAD 2>/dev/null || echo "$test_source_ref")"
 fi

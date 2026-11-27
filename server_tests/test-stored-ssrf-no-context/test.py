@@ -40,7 +40,9 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf_2", timeout=10)
     collector.soft_assert_response_code_is(
-        response, response_code)
+        response, response_code,
+        "The app should finish the request while the agent reports the blocked background operation",
+    )
 
     c.wait_for_new_events(30, old_events_length=len(
         start_events), filter_type="detected_attack")

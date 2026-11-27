@@ -266,7 +266,10 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     check_wave_attack(collector, get_random_path_query,
                       "2.16.53.8", "1237", len(queries))
 
-    heartbeats.wait_for_counts("requests", "attackWaves", {"total": 4, "blocked": 0})
+    heartbeats.wait_for_counts(
+        "requests", "attackWaves", {"total": 4, "blocked": 0},
+        reason="Each of the four clients should report one wave, and all four waves should be detected without blocking.",
+    )
 
     check_wave_attack_with_same_ip(collector,
                                    get_random_path_filename, "2.16.53.5", "1234")

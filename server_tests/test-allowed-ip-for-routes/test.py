@@ -20,47 +20,54 @@ def run_test(s: TestServer, c: CoreApi):
 
     # Baseline: start_config.json applied by runner
     non_allowed_ip = "1.3.3.7"
-    ipv4_single = "185.245.255.212"
-    ipv4_cidr_member = "185.245.255.55"          # in 185.245.255.0/24
-    ipv4_mapped = "::ffff:185.245.255.212"       # explicit allowed entry
-    ipv6_single = "2606:2800:220:1:248:1893:25c8:1946"
-    ipv6_cidr_member = "2001:0db9:abcd:1234::abcd"
-    ipv6_zoned = "fe80::1%eth0"                  # zone stripped vs. the unzoned allowlist entry
-    ipv6_zoned_other = "fe80::1%wlan0"           # different zone, still stripped to a match
-    ipv6_unzoned_vs_zoned_entry = "fe80::2"      # unzoned request vs. the zoned allowlist entry
-    ipv6_other_zone_vs_zoned_entry = "fe80::2%wlan0"  # zone differs from the allowlist entry's
 
     # 1) With allowlist: non-allowed blocked
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    collector.soft_assert_response_body_contains(response, "not allowed")
-    collector.soft_assert_response_code_is(response, 403)
+    reason = f"GET /api/pets/ should block {non_allowed_ip} with the initial allowlist"
+    collector.soft_assert_response_body_contains(response, "not allowed", reason)
+    collector.soft_assert_response_code_is(response, 403, reason)
 
     # 1a) allowed entries are permitted
-    for allowed_ip in [ipv4_single, ipv4_cidr_member, ipv4_mapped, ipv6_single, ipv6_cidr_member,
-                        ipv6_zoned, ipv6_zoned_other,
-                        ipv6_unzoned_vs_zoned_entry, ipv6_other_zone_vs_zoned_entry]:
-        resp = s.get("/api/pets/", headers={"X-Forwarded-For": allowed_ip})
-        collector.soft_assert_response_code_is(resp, 200)
+    for client_ip, allowlist_entry in [
+        ("185.245.255.212", "185.245.255.212"),
+        ("185.245.255.55", "185.245.255.0/24"),
+        ("::ffff:185.245.255.212", "::ffff:185.245.255.212"),
+        ("2606:2800:220:1:248:1893:25c8:1946", "2606:2800:220:1:248:1893:25c8:1946"),
+        ("2001:0db9:abcd:1234::abcd", "2001:0db9:abcd:1234::/64"),
+        ("fe80::1%eth0", "fe80::1"),
+        ("fe80::1%wlan0", "fe80::1"),
+        ("fe80::2", "fe80::2%eth0"),
+        ("fe80::2%wlan0", "fe80::2%eth0"),
+    ]:
+        resp = s.get("/api/pets/", headers={"X-Forwarded-For": client_ip})
+        reason = f"GET /api/pets/ should allow {client_ip} because it matches allowlist entry {allowlist_entry}"
+        if "%" in client_ip or "%" in allowlist_entry:
+            reason += " after ignoring the IPv6 zone ID"
+        collector.soft_assert_response_code_is(resp, 200, reason)
         if resp.status_code == 200:
-            collector.soft_assert(isinstance(resp.json(), list), f"Response body should be a list for allowed IP {allowed_ip}")
+            collector.soft_assert(isinstance(resp.json(), list), f"Response body should be a list for allowed IP {client_ip}")
 
     # 1b) a different host on the same link-local prefix is still blocked
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "fe80::3"})
-    collector.soft_assert_response_body_contains(response, "not allowed")
-    collector.soft_assert_response_code_is(response, 403)
+    reason = "GET /api/pets/ should block fe80::3 because the allowlist only includes other hosts on that prefix"
+    collector.soft_assert_response_body_contains(response, "not allowed", reason)
+    collector.soft_assert_response_code_is(response, 403, reason)
 
     # 2) Remove allowlist: previously blocked IP should pass
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    collector.soft_assert_response_code_is(response, 200)
+    collector.soft_assert_response_code_is(
+        response, 200, f"GET /api/pets/ should allow {non_allowed_ip} after removing the allowlist"
+    )
     if response.status_code == 200:
         collector.soft_assert(isinstance(response.json(), list), "Response body should be a list after removing allowlist")
 
     # 3) Restore allowlist: non-allowed blocked again
     c.update_runtime_config_file("start_config.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    collector.soft_assert_response_code_is(response, 403)
-    collector.soft_assert_response_body_contains(response, "not allowed")
+    reason = f"GET /api/pets/ should block {non_allowed_ip} after restoring the allowlist"
+    collector.soft_assert_response_code_is(response, 403, reason)
+    collector.soft_assert_response_body_contains(response, "not allowed", reason)
 
     collector.raise_if_failures()
 

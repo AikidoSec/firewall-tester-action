@@ -21,7 +21,10 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(5):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(response, 429)
+        collector.soft_assert_response_code_is_not(
+            response, 429,
+            f"Request {i + 1} is within the five-request limit shared by /test_ratelimiting_*",
+        )
 
     # sleep for 10 seconds
     time.sleep(5)
@@ -32,15 +35,22 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            collector.soft_assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(
+                response, 429,
+                f"Request {i + 6} exceeds the five-request limit shared by /test_ratelimiting_*",
+            )
 
-    for _ in range(100):
+    for i in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(response, 429)
+        collector.soft_assert_response_code_is_not(
+            response, 429, f"GET /api/pets/ request {i + 1} is within its independent 100-request limit"
+        )
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_code_is(response, 429)
+    collector.soft_assert_response_code_is(
+        response, 429, "GET /api/pets/ request 101 exceeds this route's 100-request limit"
+    )
 
     collector.raise_if_failures()
 

@@ -27,7 +27,7 @@ def get_successful_response(
     status_code = get_response_status_code(response)
     collector.soft_assert(
         status_code is not None and 200 <= status_code < 300,
-        f"Expected a successful response, got status {status_code}",
+        f"GET {route} from {client_ip} should succeed before checking custom events, got status {status_code}",
     )
 
 

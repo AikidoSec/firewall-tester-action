@@ -19,10 +19,12 @@ def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
     cookie = "RateLimitingGroupID=1234567890"
-    for _ in range(5):
+    for i in range(5):
         response = s.get(
             "/",  headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        collector.soft_assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(
+            response, 200, f"GET / request {i + 1} is within the five-request limit for this group"
+        )
 
     # sleep for 10 seconds
     time.sleep(10)
@@ -33,19 +35,26 @@ def run_test(s: TestServer, c: CoreApi):
         if i < 5:
             pass
         else:
-            collector.soft_assert_response_code_is(response, 429)
+            collector.soft_assert_response_code_is(
+                response, 429,
+                f"GET / request {i + 6} should exceed the shared group limit even when the client IP changes",
+            )
 
-    for _ in range(100):
+    for i in range(100):
 
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
-        collector.soft_assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(
+            response, 200, f"GET /api/pets/ request {i + 1} is within this route's separate group limit"
+        )
 
     for i in range(10):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
         collector.soft_assert_response_code_is(
-            response, 429, "Expected 429 for /api/pets/")
+            response, 429,
+            f"GET /api/pets/ request {i + 101} exceeds the 100-request limit for the shared group",
+        )
 
     tests = [
         "/api/pets", "/api/pets/", "/api//pets", "//api/pets",
@@ -70,13 +79,15 @@ def run_test(s: TestServer, c: CoreApi):
             test, headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
 
         collector.soft_assert_response_code_is_not(
-            response, 200, f"Should not be 200 for {test} ")
+            response, 200, f"GET {test} should not succeed once the /api/pets/ limit is exhausted")
 
     for i in range(10):
         response = s.get_raw(
             "/test_ratelimiting_1", headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
         collector.soft_assert_response_code_is(
-            response, 200, "Expected 200 for /test_ratelimiting_1")
+            response, 200,
+            f"GET /test_ratelimiting_1 request {i + 1} is within its separate 10-request limit for the shared group",
+        )
 
     methods = ["get", "GeT", "GET", "GET"]
     for method in methods:
@@ -107,7 +118,7 @@ def run_test(s: TestServer, c: CoreApi):
         response = s.get_raw(
             test, headers={"X-Forwarded-For": get_random_ip(), "Cookie": cookie})
         collector.soft_assert_response_code_is_not(
-            response, 200, f"Should not be 200 for {test} ")
+            response, 200, f"GET {test} should not succeed once the /test_ratelimiting_1 limit is exhausted")
 
     collector.raise_if_failures()
 

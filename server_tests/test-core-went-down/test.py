@@ -2,31 +2,33 @@ from testlib import *
 from core_api import CoreApi
 
 
-def check_attacks_blocked(collector, s, response_code):
+def check_attacks_blocked(collector, s, response_code, *, phase):
 
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
     collector.soft_assert_response_code_is(
-        response, response_code, "sql injection")
+        response, response_code, f"SQL injection should still be blocked {phase}")
 
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
     collector.soft_assert_response_code_is(
-        response, response_code, "shell injection")
+        response, response_code, f"Shell injection should still be blocked {phase}")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
     collector.soft_assert_response_code_is(
-        response, response_code, "path traversal")
+        response, response_code, f"Path traversal should still be blocked {phase}")
 
 
 def check_event_is_submitted_shell_injection(
-        collector, s, c, response_code, expected_json, max_wait_time=5):
+        collector, s, c, response_code, expected_json, max_wait_time=5, *, phase):
     start_events = c.get_events("detected_attack")
     request_started_at_ms = int(time.time() * 1000) - 1000
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(response, response_code)
+    collector.soft_assert_response_code_is(
+        response, response_code, f"Shell injection should still be blocked {phase}"
+    )
 
     deadline = time.monotonic() + max_wait_time
     new_events = []
@@ -64,16 +66,19 @@ def check_event_is_submitted_shell_injection(
 def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
-    check_attacks_blocked(collector, s, 500)
+    check_attacks_blocked(collector, s, 500, phase="before core goes offline")
 
     c.set_mock_server_down()
     time.sleep(70)
 
-    check_attacks_blocked(collector, s, 500)
+    check_attacks_blocked(collector, s, 500, phase="while core is offline")
 
-    for _ in range(5):
+    for i in range(5):
         response = s.get("/test_ratelimiting_1")
-        collector.soft_assert_response_code_is(response, 200)
+        collector.soft_assert_response_code_is(
+            response, 200,
+            f"GET /test_ratelimiting_1 request {i + 1} is within the cached limit while core is down",
+        )
 
     time.sleep(5)
 
@@ -83,23 +88,26 @@ def run_test(s: TestServer, c: CoreApi):
             pass
         else:
             collector.soft_assert_response_code_is(
-                response, 429)
+                response, 429,
+                f"GET /test_ratelimiting_1 request {i + 6} exceeds the cached limit while core is down",
+            )
 
     c.set_mock_server_up()
 
     check_event_is_submitted_shell_injection(
-        collector, s, c, 500, "expect_detection_blocked.json")
+        collector, s, c, 500, "expect_detection_blocked.json", phase="after core comes back online")
 
     c.set_mock_server_timeout()
 
     time.sleep(70)
 
-    check_attacks_blocked(collector, s, 500)
+    check_attacks_blocked(collector, s, 500, phase="while core times out")
 
     c.set_mock_server_up()
 
     check_event_is_submitted_shell_injection(
-        collector, s, c, 500, "expect_detection_blocked.json", max_wait_time=70)
+        collector, s, c, 500, "expect_detection_blocked.json", max_wait_time=70,
+        phase="after core recovers from a timeout")
 
     collector.raise_if_failures()
 

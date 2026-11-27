@@ -18,15 +18,20 @@ def run_test(s: TestServer, c: CoreApi):
 
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
-    collector.soft_assert_response_code_is(response, 403)
+    collector.soft_assert_response_code_is(
+        response, 403, "The initial /api/p* allowlist excludes client 1.3.3.7"
+    )
     collector.soft_assert_response_body_contains(
-        response, " not allowed ")
+        response, " not allowed ", "The denial should identify the wildcard route's IP restriction"
+    )
 
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
 
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
-    collector.soft_assert_response_code_is(response, 200)
+    collector.soft_assert_response_code_is(
+        response, 200, "Removing the wildcard allowlist should let client 1.3.3.7 reach /api/pets/"
+    )
     if response.status_code == 200:
         response_body = response.json()
         collector.soft_assert(isinstance(response_body, list), "Response body should be a list")
@@ -35,9 +40,12 @@ def run_test(s: TestServer, c: CoreApi):
 
     response = s.get("/api/pets/",
                      headers={"X-Forwarded-For": "1.3.3.7"})
-    collector.soft_assert_response_code_is(response, 403)
+    collector.soft_assert_response_code_is(
+        response, 403, "Restoring the wildcard allowlist should block client 1.3.3.7 again"
+    )
     collector.soft_assert_response_body_contains(
-        response, " not allowed ")
+        response, " not allowed ", "The restored wildcard allowlist should explain the denial"
+    )
 
     collector.raise_if_failures()
 

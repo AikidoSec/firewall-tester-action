@@ -13,15 +13,15 @@ def check_attacks_blocked(collector, s, response_code):
     # sql injection
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    collector.soft_assert_response_code_is(response, response_code, "sql injection")
+    collector.soft_assert_response_code_is(response, response_code, "SQL injection should be blocked even with an invalid agent token")
 
     # shell injection
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(response, response_code, "shell injection")
+    collector.soft_assert_response_code_is(response, response_code, "Shell injection should be blocked even with an invalid agent token")
 
     # path traversal
     response = s.get("/api/read?path=../secrets/key.txt")
-    collector.soft_assert_response_code_is(response, response_code, "path traversal")
+    collector.soft_assert_response_code_is(response, response_code, "Path traversal should be blocked even with an invalid agent token")
 
 
 def run_test(s: TestServer, c: CoreApi):

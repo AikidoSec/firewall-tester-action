@@ -13,11 +13,11 @@ from core_api import CoreApi
 '''
 
 
-def check_path_traversal_with_event(collector, response_code, expected_json):
+def check_path_traversal_with_event(collector, response_code, expected_json, *, phase):
     start_events = c.get_events("detected_attack")
     response = s.get("/api/read?path=../secrets/key.txt")
     collector.soft_assert_response_code_is(response, response_code,
-                                           "Path traversal check failed")
+                                           f"Path traversal request with blocking {phase}")
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -27,13 +27,13 @@ def check_path_traversal_with_event(collector, response_code, expected_json):
 
     if not collector.soft_assert(
             len(new_events) >= 1,
-            f"Events list contains {len(new_events)} elements, expected at least 1"):
+            f"Events list contains {len(new_events)} elements, expected at least 1 (with blocking {phase})"):
         return
 
     try:
         assert_event_contains_subset_file(new_events[0], expected_json)
     except AssertionError as e:
-        collector.add_failure(str(e))
+        collector.add_failure(f"{e} (with blocking {phase})")
 
 
 def check_path_traversal(collector, query_string):
@@ -48,15 +48,15 @@ def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
     check_path_traversal_with_event(
-        collector, 500, "expect_detection_blocked.json")
+        collector, 500, "expect_detection_blocked.json", phase="initially enabled")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_path_traversal_with_event(
-        collector, 200, "expect_detection_not_blocked.json")
+        collector, 200, "expect_detection_not_blocked.json", phase="disabled")
 
     c.update_runtime_config_file("start_config.json")
     check_path_traversal_with_event(
-        collector, 500, "expect_detection_blocked.json")
+        collector, 500, "expect_detection_blocked.json", phase="re-enabled")
 
     paths = [
         "../secrets/key.txt",

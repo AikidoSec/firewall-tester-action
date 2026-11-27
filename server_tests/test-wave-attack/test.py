@@ -203,51 +203,6 @@ def check_wave_attack(collector, get_method_path, ip, user_id, len_samples):
                 isinstance(sample["url"], str), "Url is not a string")
 
 
-def check_attack_wave_stats(collector, start_heartbeat_events, expected_total):
-    max_wait_time = 160
-    deadline = time.time() + max_wait_time
-    new_heartbeats = []
-    total = 0
-    blocked = 0
-    found_attack_waves = False
-
-    while time.time() < deadline:
-        all_heartbeats = c.get_events("heartbeat")
-        new_heartbeats = all_heartbeats[len(start_heartbeat_events):]
-
-        total = 0
-        blocked = 0
-        found_attack_waves = False
-
-        for heartbeat in new_heartbeats:
-            attack_waves = heartbeat.get("stats", {}).get(
-                "requests", {}).get("attackWaves")
-            if not isinstance(attack_waves, dict):
-                continue
-
-            found_attack_waves = True
-            total += attack_waves.get("total", 0)
-            blocked += attack_waves.get("blocked", 0)
-
-        if total >= expected_total:
-            break
-
-        time.sleep(1)
-
-    collector.soft_assert(
-        len(new_heartbeats) >= 1,
-        f"Expected at least 1 heartbeat event with attack wave stats, got {len(new_heartbeats)}")
-    collector.soft_assert(
-        found_attack_waves,
-        f"Expected attackWaves in heartbeat request stats, got {json.dumps(new_heartbeats)}")
-    collector.soft_assert(
-        total == expected_total,
-        f"Expected attack wave stats total {expected_total}, got {total} from {json.dumps(new_heartbeats)}")
-    collector.soft_assert(
-        blocked == 0,
-        f"Expected attack wave stats blocked 0, got {blocked} from {json.dumps(new_heartbeats)}")
-
-
 def check_wave_attack_with_same_ip(collector, get_method_path, ip, user_id):
     start_events = c.get_events("detected_attack_wave")
     for i in range(16):
@@ -300,11 +255,8 @@ def check_wave_attack_with_bypass_ip(collector, ip, user_id):
         f"Test sent 15 suspicious requests with bypass IP {ip} (allowedIPAddresses). Expected 0 attack wave events, but got {len(new_events)} event(s)")
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    start_heartbeat_events = c.get_events("heartbeat")
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     check_wave_attack(collector, get_random_path_filename,
                       "2.16.53.5", "1234", len(filenames))
     check_wave_attack(collector, get_random_path_directory,
@@ -314,7 +266,7 @@ def run_test(s: TestServer, c: CoreApi):
     check_wave_attack(collector, get_random_path_query,
                       "2.16.53.8", "1237", len(queries))
 
-    check_attack_wave_stats(collector, start_heartbeat_events, 4)
+    heartbeats.wait_for_counts("requests", "attackWaves", {"total": 4, "blocked": 0})
 
     check_wave_attack_with_same_ip(collector,
                                    get_random_path_filename, "2.16.53.5", "1234")
@@ -328,8 +280,6 @@ def run_test(s: TestServer, c: CoreApi):
     check_wave_attack_with_same_ip_sliding_window_and_LRU(
         collector, "2.16.53.9", "1238")
     check_wave_attack_with_bypass_ip(collector, "2.16.53.10", "1239")
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

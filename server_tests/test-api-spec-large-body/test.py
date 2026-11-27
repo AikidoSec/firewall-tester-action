@@ -41,7 +41,7 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     heartbeats.wait_for_next_interval()
     collector.raise_if_failures()
     response = s.post(*get_large_body_request())
-    collector.soft_assert_response_code_is(response, 200, "POST /api/create with a JSON body over 1 MiB")
+    collector.soft_assert_response_code_is(response, 200, message="POST /api/create with a JSON body over 1 MiB")
 
     route = heartbeats.wait_for_entry("routes", has_create_query_schema)
     if not collector.soft_assert(route is not None, "Expected /api/create with a query schema in the heartbeat"):

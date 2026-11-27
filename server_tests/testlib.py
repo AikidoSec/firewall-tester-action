@@ -369,25 +369,32 @@ def get_response_status_code(response):
             return None
 
 
-def _response_assertion_message(response, detail, message):
+def _response_assertion_error(response, detail, message, *, include_body=False):
     if not message and isinstance(response, requests.Response) and response.url:
         try:
             message = urlsplit(response.url).path or "/"
         except ValueError:
-            return detail
-    return f"{detail}; {message}" if message else detail
+            pass
+    error = AssertionError(f"{detail}; {message}" if message else detail)
+    if include_body:
+        body = response.text
+        if body and body not in (message or ""):
+            error.add_note(f"Response body: {body}")
+    return error
 
 
 def assert_response_code_is(response, status_code, message=None):
     actual = get_response_status_code(response)
-    assert actual == status_code, _response_assertion_message(
-        response, f"Status codes are not the same, expected {status_code}, got {actual}", message
-    )
+    if actual != status_code:
+        detail = f"Expected status {status_code}, got {actual}"
+        raise _response_assertion_error(response, detail, message)
 
 
 def assert_response_code_is_not(response, status_code, message=None):
-    assert get_response_status_code(
-        response) != status_code, f"Status code should be different from {status_code}. Message: {message}"
+    actual = get_response_status_code(response)
+    if actual == status_code:
+        detail = f"Status code should not be {status_code}, got {actual}"
+        raise _response_assertion_error(response, detail, message)
 
 
 def assert_response_header_contains(response, header, value):
@@ -396,17 +403,15 @@ def assert_response_header_contains(response, header, value):
 
 
 def assert_response_body_contains(response, text, message=None):
-    if message is None:
-        assert text in response.text, f"Test '{text}' is not part of response body: {response.text}"
-    else:
-        assert text in response.text, f"Test '{text}' is not part of response body: {json.dumps(response.text)}. Message: {message}"
+    if text not in response.text:
+        detail = f"Text '{text}' is not part of response body"
+        raise _response_assertion_error(response, detail, message, include_body=True)
 
 
 def assert_response_body_does_not_contain(response, text, message=None):
-    if message is None:
-        assert text not in response.text, f"Test '{text}' is part of response body: {response.text}"
-    else:
-        assert text not in response.text, f"Test '{text}' is part of response body: {json.dumps(response.text)}. Message: {message}"
+    if text in response.text:
+        detail = f"Text '{text}' is part of response body"
+        raise _response_assertion_error(response, detail, message, include_body=True)
 
 
 def assert_events_length_is(events, length):
@@ -425,6 +430,13 @@ def assert_started_event_is_valid(event):
     assert_event_contains_subset(event, {"type": "started", "agent": {}})
 
 
+def format_test_failure(message, line_numbers):
+    if not line_numbers or message.startswith("[line "):
+        return message
+    refs = " → ".join(f"line {number}" for number in line_numbers[-3:])
+    return f"[{refs}] {message}"
+
+
 def assert_event_contains_subset_file(event, event_subset_file):
     caller_frame = inspect.currentframe().f_back
     caller_filename = caller_frame.f_code.co_filename
@@ -437,9 +449,8 @@ def assert_event_contains_subset_file(event, event_subset_file):
     try:
         assert_event_contains_subset(event, event_subset)
     except AssertionError as e:
-        raise AssertionError(
-            f"[line {caller_lineno}] Event does not match subset file '{event_subset_file}': {e}"
-        ) from None
+        message = f"Event does not match subset file '{event_subset_file}': {e}"
+        raise AssertionError(format_test_failure(message, [caller_lineno])) from None
 
 
 class AssertionCollector:
@@ -458,51 +469,38 @@ class AssertionCollector:
     def __init__(self):
         self.failures = []
 
-    def _get_test_caller_frames(self, max_frames=3):
-        """Walk the stack and return up to max_frames frames from test.py (outermost first)."""
-        frames = []
-        for frame_info in inspect.stack():
-            if frame_info.filename.endswith("test.py"):
-                frames.append(frame_info.lineno)
-                if len(frames) >= max_frames:
-                    break
-        frames.reverse()
-        return frames
-
     def soft_assert(self, condition, message="Assertion failed"):
         """Record failure but continue execution. Returns True if passed, False if failed."""
         if not condition:
-            frames = self._get_test_caller_frames()
-            if frames:
-                refs = " → ".join(f"line {ln}" for ln in frames)
-                prefix = f"[{refs}] "
-            else:
-                prefix = ""
-            self.failures.append(f"{prefix}{message}")
+            self.add_failure(message)
             return False
         return True
 
     def add_failure(self, message):
         """Directly add a failure message to the collector."""
-        self.failures.append(message)
+        lines = [frame.lineno for frame in reversed(inspect.stack(context=0))
+                 if os.path.basename(frame.filename) == "test.py"]
+        self.failures.append(format_test_failure(str(message), lines))
+
+    def _check_response(self, check, response, expected, message):
+        try:
+            check(response, expected, message)
+        except AssertionError as error:
+            self.add_failure(str(error))
+            return False
+        return True
 
     def soft_assert_response_code_is(self, response, status_code, message=None):
-        actual = get_response_status_code(response)
-        detail = f"Expected status {status_code}, got {actual}"
-        return self.soft_assert(actual == status_code, _response_assertion_message(response, detail, message))
+        return self._check_response(assert_response_code_is, response, status_code, message)
 
     def soft_assert_response_code_is_not(self, response, status_code, message=None):
-        actual = get_response_status_code(response)
-        detail = f"Status code should not be {status_code}, got {actual}"
-        return self.soft_assert(actual != status_code, _response_assertion_message(response, detail, message))
+        return self._check_response(assert_response_code_is_not, response, status_code, message)
 
     def soft_assert_response_body_contains(self, response, text, message=None):
-        detail = f"Text '{text}' is not part of response body"
-        return self.soft_assert(text in response.text, _response_assertion_message(response, detail, message))
+        return self._check_response(assert_response_body_contains, response, text, message)
 
     def soft_assert_response_body_does_not_contain(self, response, text, message=None):
-        detail = f"Text '{text}' is part of response body"
-        return self.soft_assert(text not in response.text, _response_assertion_message(response, detail, message))
+        return self._check_response(assert_response_body_does_not_contain, response, text, message)
 
     @property
     def has_failures(self):

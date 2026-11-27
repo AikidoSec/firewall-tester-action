@@ -23,9 +23,9 @@ def run_test(s: TestServer, c: CoreApi):
 
     # 1) With allowlist: non-allowed blocked
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    reason = f"Client {non_allowed_ip} outside the initial allowlist"
-    collector.soft_assert_response_body_contains(response, "not allowed", reason)
-    collector.soft_assert_response_code_is(response, 403, reason)
+    message = f"Client {non_allowed_ip} outside the initial allowlist"
+    collector.soft_assert_response_body_contains(response, "not allowed", message=message)
+    collector.soft_assert_response_code_is(response, 403, message=message)
 
     # 1a) allowed entries are permitted
     for client_ip, allowlist_entry in [
@@ -40,24 +40,24 @@ def run_test(s: TestServer, c: CoreApi):
         ("fe80::2%wlan0", "fe80::2%eth0"),
     ]:
         resp = s.get("/api/pets/", headers={"X-Forwarded-For": client_ip})
-        reason = f"Client {client_ip} should match allowlist entry {allowlist_entry}"
+        message = f"Client {client_ip} should match allowlist entry {allowlist_entry}"
         if "%" in client_ip or "%" in allowlist_entry:
-            reason += " after ignoring the IPv6 zone ID"
-        collector.soft_assert_response_code_is(resp, 200, reason)
+            message += " after ignoring the IPv6 zone ID"
+        collector.soft_assert_response_code_is(resp, 200, message=message)
         if resp.status_code == 200:
             collector.soft_assert(isinstance(resp.json(), list), f"Response body should be a list for allowed IP {client_ip}")
 
     # 1b) a different host on the same link-local prefix is still blocked
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "fe80::3"})
-    reason = "Client fe80::3 is outside the allowlist"
-    collector.soft_assert_response_body_contains(response, "not allowed", reason)
-    collector.soft_assert_response_code_is(response, 403, reason)
+    message = "Client fe80::3 is outside the allowlist"
+    collector.soft_assert_response_body_contains(response, "not allowed", message=message)
+    collector.soft_assert_response_code_is(response, 403, message=message)
 
     # 2) Remove allowlist: previously blocked IP should pass
     c.update_runtime_config_file("change_config_remove_allowed_ip.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
     collector.soft_assert_response_code_is(
-        response, 200, f"Client {non_allowed_ip} after removing the allowlist"
+        response, 200, message=f"Client {non_allowed_ip} after removing the allowlist"
     )
     if response.status_code == 200:
         collector.soft_assert(isinstance(response.json(), list), "Response body should be a list after removing allowlist")
@@ -65,9 +65,9 @@ def run_test(s: TestServer, c: CoreApi):
     # 3) Restore allowlist: non-allowed blocked again
     c.update_runtime_config_file("start_config.json")
     response = s.get("/api/pets/", headers={"X-Forwarded-For": non_allowed_ip})
-    reason = f"Client {non_allowed_ip} after restoring the allowlist"
-    collector.soft_assert_response_code_is(response, 403, reason)
-    collector.soft_assert_response_body_contains(response, "not allowed", reason)
+    message = f"Client {non_allowed_ip} after restoring the allowlist"
+    collector.soft_assert_response_code_is(response, 403, message=message)
+    collector.soft_assert_response_body_contains(response, "not allowed", message=message)
 
     collector.raise_if_failures()
 

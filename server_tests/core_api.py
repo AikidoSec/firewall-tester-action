@@ -225,4 +225,12 @@ class Heartbeats:
         return observed
 
     def attacks_detected(self):
-        return sum(report["stats"]["requests"]["attacksDetected"]["total"] for report in self.reports)
+        total = 0
+        for index, report in enumerate(self.reports, start=1):
+            try:
+                total += report["stats"]["requests"]["attacksDetected"]["total"]
+            except (KeyError, TypeError):
+                self.collector.add_failure(
+                    f"Expected a numeric stats.requests.attacksDetected.total in heartbeat {index}"
+                )
+        return total

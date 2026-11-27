@@ -109,8 +109,8 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     attacks = heartbeats.attacks_detected()
     collector.soft_assert(attacks == 0, f"Attacks detected should be 0, found {attacks}")
     for report in heartbeats.reports:
-        stats = report["stats"]
-        rate_limited = stats["requests"].get("rateLimited")
+        stats = report.get("stats", {})
+        rate_limited = stats.get("requests", {}).get("rateLimited")
         collector.soft_assert(rate_limited == 0, f"Expected rateLimited to be 0, got {rate_limited}")
         operations = stats.get("operations")
         if collector.soft_assert(isinstance(operations, dict), f"Expected operations in heartbeat stats, got {operations}"):

@@ -2,9 +2,11 @@ import requests
 import json
 import time
 import os
+from collections import Counter
 
 
 CONFIG_PROPAGATION_DELAY_SECONDS = int(os.environ.get("CONFIG_PROPAGATION_DELAY", "1"))
+HEARTBEAT_TIMEOUT_SECONDS = 160
 
 
 class CoreApi:
@@ -75,11 +77,12 @@ class CoreApi:
             firewall = json.load(f)
         return self.update_runtime_firewall_json(firewall)
 
-    def get_events(self, filter_type: str = None, include_headers: bool = False) -> list:
+    def get_events(self, filter_type: str = None, include_headers: bool = False, *, timeout=None) -> list:
         response = requests.get(
             f"{self.core_url}/api/runtime/events",
             headers={"Authorization": f"{self.token}"},
             params={"includeHeaders": "true"} if include_headers else None,
+            timeout=timeout,
         )
         events = response.json()
         if filter_type:
@@ -93,34 +96,6 @@ class CoreApi:
             time.sleep(1)
             max_wait_time -= 1
         return False
-
-    def wait_for_heartbeat_after(self, max_wait_time: int, old_events_length: int,
-                                 not_before_ms: int, max_heartbeats: int = 2,
-                                 predicate=None):
-        """Wait for a post-traffic heartbeat, optionally matching its content."""
-        deadline = time.monotonic() + max_wait_time
-        checked = 0
-        candidates = []
-
-        while time.monotonic() < deadline:
-            candidates = self.get_events("heartbeat")[
-                old_events_length:old_events_length + max_heartbeats
-            ]
-
-            while checked < len(candidates):
-                heartbeat = candidates[checked]
-                checked += 1
-                ended_at = heartbeat.get("stats", {}).get("endedAt", 0)
-                if ended_at >= not_before_ms and (
-                        predicate is None or predicate(heartbeat)):
-                    return heartbeat, candidates
-
-            if checked >= max_heartbeats:
-                break
-
-            time.sleep(1)
-
-        return None, candidates
 
     def set_mock_server_down(self):
         response = requests.post(
@@ -136,3 +111,126 @@ class CoreApi:
         response = requests.post(
             f"{self.core_url}/api/runtime/apps/timeout", headers={"Authorization": f"{self.token}"})
         return response.json()
+
+
+class Heartbeats:
+    def __init__(self, core, collector):
+        self.core = core
+        self.collector = collector
+        self.checkpoint()
+
+    def checkpoint(self):
+        self._all_reports = self.core.get_events("heartbeat")
+        self._start_index = len(self._all_reports)
+
+    @property
+    def reports(self):
+        return self._all_reports[self._start_index:]
+
+    def read(self, *, timeout=None):
+        self._all_reports = self.core.get_events("heartbeat", timeout=timeout)
+        return self.reports
+
+    def _poll_reports(self):
+        deadline = time.monotonic() + HEARTBEAT_TIMEOUT_SECONDS
+        previous_count = 0
+        while (remaining := deadline - time.monotonic()) > 0:
+            try:
+                reports = self.read(timeout=remaining)
+            except requests.Timeout:
+                break
+            if len(reports) > previous_count:
+                previous_count = len(reports)
+                yield reports
+            time.sleep(1)
+
+        self.collector.add_failure(
+            f"{self.core.test_name}: heartbeat check timed out after {HEARTBEAT_TIMEOUT_SECONDS}s. "
+            f"Received {len(self.reports)} report(s): {json.dumps(self.reports)}"
+        )
+
+    def _reports_after_requests(self):
+        finished_at = int(time.time() * 1000)
+        for reports in self._poll_reports():
+            fresh = [report for report in reports if report.get("stats", {}).get("endedAt", 0) >= finished_at]
+            if fresh:
+                yield fresh
+
+    def wait_for_next_interval(self):
+        if next(self._poll_reports(), None):
+            self.checkpoint()
+
+    def entries(self, field, *, since_startup=False):
+        reports = self._all_reports if since_startup else self.reports
+        return [entry for report in reports for entry in (report.get(field) or [])]
+
+    def wait_for_entries(self, expected, *, field=None, key=None):
+        from testlib import assert_event_contains_subset
+
+        def missing(entries):
+            if key is not None:
+                return set(map(str, expected)) - {str(entry.get(key)) for entry in entries}
+            return [
+                item for item in expected
+                if not any(assert_event_contains_subset(entry, item, dry_mode=True) for entry in entries)
+            ]
+
+        entries = []
+        for fresh_reports in self._reports_after_requests():
+            if key is not None:
+                # An older user entry can carry a different lastIpAddress for the same ID.
+                for report in fresh_reports:
+                    entries = report.get(field) or []
+                    if not missing(entries):
+                        return entries
+            entries = self.entries(field) if field is not None else fresh_reports
+            if not missing(entries):
+                return entries
+
+        if field is not None:
+            entries = self.entries(field)
+        absent = missing(entries)
+        self.collector.soft_assert(not absent, f"Missing heartbeat {field or 'reports'}: {absent}")
+        return entries
+
+    def wait_for_breakdown(self, category, expected):
+        return self.wait_for_counts(category, "breakdown", expected, updates=self._reports_after_requests())
+
+    def wait_for_counts(self, category, field, expected, *, since_startup=False, updates=None):
+        if updates is None:
+            updates = self._reports_after_requests() if since_startup else self._poll_reports()
+        scalar = isinstance(expected, int)
+        expected_counts = {field: expected} if scalar else expected
+
+        def totals():
+            result = Counter()
+            reports = self._all_reports if since_startup else self.reports
+            for report in reports:
+                value = report.get("stats", {}).get(category, {}).get(field, 0)
+                if scalar:
+                    result[field] += value
+                elif isinstance(value, dict):
+                    result.update(value)
+            return result
+
+        target = Counter(expected_counts)
+        for _ in updates:
+            if totals() >= target:
+                break
+        observed = dict(totals())
+        actual = {name: observed.get(name, 0) for name in expected_counts}
+        self.collector.soft_assert(
+            actual == expected_counts, f"Expected {category}.{field} counts {expected_counts}, got {observed}"
+        )
+        return observed
+
+    def attacks_detected(self):
+        total = 0
+        for index, report in enumerate(self.reports, start=1):
+            try:
+                total += report["stats"]["requests"]["attacksDetected"]["total"]
+            except (KeyError, TypeError):
+                self.collector.add_failure(
+                    f"Expected a numeric stats.requests.attacksDetected.total in heartbeat {index}"
+                )
+        return total

@@ -1,4 +1,3 @@
-import time
 from testlib import *
 from core_api import CoreApi
 
@@ -19,27 +18,9 @@ CONTROL_IP = "1.2.3.4"
 IP_LIST_KEY = "geoip/Belgium;BE"
 
 
-def check_ip_list_matches(collector, c: CoreApi, heartbeat_count_before_traffic, traffic_finished_at, mode):
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, heartbeat_count_before_traffic, traffic_finished_at
-    )
-
-    if not collector.soft_assert(
-            heartbeat is not None,
-            f"Expected a heartbeat produced after the {mode} traffic, got {len(candidates)} candidate heartbeat(s)"):
-        return
-
-    breakdown = heartbeat.get("stats", {}).get("ipAddresses", {}).get("breakdown", {})
-    collector.soft_assert(
-        breakdown.get(IP_LIST_KEY) == len(MATCHING_IPS),
-        f"Expected {len(MATCHING_IPS)} matches while {mode}, got "
-        f"{breakdown.get(IP_LIST_KEY)} (breakdown: {breakdown})")
-
-
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    heartbeat_count_before_traffic = len(c.get_events("heartbeat"))
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
+    expected = {IP_LIST_KEY: len(MATCHING_IPS)}
 
     for entry in MATCHING_IPS:
         response = s.get("/api/pets/", headers={"X-Forwarded-For": entry["ip"]})
@@ -52,11 +33,10 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should not be blocked: {response.text}")
 
-    check_ip_list_matches(
-        collector, c, heartbeat_count_before_traffic, int(time.time() * 1000), "blocking")
+    heartbeats.wait_for_breakdown("ipAddresses", expected)
 
     c.update_runtime_firewall_file("change_config_monitor_mode.json")
-    heartbeat_count_before_traffic = len(c.get_events("heartbeat"))
+    heartbeats.checkpoint()
 
     for entry in MATCHING_IPS:
         response = s.get("/api/pets/", headers={"X-Forwarded-For": entry["ip"]})
@@ -70,10 +50,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector.soft_assert_response_code_is(
         response, 200, f"Control IP {CONTROL_IP} should still not be blocked: {response.text}")
 
-    check_ip_list_matches(
-        collector, c, heartbeat_count_before_traffic, int(time.time() * 1000), "monitoring")
-
-    collector.raise_if_failures()
+    heartbeats.wait_for_breakdown("ipAddresses", expected)
 
 
 if __name__ == "__main__":

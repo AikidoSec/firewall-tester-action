@@ -22,10 +22,7 @@ Tests the outbound domain blocking feature:
 11. Tests that detection mode (block: false) doesn't block
 '''
 
-def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
-
-    start_events = c.get_events("heartbeat")
-
+def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     """Test that explicitly blocked domains are always blocked"""
     response = s.post("/api/request",
                       {"url": "http://evil.example.com/test"})
@@ -129,32 +126,9 @@ def test_explicitly_blocked_domain(collector, s: TestServer, c: CoreApi):
         collector.soft_assert_response_body_contains(
             response, "blocked an outbound connection", "percent-encoded hostname b%C3%B6se.example.com should not be allowed")
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_events), traffic_finished_at
+    heartbeats.wait_for_entries(
+        [{"hostname": "domain2.example.com"}, {"hostname": "safe.example.com"}], field="hostnames"
     )
-
-    if not collector.soft_assert(
-            heartbeat is not None,
-            f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)"):
-        return
-
-    # assrt hostname in heartbeat
-    collector.soft_assert("hostnames" in heartbeat,
-                          "hostnames should be in heartbeat")
-
-    if "hostnames" in heartbeat:
-        hostnames = heartbeat["hostnames"]
-
-        collector.soft_assert(any(hostname["hostname"] == "domain2.example.com" for hostname in hostnames),
-                              "domain2.example.com should be in hostnames, blocked domains still need to be reported in the heartbeat event")
-        # PHP firewall calls the original handler directly for bypassed IPs,
-        # making domain reporting in heartbeats difficult to implement there.
-        # collector.soft_assert(any(
-        #     hostname["hostname"] == "domain1.example.com" for hostname in hostnames), "domain1.example.com should be in hostnames, Bypassed IPs should still report domains in heartbeat events")
-        # safe.example.com
-        collector.soft_assert(any(hostname["hostname"] == "safe.example.com" for hostname in hostnames),
-                              "safe.example.com should be in hostnames, allowed domains should be reported in the heartbeat event")
 
 
 def test_new_domain_allowed_when_flag_disabled(collector, s: TestServer, c: CoreApi):
@@ -183,15 +157,12 @@ def test_detection_mode(collector, s: TestServer, c: CoreApi):
         response, 200, "detection mode (block: false) should not block requests to evil.example.com")
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    test_explicitly_blocked_domain(collector, s, c)
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
+    test_explicitly_blocked_domain(collector, s, heartbeats)
 
    # test_new_domain_allowed_when_flag_disabled(collector, s, c)
     # test_detection_mode(collector, s, c)
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

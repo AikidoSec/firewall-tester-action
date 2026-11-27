@@ -11,7 +11,7 @@ import inspect
 import os
 import http.client
 import re
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 _sessions = {}
 _raw_connections = {}
@@ -369,9 +369,20 @@ def get_response_status_code(response):
             return None
 
 
+def _response_assertion_message(response, detail, message):
+    if not message and isinstance(response, requests.Response) and response.url:
+        try:
+            message = urlsplit(response.url).path or "/"
+        except ValueError:
+            return detail
+    return f"{detail}; {message}" if message else detail
+
+
 def assert_response_code_is(response, status_code, message=None):
-    assert get_response_status_code(
-        response) == status_code, f"Status codes are not the same, expected {status_code}, got {get_response_status_code(response)} - {message}"
+    actual = get_response_status_code(response)
+    assert actual == status_code, _response_assertion_message(
+        response, f"Status codes are not the same, expected {status_code}, got {actual}", message
+    )
 
 
 def assert_response_code_is_not(response, status_code, message=None):
@@ -477,29 +488,21 @@ class AssertionCollector:
 
     def soft_assert_response_code_is(self, response, status_code, message=None):
         actual = get_response_status_code(response)
-        msg = f"Expected status {status_code}, got {actual}"
-        if message:
-            msg += f"; {message}"
-        return self.soft_assert(actual == status_code, msg)
+        detail = f"Expected status {status_code}, got {actual}"
+        return self.soft_assert(actual == status_code, _response_assertion_message(response, detail, message))
 
     def soft_assert_response_code_is_not(self, response, status_code, message=None):
         actual = get_response_status_code(response)
-        msg = f"Status code should not be {status_code}, got {actual}"
-        if message:
-            msg += f"; {message}"
-        return self.soft_assert(actual != status_code, msg)
+        detail = f"Status code should not be {status_code}, got {actual}"
+        return self.soft_assert(actual != status_code, _response_assertion_message(response, detail, message))
 
     def soft_assert_response_body_contains(self, response, text, message=None):
-        msg = f"Text '{text}' is not part of response body"
-        if message:
-            msg += f"; {message}"
-        return self.soft_assert(text in response.text, msg)
+        detail = f"Text '{text}' is not part of response body"
+        return self.soft_assert(text in response.text, _response_assertion_message(response, detail, message))
 
     def soft_assert_response_body_does_not_contain(self, response, text, message=None):
-        msg = f"Text '{text}' is part of response body"
-        if message:
-            msg += f"; {message}"
-        return self.soft_assert(text not in response.text, msg)
+        detail = f"Text '{text}' is part of response body"
+        return self.soft_assert(text not in response.text, _response_assertion_message(response, detail, message))
 
     @property
     def has_failures(self):

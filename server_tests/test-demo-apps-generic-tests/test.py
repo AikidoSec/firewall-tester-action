@@ -45,34 +45,33 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get_raw("/api/pets/", headers={
         "user": "123456"})
     response.read()
-    collector.soft_assert_response_code_is(response, 200, "User 123456 is allowed to read pets")
+    collector.soft_assert_response_code_is(
+        response, 200, "Expected 200 for user 123456")
 
     response = s.get_raw("/api/pets/", headers={
         "user": "789"})
     response.read()
-    collector.soft_assert_response_code_is(response, 403, "User 789 is on the blocked-user list")
+    collector.soft_assert_response_code_is(
+        response, 403, "Expected 403 for user 789")
 
     # ------ Bot blocking ------
 
     response = s.get("/api/pets/", headers={
         "User-Agent": "1234googlebot1234"})
     collector.soft_assert_response_code_is(
-        response, 403, "The configured bot user agent should be blocked on GET /api/pets/"
-    )
+        response, 403)
 
     # ------ Big request ------
     file_path = os.path.join(os.path.dirname(__file__), "test.json")
     with open(file_path, 'r', encoding="utf-8") as file:
         response = s.post("/api/create", json.load(file))
     collector.soft_assert_response_code_is(
-        response, 200, "Creating a pet should succeed with the large JSON fixture"
-    )
+        response, 200, "Expected 200 for /api/create")
 
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
     collector.soft_assert_response_code_is(
-        response, 500, "SQL injection should still be blocked after processing the large JSON fixture"
-    )
+        response, 500, "Expected 500 for /api/create")
 
     # ------ Big Nested JSON ------
     body = '{"a":' + build_nested_json_text(8000) + ',"name":' + json.dumps(

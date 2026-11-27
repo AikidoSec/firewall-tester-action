@@ -54,7 +54,7 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf", timeout=10)
     collector.soft_assert_response_code_is(
-        response, response_code, f"Stored outbound request with SSRF blocking {phase}"
+        response, response_code, f"SSRF blocking {phase}"
     )
 
     c.wait_for_new_events(5, old_events_length=len(
@@ -65,17 +65,17 @@ def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_eve
 
     if num_events == 0:
         collector.soft_assert(len(new_events) == 0,
-                              f"Expected no new events, got {len(new_events)} (with blocking {phase})")
+                              f"Expected no new events, got {len(new_events)}")
         return
 
     # Prerequisite: need at least num_events to check contents
-    if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)} (with blocking {phase})"):
+    if not collector.soft_assert(len(new_events) >= num_events, f"Expected at least {num_events} new event(s), got {len(new_events)}"):
         return
     try:
         if num_events == 1:
             assert_event_contains_subset_file(new_events[0], expected_json)
     except AssertionError as e:
-        collector.add_failure(f"{e} (with blocking {phase})")
+        collector.add_failure(str(e))
 
 
 def check_ssrf_bypassed_ip(collector, s, ip: str):

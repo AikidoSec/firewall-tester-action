@@ -204,7 +204,7 @@ class Heartbeats:
     def wait_for_breakdown(self, category, expected):
         return self.wait_for_counts(category, "breakdown", expected, updates=self._reports_after_requests())
 
-    def wait_for_counts(self, category, field, expected, *, since_startup=False, updates=None, reason=None):
+    def wait_for_counts(self, category, field, expected, *, since_startup=False, updates=None):
         if updates is None:
             updates = self._reports_after_requests() if since_startup else self._poll_reports()
         scalar = isinstance(expected, int)
@@ -227,10 +227,9 @@ class Heartbeats:
                 break
         observed = dict(totals())
         actual = {name: observed.get(name, 0) for name in expected_counts}
-        message = f"Expected {category}.{field} counts {expected_counts}, got {observed}"
-        if reason:
-            message += f". {reason}"
-        self.collector.soft_assert(actual == expected_counts, message)
+        self.collector.soft_assert(
+            actual == expected_counts, f"Expected {category}.{field} counts {expected_counts}, got {observed}"
+        )
         return observed
 
     def attacks_detected(self):

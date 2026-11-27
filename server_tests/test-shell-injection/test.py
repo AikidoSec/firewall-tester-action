@@ -13,12 +13,10 @@ import os
 '''
 
 
-def check_shell_injection(collector, s, c, response_code, expected_json, *, phase):
+def check_shell_injection(collector, s, c, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(
-        response, response_code, f"Shell injection on /api/execute with blocking {phase}"
-    )
+    collector.soft_assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -27,13 +25,13 @@ def check_shell_injection(collector, s, c, response_code, expected_json, *, phas
     new_events = all_events[len(start_events):]
 
     # Prerequisite: need at least 1 event to check its contents
-    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)} (with blocking {phase})"):
+    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
         return
 
     try:
         assert_event_contains_subset_file(new_events[0], expected_json)
     except AssertionError as e:
-        collector.add_failure(f"{e} (with blocking {phase})")
+        collector.add_failure(str(e))
 
 
 def check_shell_injection_command_post(collector, s, command):
@@ -56,15 +54,15 @@ def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
     check_shell_injection(collector, s, c, 500,
-                          "expect_detection_blocked.json", phase="initially enabled")
+                          "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_shell_injection(collector, s, c, 200,
-                          "expect_detection_not_blocked.json", phase="disabled")
+                          "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
     check_shell_injection(collector, s, c, 500,
-                          "expect_detection_blocked.json", phase="re-enabled")
+                          "expect_detection_blocked.json")
     commands = [
         # Basic commands
         "whoami",

@@ -15,13 +15,11 @@ import os
 '''
 
 
-def check_sql_injection(collector, s, c, response_code, response_body, event_id, expected_json, *, phase):
+def check_sql_injection(collector, s, c, response_code, response_body, event_id, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post(
         "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
-    collector.soft_assert_response_body_contains(
-        response, response_body, f"SQL injection response with blocking {phase}"
-    )
+    collector.soft_assert_response_body_contains(response, response_body)
 
     c.wait_for_new_events(20, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -30,12 +28,12 @@ def check_sql_injection(collector, s, c, response_code, response_body, event_id,
     new_events = all_events[len(start_events):]
 
     # Prerequisite: need at least 1 event to check its contents
-    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)} (with blocking {phase})"):
+    if not collector.soft_assert(len(new_events) >= 1, f"Expected at least 1 new event, got {len(new_events)}"):
         return
     try:
         assert_event_contains_subset_file(new_events[0], expected_json)
     except AssertionError as e:
-        collector.add_failure(f"{e} (with blocking {phase})")
+        collector.add_failure(str(e))
 
 
 def check_sql_injection_payload(collector, s, payload):
@@ -65,15 +63,15 @@ def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
     check_sql_injection(collector, s, c, 500, "", 1,
-                        "expect_detection_blocked.json", phase="initially enabled")
+                        "expect_detection_blocked.json")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_sql_injection(collector, s, c, 200, "", 2,
-                        "expect_detection_not_blocked.json", phase="disabled")
+                        "expect_detection_not_blocked.json")
 
     c.update_runtime_config_file("start_config.json")
     check_sql_injection(collector, s, c, 500, "", 3,
-                        "expect_detection_blocked.json", phase="re-enabled")
+                        "expect_detection_blocked.json")
     s.get("/clear")
     payloads = [
         "Malicious Pet', 'Gru from the Minions') --",

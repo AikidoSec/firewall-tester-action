@@ -15,7 +15,7 @@ def send_100_requests(collector):
     for _ in range(100):
         response = s.get("/api/pets/")
         collector.soft_assert_response_code_is(response, 200,
-                                               f"GET /api/pets/ should stay available during the traffic check. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
 
 
 def send_attacks(collector):
@@ -23,44 +23,41 @@ def send_attacks(collector):
     for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
         collector.soft_assert_response_code_is(response, 500,
-                                               f"Path traversal should be blocked. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, "firewall has blocked a path traversal", f"Path traversal should be blocked. {response.text} {cs.get_server_logs()}")
+            response, "firewall has blocked a path traversal", f"{response.text} {cs.get_server_logs()}")
 
     # sql injection attacks
     for _ in range(2):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
         collector.soft_assert_response_code_is(response, 500,
-                                               f"SQL injection should be blocked. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, "firewall has blocked an SQL injection", f"SQL injection should be blocked. {response.text} {cs.get_server_logs()}")
+            response, "firewall has blocked an SQL injection", f"{response.text} {cs.get_server_logs()}")
 
     # shell injection attacks
     for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
         collector.soft_assert_response_code_is(response, 500,
-                                               f"Shell injection should be blocked. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, "firewall has blocked a shell injection", f"Shell injection should be blocked. {response.text} {cs.get_server_logs()}")
+            response, "firewall has blocked a shell injection", f"{response.text} {cs.get_server_logs()}")
 
     # ssrf attacks
     for _ in range(2):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081"}, timeout=10)
         collector.soft_assert_response_code_is(response, 500,
-                                               f"SSRF should be blocked. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, "firewall has blocked a server-side request forgery", f"SSRF should be blocked. {response.text} {cs.get_server_logs()}")
+            response, "firewall has blocked a server-side request forgery", f"{response.text} {cs.get_server_logs()}")
 
 
 def check_event_is_submitted_shell_injection(collector, response_code, expected_json):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    collector.soft_assert_response_code_is(
-        response, response_code,
-        "Shell injection should still be blocked after repeated server stop/start cycles",
-    )
+    collector.soft_assert_response_code_is(response, response_code)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")

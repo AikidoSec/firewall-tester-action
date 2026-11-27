@@ -23,10 +23,7 @@ def get_start_event(c):
 def send_attack_and_get_event(s, c):
     existing_events = c.get_events("detected_attack")
     response = s.post("/api/execute", {"userCommand": "whoami"})
-    assert_response_code_is(
-        response, 500,
-        "The agent should block the request that generates the detection event used for header checks",
-    )
+    assert_response_code_is(response, 500)
     assert c.wait_for_new_events(10, len(existing_events), "detected_attack"), (
         "Expected a detected attack event"
     )

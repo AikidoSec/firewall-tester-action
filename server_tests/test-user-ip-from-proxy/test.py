@@ -22,22 +22,16 @@ USER_ID_WITHOUT_PROXY_HEADER = "43"
 
 @with_heartbeats
 def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
-    for i in range(3):
+    for _ in range(3):
         response = s.get("/api/pets/", headers={
             "user": USER_ID,
             "X-Real-IP": REAL_CLIENT_IP
         })
-        collector.soft_assert_response_code_is(
-            response, 200,
-            f"Request {i + 1} for user {USER_ID} must succeed to record the IP from X-Real-IP",
-        )
+        collector.soft_assert_response_code_is(response, 200)
         time.sleep(0.5)
 
     response = s.get("/api/pets/", headers={"user": USER_ID_WITHOUT_PROXY_HEADER})
-    collector.soft_assert_response_code_is(
-        response, 200,
-        f"The request for user {USER_ID_WITHOUT_PROXY_HEADER} must succeed to record the fallback client IP",
-    )
+    collector.soft_assert_response_code_is(response, 200)
 
     users = heartbeats.wait_for_entries({USER_ID, USER_ID_WITHOUT_PROXY_HEADER}, field="users", key="id")
     collector.raise_if_failures()

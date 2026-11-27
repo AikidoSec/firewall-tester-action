@@ -61,17 +61,17 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
         response = s.get("/api/read?path=../secrets/key.txt",
                          headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"The IP bypass for {ip['ip']} should allow this path traversal request")
+            response, 200, "Request should not be blocked")
         # 2. sql injection attack
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"}, headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"The IP bypass for {ip['ip']} should allow this SQL injection request")
+            response, 200, "Request should not be blocked")
         # 3. shell injection attack
         response = s.post(
             "/api/execute", {"userCommand": "whoami"}, headers={"X-Forwarded-For": ip["ip"]})
         collector.soft_assert_response_code_is(
-            response, 200, f"The IP bypass for {ip['ip']} should allow this shell injection request")
+            response, 200, "Request should not be blocked")
 
         # 4. bot blocking should be bypassed (send request with blocked user agent)
         # Using pattern like "1234googlebot1234" which matches the blockedUserAgents pattern "Googlebot"
@@ -101,10 +101,7 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
         collector.soft_assert_response_code_is(
             response, 200, f"Request from bypass IP {ip['ip']} ({ip['type']}) should bypass blocked user IDs")
 
-    heartbeats.wait_for_counts(
-        "requests", "total", 1, since_startup=True,
-        reason="Only the startup request should count. Every subsequent request came from a bypassed IP.",
-    )
+    heartbeats.wait_for_counts("requests", "total", 1, since_startup=True)
     for route in heartbeats.entries("routes"):
         collector.soft_assert(
             not ("POST" in route["method"] and "/api/create" in route["path"]),

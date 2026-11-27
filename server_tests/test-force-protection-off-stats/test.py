@@ -34,10 +34,7 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     response = s.get("/api/pets/")
     collector.soft_assert_response_code_is(response, 200, "GET /api/pets")
 
-    heartbeats.wait_for_counts(
-        "requests", "total", 2, since_startup=True,
-        reason="Only the startup request and GET /api/pets/ should count. Protection is off for /api/create and /api/read.",
-    )
+    heartbeats.wait_for_counts("requests", "total", 2, since_startup=True)
     for route in heartbeats.entries("routes", since_startup=True):
         collector.soft_assert(
             route["path"] not in ("/api/create", "/api/read"),

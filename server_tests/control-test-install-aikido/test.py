@@ -17,43 +17,43 @@ def send_100_requests(collector):
     for _ in range(5):
         response = s.get("/api/pets/")
         collector.soft_assert_response_code_is(response, 200,
-                                               f"GET /api/pets/ should stay available during the traffic check. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
 
 
-def send_attacks(collector, expected_code: int, expected_message: str, *, phase):
+def send_attacks(collector, expected_code: int, expected_message: str):
     # path traversal attacks
     for _ in range(2):
         response = s.get("/api/read?path=../secrets/key.txt")
         collector.soft_assert_response_code_is(response, expected_code,
-                                               f"Path traversal check {phase}. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, expected_message, f"Path traversal check {phase}. {response.text} {cs.get_server_logs()}")
+            response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # sql injection attacks
     for _ in range(2):
         response = s.post(
             "/api/create", {"name": "Malicious Pet', 'Gru from the Minions') --"})
         collector.soft_assert_response_code_is(response, expected_code,
-                                               f"SQL injection check {phase}. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, expected_message, f"SQL injection check {phase}. {response.text} {cs.get_server_logs()}")
+            response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # shell injection attacks
     for _ in range(2):
         response = s.post("/api/execute", {"userCommand": "whoami"})
         collector.soft_assert_response_code_is(response, expected_code,
-                                               f"Shell injection check {phase}. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, expected_message, f"Shell injection check {phase}. {response.text} {cs.get_server_logs()}")
+            response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
     # ssrf attacks
     for _ in range(2):
         response = s.post(
             "/api/request", {"url": "http://127.0.0.1:8081/health"}, timeout=10)
         collector.soft_assert_response_code_is(response, expected_code,
-                                               f"SSRF check {phase}. {response.text} {cs.get_server_logs()}")
+                                               f"Request failed: {response.text} {cs.get_server_logs()}")
         collector.soft_assert_response_body_contains(
-            response, expected_message, f"SSRF check {phase}. {response.text} {cs.get_server_logs()}")
+            response, expected_message, f"{response.text} {cs.get_server_logs()}")
 
 
 def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
@@ -64,23 +64,23 @@ def run_test(s: TestServer, c: CoreApi, cs: TestControlServer):
     cs.start_server()
 
     send_100_requests(collector)
-    send_attacks(collector, 500, "firewall has blocked", phase="with the agent installed")
+    send_attacks(collector, 500, "firewall has blocked")
 
     cs.stop_server()
     cs.uninstall_aikido()
     cs.start_server()
 
     send_100_requests(collector)
-    send_attacks(collector, 200, "", phase="after uninstalling the agent")
+    send_attacks(collector, 200, "")
 
     cs.install_aikido()
-    send_attacks(collector, 200, "", phase="after reinstalling the agent before restart")
+    send_attacks(collector, 200, "")
 
     cs.graceful_restart()
     # A pre-install keep-alive connection can still use an old Apache worker
     # after a graceful restart.
     get_session(s.port).close()
-    send_attacks(collector, 500, "firewall has blocked", phase="after restarting with the reinstalled agent")
+    send_attacks(collector, 500, "firewall has blocked")
 
     collector.raise_if_failures()
 

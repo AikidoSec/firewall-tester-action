@@ -29,9 +29,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     collector.soft_assert_response_code_is(
         response, 500, "explicitly blocked domain evil.example.com should be blocked")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "The explicitly blocked domain should produce the outbound-block response",
-    )
+        response, "blocked an outbound connection")
 
     """ Bypassed IP address tests that should be allowed """
     response = s.post(
@@ -60,9 +58,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     collector.soft_assert_response_code_is(
         response, 500, "new domain should be blocked when blockNewOutgoingRequests is true")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "An unknown domain should produce the outbound-block response while new domains are blocked",
-    )
+        response, "blocked an outbound connection")
 
     """Test that hostname matching is case-insensitive"""
     # Test with uppercase hostname
@@ -70,18 +66,14 @@ def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     collector.soft_assert_response_code_is(
         response, 500, "uppercase hostname EVIL.EXAMPLE.COM should be blocked (case-insensitive matching)")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "The uppercase form of the blocked hostname should produce the same denial",
-    )
+        response, "blocked an outbound connection")
 
     # Test with mixed case
     response = s.post("/api/request", {"url": "http://Evil.Example.Com"})
     collector.soft_assert_response_code_is(
         response, 500, "mixed case hostname Evil.Example.Com should be blocked (case-insensitive matching)")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "The mixed-case form of the blocked hostname should produce the same denial",
-    )
+        response, "blocked an outbound connection")
 
     """Test Punycode bypass attempts - Unicode domain blocked, Punycode request"""
     # böse.example.com is blocked in config as Unicode
@@ -91,9 +83,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
     collector.soft_assert_response_code_is(
         response, 500, "Punycode request xn--bse-sna.example.com should be blocked when Unicode domain böse.example.com is in blocklist")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "The Punycode form should match the blocked Unicode hostname",
-    )
+        response, "blocked an outbound connection")
 
     """Test Unicode domain blocked - Unicode request"""
     # münchen.example.com is blocked in config as Unicode (core only accepts Unicode hostnames)
@@ -103,9 +93,7 @@ def test_explicitly_blocked_domain(collector, s: TestServer, heartbeats):
         response, 500, "Unicode request münchen.example.com should be blocked when Unicode domain is in blocklist")
     if "InvalidURIError" not in response.text:
         collector.soft_assert_response_body_contains(
-            response, "blocked an outbound connection",
-            "The Unicode hostname should produce the configured denial",
-        )
+            response, "blocked an outbound connection")
 
     """Test allowed IDN domains work with both Unicode and Punycode forms"""
     # münchen-allowed.example.com is allowed in config as Unicode
@@ -157,9 +145,7 @@ def test_new_domain_allowed_when_flag_disabled(collector, s: TestServer, c: Core
     collector.soft_assert_response_code_is(
         response, 500, "explicitly blocked domain evil.example.com should still be blocked even when blockNewOutgoingRequests is false")
     collector.soft_assert_response_body_contains(
-        response, "blocked an outbound connection",
-        "An explicitly blocked domain should still produce a denial when new domains are allowed",
-    )
+        response, "blocked an outbound connection")
 
 
 def test_detection_mode(collector, s: TestServer, c: CoreApi):

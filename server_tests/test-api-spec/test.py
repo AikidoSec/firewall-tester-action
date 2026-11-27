@@ -84,10 +84,7 @@ def check_reported_schema(s, c, expected_report, collector, heartbeats):
 
     for request in (get_api_spec_with_body(), get_api_spec_simple()):
         response = s.post(*request)
-        collector.soft_assert_response_code_is(
-            response, 200,
-            f"POST {request[0]} must succeed so its schema can contribute to the merged report",
-        )
+        collector.soft_assert_response_code_is(response, 200)
 
     heartbeats.wait_for_entries([expected_report])
 

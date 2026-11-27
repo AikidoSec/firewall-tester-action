@@ -403,10 +403,12 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     for result in ordered:
         if result["status"] == "FAIL":
             assertions = failed_assertions[result["test"]]
-            detail = f"{len(assertions)} assertion(s) failed" if assertions else "failure log"
+            detail = "failure log"
+            if assertions:
+                detail = "1 assertion" if len(assertions) == 1 else f"{len(assertions)} assertions"
             markdown.extend([
                 "<details>",
-                f"<summary>{escape(result['test'])} - {detail}</summary>",
+                f"<summary><strong>FAIL</strong> {escape(result['test'])} ({detail})</summary>",
                 "",
             ])
             if assertions:

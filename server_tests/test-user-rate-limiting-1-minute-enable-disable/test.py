@@ -36,10 +36,7 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(5):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(
-            response, 429,
-            f"Request {i + 1} is within the initial five-request limit for /test_ratelimiting_*",
-        )
+        collector.soft_assert_response_code_is_not(response, 429)
 
     # sleep for 10 seconds
     time.sleep(5)
@@ -47,32 +44,22 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}", headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is(
-            response, 429,
-            f"Request {i + 6} exceeds the initial five-request limit for /test_ratelimiting_*",
-        )
+        collector.soft_assert_response_code_is(response, 429)
 
-    for i in range(100):
+    for _ in range(100):
         response = s.get(
             "/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(
-            response, 429, f"GET /api/pets/ request {i + 1} is within its separate 100-request limit"
-        )
+        collector.soft_assert_response_code_is_not(response, 429)
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_code_is(
-        response, 429, "GET /api/pets/ request 101 exceeds this route's 100-request limit"
-    )
+    collector.soft_assert_response_code_is(response, 429)
 
     c.update_runtime_config_file("disable_rate_limit.json")
 
     for i in range(20):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(
-            response, 429,
-            f"Request {i + 1} to /test_ratelimiting_* should pass while rate limiting is disabled",
-        )
+        collector.soft_assert_response_code_is_not(response, 429)
 
     # enable rate limiting and update max requests to 10 (reset counter)
     c.update_runtime_config_file("enable_rate_limit.json")
@@ -80,19 +67,13 @@ def run_test(s: TestServer, c: CoreApi):
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is_not(
-            response, 429,
-            f"Request {i + 1} is within the new 10-request limit after re-enabling rate limiting",
-        )
+        collector.soft_assert_response_code_is_not(response, 429)
 
     time.sleep(5)
     for i in range(10):
         response = s.get(
             f"/test_ratelimiting_{get_random()}",  headers={"X-Forwarded-For": "2.16.53.5"})
-        collector.soft_assert_response_code_is(
-            response, 429,
-            f"Request {i + 11} exceeds the new 10-request limit after re-enabling rate limiting",
-        )
+        collector.soft_assert_response_code_is(response, 429)
 
     collector.raise_if_failures()
 

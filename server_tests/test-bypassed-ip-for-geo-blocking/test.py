@@ -17,9 +17,7 @@ def run_test(s: TestServer, c: CoreApi):
     collector = AssertionCollector()
 
     response = s.get("/api/pets/",  headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_code_is(
-        response, 200, "The bypass list should allow 2.16.53.5 despite the country block"
-    )
+    collector.soft_assert_response_code_is(response, 200)
     if response.status_code == 200:
         response_body = response.json()
         collector.soft_assert(isinstance(response_body, list),
@@ -28,20 +26,13 @@ def run_test(s: TestServer, c: CoreApi):
     c.update_runtime_config_file("change_config_remove_bypassed_ip.json")
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_body_contains(
-        response, "is blocked",
-        "Removing 2.16.53.5 from the bypass list should produce a country-block response",
-    )
-    collector.soft_assert_response_code_is(
-        response, 403, "The country block should apply after removing 2.16.53.5 from the bypass list"
-    )
+    collector.soft_assert_response_body_contains(response, "is blocked")
+    collector.soft_assert_response_code_is(response, 403)
 
     c.update_runtime_config_file("start_config.json")
 
     response = s.get("/api/pets/", headers={"X-Forwarded-For": "2.16.53.5"})
-    collector.soft_assert_response_code_is(
-        response, 200, "Restoring the bypass list should allow 2.16.53.5 again"
-    )
+    collector.soft_assert_response_code_is(response, 200)
     if response.status_code == 200:
         response_body = response.json()
         collector.soft_assert(isinstance(response_body, list),

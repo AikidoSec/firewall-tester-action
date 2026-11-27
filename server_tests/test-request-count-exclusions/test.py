@@ -31,10 +31,7 @@ def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     response = s.get("/")
     collector.soft_assert_response_code_is(response, 200, "GET / (counted)")
 
-    heartbeats.wait_for_counts(
-        "requests", "total", 2, since_startup=True,
-        reason="Only the startup request and GET / should count. The /api/create and /api/pets requests are excluded.",
-    )
+    heartbeats.wait_for_counts("requests", "total", 2, since_startup=True)
     discovered = {route["path"] for route in heartbeats.entries("routes", since_startup=True)}
     for path in ("/api/create", "/api/pets"):
         collector.soft_assert(

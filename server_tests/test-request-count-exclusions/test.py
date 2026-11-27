@@ -14,11 +14,8 @@ This test verifies that:
 """
 
 
-def run_test(s: TestServer, c: CoreApi):
-    collector = AssertionCollector()
-
-    start_heartbeat_events = c.get_events("heartbeat")
-
+@with_heartbeats
+def run_test(s: TestServer, c: CoreApi, collector, heartbeats):
     for _ in range(3):
         response = s.post("/api/create", {"name": "test2", "age": 34})
         collector.soft_assert_response_code_is(
@@ -34,39 +31,13 @@ def run_test(s: TestServer, c: CoreApi):
     response = s.get("/")
     collector.soft_assert_response_code_is(response, 200, "GET / (counted)")
 
-    traffic_finished_at = int(time.time() * 1000)
-    heartbeat, candidates = c.wait_for_heartbeat_after(
-        160, len(start_heartbeat_events), traffic_finished_at
-    )
-    all_heartbeat_events = c.get_events("heartbeat")
-    if not collector.soft_assert(
-        heartbeat is not None,
-        f"Expected a heartbeat produced after test traffic, got {len(candidates)} candidate heartbeat(s)",
-    ):
-        collector.raise_if_failures()
-        return
-
-    requests_total = sum(
-        event.get("stats", {}).get("requests", {}).get("total", 0)
-        for event in all_heartbeat_events
-    )
-    collector.soft_assert(
-        requests_total == 2,
-        f"Only the initial request and the control request to / should be counted, found {requests_total}",
-    )
-
-    discovered = {
-        route["path"]
-        for event in all_heartbeat_events
-        for route in event.get("routes", [])
-    }
+    heartbeats.wait_for_counts("requests", "total", 2, since_startup=True)
+    discovered = {route["path"] for route in heartbeats.entries("routes", since_startup=True)}
     for path in ("/api/create", "/api/pets"):
         collector.soft_assert(
             path in discovered,
             f"Excluded route {path} should still be discovered, found {sorted(discovered)}",
         )
-
-    collector.raise_if_failures()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,16 @@
+services:
+  test-request-count-exclusions:
+    profiles:
+      - policies
+    extends:
+      file: ../compose.templates.${COMPOSE_OS:?Set COMPOSE_OS}.yml
+      service: app-template
+    env_file:
+      - ./test.env
+    environment:
+      AIKIDO_TOKEN: AIK_RUNTIME_1_test-request-count-exclusions
+      DATABASE_NAME: test-request-count-exclusions
+      DATABASE_URL:
+        '${DATABASE_URL_PREFIX:?Set
+        DATABASE_URL_PREFIX}test-request-count-exclusions${DATABASE_URL_SUFFIX:?Set
+        DATABASE_URL_SUFFIX}'

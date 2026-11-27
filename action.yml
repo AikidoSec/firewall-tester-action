@@ -86,6 +86,7 @@ runs:
         RUN_TESTS: ${{ inputs.run_tests }}
         SKIP_TESTS: ${{ inputs.skip_tests }}
         TEST_NAME: ${{ inputs.test_name }}
+        TEST_SOURCE_REF: ${{ github.action_ref }}
         TEST_SUITE: ${{ inputs.test_suite }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-compose-tests.sh"
 

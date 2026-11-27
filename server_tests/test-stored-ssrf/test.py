@@ -50,11 +50,10 @@ def set_dns_mapping(ip: str, hostname: str):
     time.sleep(5)
 
 
-def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_events: int = 1):
+def check_ssrf_with_event(collector, s, c, response_code, expected_json, num_events: int = 1, *, message):
     start_events = c.get_events("detected_attack")
     response = s.post("/api/stored_ssrf", timeout=10)
-    collector.soft_assert_response_code_is(
-        response, response_code)
+    collector.soft_assert_response_code_is(response, response_code, message=message)
 
     c.wait_for_new_events(5, old_events_length=len(
         start_events), filter_type="detected_attack")
@@ -106,18 +105,18 @@ def run_test(s: TestServer, c: CoreApi):
     set_dns_mapping("169.254.169.254", "evil-stored-ssrf-hostname")
 
     check_ssrf_with_event(collector, s, c, 500,
-                          "expect_detection_blocked.json")
+                          "expect_detection_blocked.json", message="SSRF blocking initially enabled")
 
     # test with allowedIPAddresses, should not be blocked
     check_ssrf_bypassed_ip(collector, s, "93.184.216.34")
 
     c.update_runtime_config_file("change_config_disable_blocking.json")
     check_ssrf_with_event(collector, s, c,
-                          200, "expect_detection_not_blocked.json", num_events=0)
+                          200, "expect_detection_not_blocked.json", num_events=0, message="SSRF blocking disabled")
 
     c.update_runtime_config_file("start_config.json")
     check_ssrf_with_event(collector, s, c, 500,
-                          "expect_detection_blocked.json")
+                          "expect_detection_blocked.json", message="SSRF blocking re-enabled")
 
     IDMS_IPS_V4 = [
         "169.254.169.254",

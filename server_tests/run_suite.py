@@ -14,6 +14,7 @@ from psycopg import sql
 import requests
 
 from core_api import CoreApi
+from testlib import AssertionCollector, format_test_failure
 
 
 IS_WINDOWS = os.name == "nt"
@@ -235,6 +236,7 @@ def test_environment(test_name: str) -> dict[str, str]:
         {
             "PYTHONPATH": str(SERVER_TESTS),
             "PYTHONUNBUFFERED": "1",
+            "PYTHONIOENCODING": "utf-8",
             "TEST_SERVER_HOST": app_host,
             "TEST_CONTROL_SERVER_HOST": app_host,
             "TEST_CORE_HOST": os.environ.get("CORE_HOST", "core"),
@@ -336,6 +338,27 @@ def format_assertion(assertion: str, test_name: str) -> str:
     return text
 
 
+def read_assertions(log: str, test_name: str) -> list[str]:
+    prefix = f"{AssertionCollector.FAILURE_MARKER} "
+    messages = [line.removeprefix(prefix) for line in log.splitlines() if line.startswith(prefix)]
+    _, traceback_header, trace = log.rpartition("Traceback (most recent call last):\n")
+    if not traceback_header:
+        return messages
+
+    lines = []
+    trace_lines = iter(trace.splitlines())
+    for line in trace_lines:
+        frame = re.fullmatch(r'  File "(.+)", line (\d+)(?:, in .+)?', line)
+        if frame and frame[1].replace("\\", "/").split("/")[-2:] == [test_name, "test.py"]:
+            lines.append(int(frame[2]))
+        if line and not line[0].isspace():
+            exception, _, message = line.partition(": ")
+            if lines and exception == "AssertionError" and not next(trace_lines, "").startswith(prefix):
+                messages.append(format_test_failure(message or "Assertion failed", lines))
+            break
+    return messages
+
+
 def write_summary(results: list[dict], skipped: list[str]) -> None:
     ordered = sorted(results, key=lambda result: result["test"])
     passed = sum(result["status"] == "PASS" for result in ordered)
@@ -373,7 +396,7 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
         for result in ordered if result["status"] == "FAIL"
     }
     failed_assertions = {
-        test_name: [line[7:] for line in log.splitlines() if line.startswith("[FAIL] ")]
+        test_name: read_assertions(log, test_name)
         for test_name, log in failed_logs.items()
     }
     markdown = [
@@ -403,10 +426,12 @@ def write_summary(results: list[dict], skipped: list[str]) -> None:
     for result in ordered:
         if result["status"] == "FAIL":
             assertions = failed_assertions[result["test"]]
-            detail = f"{len(assertions)} assertion(s) failed" if assertions else "failure log"
+            detail = "failure log"
+            if assertions:
+                detail = "1 assertion" if len(assertions) == 1 else f"{len(assertions)} assertions"
             markdown.extend([
                 "<details>",
-                f"<summary>{escape(result['test'])} - {detail}</summary>",
+                f"<summary><strong>FAIL</strong> {escape(result['test'])} ({detail})</summary>",
                 "",
             ])
             if assertions:
@@ -445,7 +470,7 @@ def check_for_app_crashes() -> int:
         if test_name not in crashed:
             result["error"] = "; ".join(filter(None, [result["error"], "Application process crashed"]))
         with Path(result["log"]).open("a", encoding="utf-8") as output:
-            print(f"\n[FAIL] Application process crashed: {message.strip()}", file=output)
+            print(f"\n{AssertionCollector.FAILURE_MARKER} Application process crashed: {message.strip()}", file=output)
         crashed.add(test_name)
 
     write_summary(list(results.values()), summary["skipped_tests"])

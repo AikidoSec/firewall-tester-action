@@ -47,17 +47,29 @@ def run_test(s: TestServer, c: CoreApi):
             )
 
         agent = event["agent"]
-        assert headers["x-agent-library"] == agent["library"]
-        assert headers["x-agent-version"] == agent["version"]
-        assert headers["x-agent-hostname"] == agent["hostname"]
-        assert headers["x-agent-ip-address"] == agent["ipAddress"]
+        for header, field in (
+            ("x-agent-library", "library"),
+            ("x-agent-version", "version"),
+            ("x-agent-hostname", "hostname"),
+            ("x-agent-ip-address", "ipAddress"),
+        ):
+            assert headers[header] == agent[field], (
+                f"{event['type']} event sent {header}={headers[header]!r}, "
+                f"expected {agent[field]!r} from agent.{field}"
+            )
 
-    assert expected_headers["x-agent-platform"].lower() != "unknown"
-    assert expected_headers["x-agent-version"].lower() != "unknown"
+    for header in ("x-agent-platform", "x-agent-version"):
+        assert expected_headers[header].lower() != "unknown", (
+            f"The startup event must report a known value for {header}"
+        )
 
     session_id = uuid.UUID(expected_headers["x-agent-session-id"])
-    assert session_id.version in (4, 7)
-    assert session_id.variant == uuid.RFC_4122
+    assert session_id.version in (4, 7), (
+        f"Expected x-agent-session-id to use UUID version 4 or 7, got {session_id.version}"
+    )
+    assert session_id.variant == uuid.RFC_4122, (
+        f"Expected x-agent-session-id to use the RFC 4122 variant, got {session_id.variant}"
+    )
 
     agent_ip_address = expected_headers["x-agent-ip-address"]
     if agent_ip_address != "unknown":
